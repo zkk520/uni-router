@@ -188,23 +188,32 @@ func relayLogCleanup(ctx context.Context) error {
 
 // RelayLogList 查询日志列表，支持可选的时间范围过滤
 // startTime 和 endTime 为 nil 时表示不限制时间范围
+type RelayLogFilter struct {
+	StartTime  *int
+	EndTime    *int
+	APIKeyName string
+	RouterID   int
+	EndpointID int
+	Status     string
+}
+
 func RelayLogList(ctx context.Context, startTime, endTime *int, page, pageSize int) ([]model.RelayLog, error) {
+	return RelayLogListWithFilter(ctx, RelayLogFilter{StartTime: startTime, EndTime: endTime}, page, pageSize)
+}
+
+func RelayLogListWithFilter(ctx context.Context, filter RelayLogFilter, page, pageSize int) ([]model.RelayLog, error) {
 	enabled, err := SettingGetBool(model.SettingKeyRelayLogKeepEnabled)
 	if err != nil {
 		return nil, err
 	}
-	hasTimeFilter := startTime != nil && endTime != nil
+	hasTimeFilter := filter.StartTime != nil && filter.EndTime != nil
 
 	// 获取缓存中符合条件的日志
 	relayLogCacheLock.Lock()
 	var cachedLogs []model.RelayLog
-	for _, log := range relayLogCache {
-		if hasTimeFilter {
-			if log.Time >= int64(*startTime) && log.Time <= int64(*endTime) {
-				cachedLogs = append(cachedLogs, log)
-			}
-		} else {
-			cachedLogs = append(cachedLogs, log)
+	for _, item := range relayLogCache {
+		if relayLogMatchFilter(item, filter, hasTimeFilter) {
+			cachedLogs = append(cachedLogs, item)
 		}
 	}
 	relayLogCacheLock.Unlock()
@@ -239,7 +248,22 @@ func RelayLogList(ctx context.Context, startTime, endTime *int, page, pageSize i
 
 			query := db.GetDB().WithContext(ctx)
 			if hasTimeFilter {
-				query = query.Where("time >= ? AND time <= ?", *startTime, *endTime)
+				query = query.Where("time >= ? AND time <= ?", *filter.StartTime, *filter.EndTime)
+			}
+			if filter.APIKeyName != "" {
+				query = query.Where("request_api_key_name = ?", filter.APIKeyName)
+			}
+			if filter.RouterID > 0 {
+				query = query.Where("router_id = ?", filter.RouterID)
+			}
+			if filter.EndpointID > 0 {
+				query = query.Where("endpoint_id = ?", filter.EndpointID)
+			}
+			if filter.Status == "success" {
+				query = query.Where("error = ''")
+			}
+			if filter.Status == "failed" {
+				query = query.Where("error <> ''")
 			}
 
 			var dbLogs []model.RelayLog
@@ -251,6 +275,28 @@ func RelayLogList(ctx context.Context, startTime, endTime *int, page, pageSize i
 	}
 
 	return result, nil
+}
+
+func relayLogMatchFilter(item model.RelayLog, filter RelayLogFilter, hasTimeFilter bool) bool {
+	if hasTimeFilter && (item.Time < int64(*filter.StartTime) || item.Time > int64(*filter.EndTime)) {
+		return false
+	}
+	if filter.APIKeyName != "" && item.RequestAPIKeyName != filter.APIKeyName {
+		return false
+	}
+	if filter.RouterID > 0 && item.RouterID != filter.RouterID {
+		return false
+	}
+	if filter.EndpointID > 0 && item.EndpointID != filter.EndpointID {
+		return false
+	}
+	if filter.Status == "success" && item.Error != "" {
+		return false
+	}
+	if filter.Status == "failed" && item.Error == "" {
+		return false
+	}
+	return true
 }
 
 func RelayLogClear(ctx context.Context) error {

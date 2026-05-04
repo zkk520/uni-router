@@ -78,7 +78,7 @@ function RetryBadgeWithTooltip({ channelName, brandColor, attempts }: RetryBadge
                             </Badge>
                             <div className="flex min-w-0 flex-col flex-1">
                                 <span className="truncate text-xs font-semibold text-foreground">
-                                    {attempt.channel_name}
+                                    {attempt.endpoint_name || attempt.channel_name}
                                 </span>
                                 <span className="text-[10px] text-muted-foreground">
                                     {attempt.model_name} • {formatDuration(attempt.duration)}
@@ -397,7 +397,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                                                     >
                                                                         <div className="flex items-center gap-2">
                                                                             <span className="font-semibold text-foreground">
-                                                                                {attempt.channel_name}
+                                                                                {attempt.endpoint_name || attempt.channel_name}
                                                                             </span>
                                                                             <span className="text-muted-foreground">
                                                                                 ({attempt.model_name})

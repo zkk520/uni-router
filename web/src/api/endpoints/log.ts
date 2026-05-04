@@ -16,6 +16,8 @@ export interface ChannelAttempt {
     channel_id: number;
     channel_key_id?: number;
     channel_name: string;
+    endpoint_id?: number;
+    endpoint_name?: string;
     model_name: string;
     attempt_num: number;    // 第几次尝试
     status: AttemptStatus;
@@ -32,6 +34,10 @@ export interface RelayLog {
     time: number;                // 时间戳
     request_model_name: string;  // 请求模型名称
     request_api_key_name?: string; // 请求使用的 API Key 名称
+    router_id?: number;
+    router_name?: string;
+    endpoint_id?: number;
+    endpoint_name?: string;
     channel: number;             // 实际使用的渠道ID
     channel_name: string;        // 渠道名称
     actual_model_name: string;   // 实际使用模型名称

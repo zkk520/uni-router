@@ -41,6 +41,10 @@ func listLog(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	startTimeStr := c.Query("start_time")
 	endTimeStr := c.Query("end_time")
+	apiKeyName := c.Query("api_key_name")
+	routerID, _ := strconv.Atoi(c.Query("router_id"))
+	endpointID, _ := strconv.Atoi(c.Query("endpoint_id"))
+	status := c.Query("status")
 
 	if page < 1 {
 		page = 1
@@ -65,7 +69,14 @@ func listLog(c *gin.Context) {
 		endTime = &et
 	}
 
-	logs, err := op.RelayLogList(c.Request.Context(), startTime, endTime, page, pageSize)
+	logs, err := op.RelayLogListWithFilter(c.Request.Context(), op.RelayLogFilter{
+		StartTime:  startTime,
+		EndTime:    endTime,
+		APIKeyName: apiKeyName,
+		RouterID:   routerID,
+		EndpointID: endpointID,
+		Status:     status,
+	}, page, pageSize)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
