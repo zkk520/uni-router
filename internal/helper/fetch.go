@@ -1,9 +1,13 @@
 package helper
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/bestruirui/octopus/internal/model"
@@ -12,6 +16,13 @@ import (
 )
 
 func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
+	if request.GetBaseUrl() == "" {
+		return nil, fmt.Errorf("base url is required")
+	}
+	if request.GetChannelKey().ChannelKey == "" {
+		return nil, fmt.Errorf("api key is required")
+	}
+
 	client, err := ChannelHttpClient(&request)
 	if err != nil {
 		return nil, err
@@ -50,12 +61,19 @@ func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
 
 // refer: https://platform.openai.com/docs/api-reference/models/list
 func fetchOpenAIModels(client *http.Client, ctx context.Context, request model.Channel) ([]string, error) {
-	req, _ := http.NewRequestWithContext(
+	endpoint, err := appendURLPath(request.GetBaseUrl(), "models")
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
-		request.GetBaseUrl()+"/models",
+		endpoint,
 		nil,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create model list request: %w", err)
+	}
 	req.Header.Set("Authorization", "Bearer "+request.GetChannelKey().ChannelKey)
 	for _, header := range request.CustomHeader {
 		if header.HeaderKey != "" {
@@ -68,10 +86,14 @@ func fetchOpenAIModels(client *http.Client, ctx context.Context, request model.C
 		return nil, err
 	}
 	defer resp.Body.Close()
+	body, err := readSuccessBody(resp)
+	if err != nil {
+		return nil, err
+	}
 
 	var result model.OpenAIModelList
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
 
@@ -88,12 +110,19 @@ func fetchGeminiModels(client *http.Client, ctx context.Context, request model.C
 	pageToken := ""
 
 	for {
-		req, _ := http.NewRequestWithContext(
+		endpoint, err := appendURLPath(request.GetBaseUrl(), "models")
+		if err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequestWithContext(
 			ctx,
 			http.MethodGet,
-			request.GetBaseUrl()+"/models",
+			endpoint,
 			nil,
 		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create model list request: %w", err)
+		}
 		req.Header.Set("X-Goog-Api-Key", request.GetChannelKey().ChannelKey)
 		for _, header := range request.CustomHeader {
 			if header.HeaderKey != "" {
@@ -110,11 +139,24 @@ func fetchGeminiModels(client *http.Client, ctx context.Context, request model.C
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
+		body, err := readSuccessBody(resp)
+		closeErr := resp.Body.Close()
+		if err != nil {
+			if fallbackModels, fallbackErr := fetchOpenAIModels(client, ctx, request); fallbackErr == nil {
+				return fallbackModels, nil
+			}
+			return nil, err
+		}
+		if closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 
 		var result model.GeminiModelList
 
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := json.Unmarshal(body, &result); err != nil {
+			if fallbackModels, fallbackErr := fetchOpenAIModels(client, ctx, request); fallbackErr == nil {
+				return fallbackModels, nil
+			}
 			return nil, err
 		}
 
@@ -140,13 +182,20 @@ func fetchAnthropicModels(client *http.Client, ctx context.Context, request mode
 	var allModels []string
 	var afterID string
 	for {
+		endpoint, err := appendURLPath(request.GetBaseUrl(), "models")
+		if err != nil {
+			return nil, err
+		}
 
-		req, _ := http.NewRequestWithContext(
+		req, err := http.NewRequestWithContext(
 			ctx,
 			http.MethodGet,
-			request.GetBaseUrl()+"/models",
+			endpoint,
 			nil,
 		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create model list request: %w", err)
+		}
 		req.Header.Set("X-Api-Key", request.GetChannelKey().ChannelKey)
 		req.Header.Set("Anthropic-Version", "2023-06-01")
 		for _, header := range request.CustomHeader {
@@ -166,11 +215,24 @@ func fetchAnthropicModels(client *http.Client, ctx context.Context, request mode
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
+		body, err := readSuccessBody(resp)
+		closeErr := resp.Body.Close()
+		if err != nil {
+			if fallbackModels, fallbackErr := fetchOpenAIModels(client, ctx, request); fallbackErr == nil {
+				return fallbackModels, nil
+			}
+			return nil, err
+		}
+		if closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 
 		var result model.AnthropicModelList
 
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := json.Unmarshal(body, &result); err != nil {
+			if fallbackModels, fallbackErr := fetchOpenAIModels(client, ctx, request); fallbackErr == nil {
+				return fallbackModels, nil
+			}
 			return nil, err
 		}
 
@@ -188,4 +250,73 @@ func fetchAnthropicModels(client *http.Client, ctx context.Context, request mode
 		return fetchOpenAIModels(client, ctx, request)
 	}
 	return allModels, nil
+}
+
+func appendURLPath(baseURL string, elems ...string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse base url: %w", err)
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("invalid base url: %s", baseURL)
+	}
+
+	basePath := strings.TrimRight(parsed.Path, "/")
+	for _, elem := range elems {
+		trimmed := strings.Trim(elem, "/")
+		if trimmed == "" {
+			continue
+		}
+		basePath += "/" + trimmed
+	}
+	parsed.Path = basePath
+	return parsed.String(), nil
+}
+
+func readSuccessBody(resp *http.Response) ([]byte, error) {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return body, nil
+	}
+
+	message := extractErrorMessage(body)
+	if message == "" {
+		message = strings.TrimSpace(string(body))
+	}
+	if message == "" {
+		message = resp.Status
+	}
+	return nil, fmt.Errorf("upstream returned HTTP %d: %s", resp.StatusCode, message)
+}
+
+func extractErrorMessage(body []byte) string {
+	body = bytes.TrimSpace(body)
+	if len(body) == 0 || !json.Valid(body) {
+		return ""
+	}
+
+	var payload struct {
+		Error   any    `json:"error"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return ""
+	}
+
+	switch errPayload := payload.Error.(type) {
+	case string:
+		return errPayload
+	case map[string]any:
+		if msg, ok := errPayload["message"].(string); ok {
+			return msg
+		}
+		if msg, ok := errPayload["error"].(string); ok {
+			return msg
+		}
+	}
+
+	return payload.Message
 }

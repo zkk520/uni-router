@@ -363,3 +363,20 @@ export function useSyncChannel() {
         },
     });
 }
+
+export function useTestChannel() {
+    return useMutation({
+        mutationFn: async (channel: Channel) => {
+            const firstKey = channel.keys.find((key) => key.enabled && key.channel_key);
+            return apiClient.post<string[]>('/api/v1/channel/fetch-model', {
+                type: channel.type,
+                base_urls: channel.base_urls,
+                keys: firstKey ? [{ enabled: true, channel_key: firstKey.channel_key }] : [],
+                proxy: channel.proxy,
+                channel_proxy: channel.channel_proxy ?? null,
+                match_regex: channel.match_regex ?? null,
+                custom_header: channel.custom_header ?? [],
+            } satisfies FetchModelRequest);
+        },
+    });
+}
