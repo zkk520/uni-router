@@ -1,7 +1,7 @@
 import type { ApiError } from './types';
 import { HttpStatus } from './types';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '.';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '.');
 
 /**
  * 获取认证 Store（延迟导入以避免循环依赖）
@@ -16,7 +16,7 @@ export function setAuthStoreGetter(getter: () => { token: string | null; logout:
  * 全局错误处理
  */
 const handleError = (error: ApiError) => {
-    console.error('API Error:', error);
+    console.warn('API Error:', error);
 
     // 401 未授权，调用 store 的 logout
     if (error.code === HttpStatus.UNAUTHORIZED) {
@@ -50,7 +50,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
         };
 
         handleError(error);
-        throw error;
+        throw Object.assign(new Error(error.message), error);
     }
 
     // 如果是标准的 ApiResponse 格式，返回 data 字段

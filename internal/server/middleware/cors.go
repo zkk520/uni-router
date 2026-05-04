@@ -3,6 +3,7 @@ package middleware
 import (
 	"strings"
 
+	"github.com/bestruirui/octopus/internal/conf"
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/gin-contrib/cors"
@@ -26,7 +27,7 @@ func Cors() gin.HandlerFunc {
 		}
 		allowed = strings.TrimSpace(allowed)
 		if allowed == "" {
-			return false
+			return conf.IsDebug() && isLocalDevOrigin(origin)
 		}
 		if allowed == "*" {
 			return true
@@ -58,4 +59,22 @@ func Cors() gin.HandlerFunc {
 		return false
 	}
 	return cors.New(config)
+}
+
+func isLocalDevOrigin(origin string) bool {
+	origin = strings.TrimSpace(origin)
+	origin = strings.TrimRight(origin, "/")
+	switch origin {
+	case "http://localhost:3000",
+		"http://127.0.0.1:3000",
+		"http://localhost:3001",
+		"http://127.0.0.1:3001",
+		"https://localhost:3000",
+		"https://127.0.0.1:3000",
+		"https://localhost:3001",
+		"https://127.0.0.1:3001":
+		return true
+	default:
+		return false
+	}
 }

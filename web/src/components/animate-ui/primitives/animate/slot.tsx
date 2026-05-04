@@ -63,6 +63,7 @@ function Slot<T extends HTMLElement = HTMLElement>({
   ref,
   ...props
 }: SlotProps<T>) {
+  /* eslint-disable react-hooks/static-components */
   const isAlreadyMotion =
     typeof children.type === 'object' &&
     children.type !== null &&
@@ -85,6 +86,7 @@ function Slot<T extends HTMLElement = HTMLElement>({
   return (
     <Base {...mergedProps} ref={mergeRefs(childRef as React.Ref<T>, ref)} />
   );
+  /* eslint-enable react-hooks/static-components */
 }
 
 export {

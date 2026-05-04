@@ -105,7 +105,9 @@ export function GroupCard({ group }: { group: Group }) {
     );
 
     useEffect(() => {
-        if (!isDragging.current) setMembers([...displayMembers]);
+        if (isDragging.current) return;
+        const timer = setTimeout(() => setMembers([...displayMembers]), 0);
+        return () => clearTimeout(timer);
     }, [displayMembers]);
 
     useEffect(() => {
