@@ -59,6 +59,7 @@ func APIKeyGetByAPIKey(apiKey string, ctx context.Context) (model.APIKey, error)
 }
 
 func APIKeyDelete(id int, ctx context.Context) error {
+	existing, _ := apiKeyCache.Get(id)
 	k := model.APIKey{
 		ID: id,
 	}
@@ -73,8 +74,22 @@ func APIKeyDelete(id int, ctx context.Context) error {
 		return fmt.Errorf("failed to delete API key: %w", result.Error)
 	}
 	apiKeyCache.Del(k.ID)
-	apiKeyIDMap.Del(k.APIKey)
+	apiKeyIDMap.Del(existing.APIKey)
 	return nil
+}
+
+func APIKeyCountByRouter(routerID int, ctx context.Context) int {
+	count := int64(0)
+	if routerID <= 0 {
+		return 0
+	}
+	if err := db.GetDB().WithContext(ctx).
+		Model(&model.APIKey{}).
+		Where("router_id = ?", routerID).
+		Count(&count).Error; err != nil {
+		return 0
+	}
+	return int(count)
 }
 
 func apiKeyRefreshCache(ctx context.Context) error {

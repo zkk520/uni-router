@@ -40,6 +40,11 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 
 	requestModel := internalRequest.Model
 	apiKeyID := c.GetInt("api_key_id")
+	apiKey, apiKeyErr := op.APIKeyGet(apiKeyID, c.Request.Context())
+	if apiKeyErr == nil && apiKey.RouterID > 0 {
+		handleRoute(internalRequest, inAdapter, apiKeyID, requestModel, apiKey.RouterID, c)
+		return
+	}
 
 	// 获取通道分组
 	group, err := op.GroupGetEnabledMap(requestModel, c.Request.Context())
@@ -271,7 +276,7 @@ func (ra *relayAttempt) forward() (int, error) {
 		if err != nil {
 			return 0, fmt.Errorf("failed to read response body: %w", err)
 		}
-		return 0, fmt.Errorf("upstream error: %d: %s", response.StatusCode, string(body))
+		return response.StatusCode, fmt.Errorf("upstream error: %d: %s", response.StatusCode, string(body))
 	}
 
 	// 处理响应

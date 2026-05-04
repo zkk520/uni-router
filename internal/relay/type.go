@@ -61,6 +61,12 @@ type relayRequest struct {
 	apiKeyID        int
 	requestModel    string
 	iter            *balancer.Iterator
+	routeAttempts   []dbmodel.ChannelAttempt
+	routeAttemptNum int
+	routerID        int
+	routerName      string
+	endpointID      int
+	endpointName    string
 }
 
 // relayAttempt 尝试级上下文

@@ -15,6 +15,8 @@ type ChannelAttempt struct {
 	ChannelID    int           `json:"channel_id"`
 	ChannelKeyID int           `json:"channel_key_id,omitempty"`
 	ChannelName  string        `json:"channel_name"`
+	EndpointID   int           `json:"endpoint_id,omitempty"`
+	EndpointName string        `json:"endpoint_name,omitempty"`
 	ModelName    string        `json:"model_name"`
 	AttemptNum   int           `json:"attempt_num"`
 	Status       AttemptStatus `json:"status"`
@@ -28,6 +30,10 @@ type RelayLog struct {
 	Time              int64            `json:"time"`                                     // 时间戳（秒）
 	RequestModelName  string           `json:"request_model_name"`                       // 请求模型名称
 	RequestAPIKeyName string           `json:"request_api_key_name"`                     // 请求使用的 API Key 名称
+	RouterID          int              `json:"router_id,omitempty"`                      // Router ID
+	RouterName        string           `json:"router_name,omitempty"`                    // Router 名称
+	EndpointID        int              `json:"endpoint_id,omitempty"`                    // 实际使用端点 ID
+	EndpointName      string           `json:"endpoint_name,omitempty"`                  // 实际使用端点名称
 	ChannelId         int              `json:"channel"`                                  // 实际使用的渠道ID
 	ChannelName       string           `json:"channel_name"`                             // 渠道名称
 	ActualModelName   string           `json:"actual_model_name"`                        // 实际使用模型名称

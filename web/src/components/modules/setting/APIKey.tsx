@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { KeyRound, Plus, Loader, Trash2, Check, X, Info, CalendarDays, Pencil, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -24,6 +24,7 @@ import {
     type APIKey,
 } from '@/api/endpoints/apikey';
 import { useGroupList } from '@/api/endpoints/group';
+import { useRouterList } from '@/api/endpoints/router';
 import { useStatsAPIKey } from '@/api/endpoints/stats';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/common/Toast';
@@ -82,6 +83,7 @@ interface APIKeyFormProps {
 function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKeyFormProps) {
     const t = useTranslations('setting');
     const { data: groups = [] } = useGroupList();
+    const { data: routers = [] } = useRouterList();
 
     const [form, setForm] = useState<Omit<APIKey, 'id' | 'api_key'>>(() => ({
         name: apiKey?.name ?? '',
@@ -89,6 +91,7 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
         expire_at: apiKey?.expire_at,
         max_cost: apiKey?.max_cost,
         supported_models: apiKey?.supported_models,
+        router_id: apiKey?.router_id,
     }));
     const [maxCostInput, setMaxCostInput] = useState(() =>
         apiKey?.max_cost != null ? String(apiKey.max_cost) : ''
@@ -312,6 +315,23 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
                 <div className="text-[11px] text-muted-foreground/80">{t('apiKey.form.modelsHint')}</div>
             </div>
 
+            <div className="grid gap-1 text-xs text-muted-foreground">
+                Router
+                <select
+                    value={form.router_id ?? 0}
+                    onChange={(e) => updateForm({ router_id: Number(e.target.value) || undefined })}
+                    disabled={isPending}
+                    className="h-9 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+                >
+                    <option value={0}>Use legacy Group routing</option>
+                    {routers.map((router) => (
+                        <option key={router.id} value={router.id}>
+                            {router.name}
+                        </option>
+                    ))}
+                </select>
+            </div>
+
             <div className="flex items-center justify-between pt-1">
                 <span className="text-xs text-muted-foreground">{t('apiKey.form.enabled')}</span>
                 <Switch
@@ -491,7 +511,12 @@ function APIKeyKeyItem({
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             className="group relative flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/50 overflow-hidden origin-top"
         >
-            <span className="text-sm font-medium truncate">{apiKey.name}</span>
+            <span className="text-sm font-medium truncate">
+                {apiKey.name}
+                {apiKey.router_id ? (
+                    <span className="ml-2 text-xs text-muted-foreground">Router #{apiKey.router_id}</span>
+                ) : null}
+            </span>
 
             <div className="flex items-center gap-1.5">
                 <motion.button

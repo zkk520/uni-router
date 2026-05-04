@@ -30,6 +30,10 @@ type RelayMetrics struct {
 	// 统计指标
 	ActualModel string
 	Stats       model.StatsMetrics
+	RouterID    int
+	RouterName  string
+	EndpointID  int
+	EndpointName string
 }
 
 func NewRelayMetrics(apiKeyID int, requestModel string, req *transformerModel.InternalLLMRequest) *RelayMetrics {
@@ -133,6 +137,10 @@ func (m *RelayMetrics) saveLog(ctx context.Context, err error, duration time.Dur
 	relayLog := model.RelayLog{
 		Time:             m.StartTime.Unix(),
 		RequestModelName: m.RequestModel,
+		RouterID:         m.RouterID,
+		RouterName:       m.RouterName,
+		EndpointID:       m.EndpointID,
+		EndpointName:     m.EndpointName,
 		ChannelName:      channelName,
 		ChannelId:        channelID,
 		ActualModelName:  actualModel,
