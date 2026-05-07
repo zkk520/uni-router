@@ -30,12 +30,18 @@ function statusClass(status: string) {
     return 'bg-muted-foreground';
 }
 
+function routeModeLabel(mode: RouteMode) {
+    if (mode === 'manual') return '手动';
+    if (mode === 'weighted') return '加权';
+    return mode;
+}
+
 function endpointLabel(endpoint: RouteEndpoint, options: RouteOptionChannel[]) {
     const channel = options.find((item) => item.id === endpoint.channel_id);
     const key = channel?.keys.find((item) => item.id === endpoint.channel_key_id);
     return {
-        channelName: channel?.name ?? `Channel #${endpoint.channel_id}`,
-        keyName: key?.remark || key?.masked_key || `Key #${endpoint.channel_key_id}`,
+        channelName: channel?.name ?? `渠道 #${endpoint.channel_id}`,
+        keyName: key?.remark || key?.masked_key || `密钥 #${endpoint.channel_key_id}`,
         keyEnabled: key?.enabled ?? false,
     };
 }
@@ -93,7 +99,7 @@ function AddEndpointForm({
                 >
                     {keys.map((item) => (
                         <option key={item.id} value={item.id}>
-                            {item.remark || 'No remark'} ({item.masked_key})
+                            {item.remark || '无备注'} ({item.masked_key})
                         </option>
                     ))}
                 </select>
@@ -101,12 +107,12 @@ function AddEndpointForm({
             <Input
                 value={mapping}
                 onChange={(e) => setMapping(e.target.value)}
-                placeholder='Optional model mapping JSON, e.g. {"claude":"provider/claude"}'
+                placeholder='可选模型映射 JSON，例如 {"claude":"provider/claude"}'
                 className="rounded-xl"
             />
             <Button type="button" onClick={submit} disabled={!channel || !selectedKey} className="rounded-xl">
                 <Plus className="size-4 mr-2" />
-                Add endpoint
+                添加端点
             </Button>
         </div>
     );
@@ -131,8 +137,8 @@ function RouterDetail({ routerId }: { routerId: number }) {
 
     const update = (patch: Partial<RouteProfile>) => {
         updateRouter.mutate({ id: router.id, ...patch }, {
-            onSuccess: () => toast.success('Router saved'),
-            onError: (error) => toast.error('Router save failed', { description: String(error) }),
+            onSuccess: () => toast.success('路由已保存'),
+            onError: (error) => toast.error('路由保存失败', { description: String(error) }),
         });
     };
 
@@ -161,7 +167,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
         updateRouter.mutate({
             id: router.id,
             endpoints_to_add: [{ ...endpoint, priority: maxPriority + 1 }],
-        }, { onSuccess: () => toast.success('Endpoint added') });
+        }, { onSuccess: () => toast.success('端点已添加') });
     };
 
     return (
@@ -178,12 +184,12 @@ function RouterDetail({ routerId }: { routerId: number }) {
                         onChange={(e) => update({ mode: e.target.value as RouteMode })}
                         className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
                     >
-                        <option value="manual">Manual</option>
-                        <option value="weighted">Weighted</option>
+                        <option value="manual">手动</option>
+                        <option value="weighted">加权</option>
                     </select>
                     <label className="flex items-center gap-2 text-sm">
                         <Switch checked={router.failover_enabled} onCheckedChange={(checked) => update({ failover_enabled: checked })} />
-                        Failover
+                        故障转移
                     </label>
                 </div>
             </div>
@@ -193,7 +199,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
             <div className="min-h-0 flex-1 overflow-auto space-y-3 pr-1">
                 {endpoints.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                        Add endpoints to make this router usable.
+                        添加端点后此路由才能使用。
                     </div>
                 ) : endpoints.map((endpoint) => {
                     const label = endpointLabel(endpoint, options);
@@ -219,29 +225,29 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                             onChange={(e) => updateEndpoint(endpoint, { name: e.target.value })}
                                             className="h-8 max-w-[360px] rounded-lg border-0 bg-transparent px-1 font-semibold shadow-none"
                                         />
-                                        {current ? <Badge>Current</Badge> : null}
+                                        {current ? <Badge>当前</Badge> : null}
                                     </div>
                                     <div className="mt-1 text-xs text-muted-foreground">
                                         {label.channelName} / {label.keyName}
-                                        {invalid ? <span className="ml-2 text-destructive">Upstream key invalid</span> : null}
+                                        {invalid ? <span className="ml-2 text-destructive">上游密钥无效</span> : null}
                                     </div>
                                     {endpoint.last_error ? (
                                         <div className="mt-2 text-xs text-destructive line-clamp-2">{endpoint.last_error}</div>
                                     ) : null}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Button variant="secondary" size="sm" onClick={() => reorder(endpoint, -1)}>Up</Button>
-                                    <Button variant="secondary" size="sm" onClick={() => reorder(endpoint, 1)}>Down</Button>
+                                    <Button variant="secondary" size="sm" onClick={() => reorder(endpoint, -1)}>上移</Button>
+                                    <Button variant="secondary" size="sm" onClick={() => reorder(endpoint, 1)}>下移</Button>
                                     <Button
                                         variant={current ? 'secondary' : 'default'}
                                         size="sm"
                                         disabled={current || invalid || endpoint.status === 'error'}
                                         onClick={() => switchEndpoint.mutate({ router_id: router.id, endpoint_id: endpoint.id }, {
-                                            onSuccess: () => toast.success(`Switched to ${endpoint.name}`),
+                                            onSuccess: () => toast.success(`已切换到 ${endpoint.name}`),
                                         })}
                                     >
                                         <Check className="size-4 mr-1" />
-                                        {current ? 'Using' : 'Switch'}
+                                        {current ? '使用中' : '切换'}
                                     </Button>
                                     <Button variant="secondary" size="sm" onClick={() => testEndpoint.mutate(endpoint.id)}>
                                         <TestTube2 className="size-4" />
@@ -257,7 +263,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
                             </div>
                             <div className="mt-3 grid gap-3 md:grid-cols-3">
                                 <label className="text-xs text-muted-foreground">
-                                    Priority
+                                    优先级
                                     <Input
                                         type="number"
                                         value={endpoint.priority}
@@ -266,7 +272,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                     />
                                 </label>
                                 <label className="text-xs text-muted-foreground">
-                                    Weight {router.mode === 'weighted' ? `(${percent}%)` : ''}
+                                    权重 {router.mode === 'weighted' ? `(${percent}%)` : ''}
                                     <Input
                                         type="number"
                                         value={endpoint.weight}
@@ -276,7 +282,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                 </label>
                                 <label className="flex items-center gap-2 pt-5 text-sm">
                                     <Switch checked={endpoint.enabled} onCheckedChange={(checked) => updateEndpoint(endpoint, { enabled: checked })} />
-                                    Enabled
+                                    启用
                                 </label>
                             </div>
                         </div>
@@ -297,15 +303,15 @@ export function Router() {
 
     const create = () => {
         createRouter.mutate({
-            name: `Router ${routers.length + 1}`,
+            name: `路由 ${routers.length + 1}`,
             mode: 'manual',
             failover_enabled: true,
         }, {
             onSuccess: (router) => {
-                toast.success('Router created');
+                toast.success('路由已创建');
                 setSelectedId(router.id);
             },
-            onError: (error) => toast.error('Create router failed', { description: String(error) }),
+            onError: (error) => toast.error('创建路由失败', { description: String(error) }),
         });
     };
 
@@ -315,7 +321,7 @@ export function Router() {
                 <div className="mb-3 flex items-center justify-between">
                     <h2 className="flex items-center gap-2 text-lg font-bold">
                         <Cable className="size-5" />
-                        Router
+                        路由
                     </h2>
                     <Button size="sm" onClick={create} disabled={createRouter.isPending}>
                         <Plus className="size-4" />
@@ -326,10 +332,10 @@ export function Router() {
                         <div className="flex justify-center p-6"><Loader2 className="size-5 animate-spin" /></div>
                     ) : error ? (
                         <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                            Failed to load routers: {String(error)}
+                            路由加载失败：{String(error)}
                         </div>
                     ) : routers.length === 0 ? (
-                        <div className="p-6 text-center text-sm text-muted-foreground">No routers yet.</div>
+                        <div className="p-6 text-center text-sm text-muted-foreground">暂无路由。</div>
                     ) : routers.map((router) => (
                         <div
                             key={router.id}
@@ -349,10 +355,10 @@ export function Router() {
                         >
                             <div className="flex items-center justify-between gap-2">
                                 <span className="truncate text-sm font-semibold">{router.name}</span>
-                                <Badge variant="outline">{router.mode}</Badge>
+                                <Badge variant="outline">{routeModeLabel(router.mode)}</Badge>
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                                {router.endpoints?.length ?? 0} endpoints / {router.bound_api_key_count ?? 0} keys
+                                {router.endpoints?.length ?? 0} 个端点 / {router.bound_api_key_count ?? 0} 个密钥
                             </div>
                             <div className="mt-2 flex justify-end">
                                 <button
@@ -360,7 +366,7 @@ export function Router() {
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         deleteRouter.mutate(router.id, {
-                                            onError: (error) => toast.error('Delete failed', { description: String(error) }),
+                                            onError: (error) => toast.error('删除失败', { description: String(error) }),
                                         });
                                     }}
                                     className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
@@ -374,7 +380,7 @@ export function Router() {
             </div>
             <div className="min-h-0 rounded-2xl border border-border bg-background p-4">
                 {selected ? <RouterDetail routerId={selected} /> : (
-                    <div className="flex h-full items-center justify-center text-muted-foreground">Create a router to start.</div>
+                    <div className="flex h-full items-center justify-center text-muted-foreground">创建一个路由后开始使用。</div>
                 )}
             </div>
         </div>

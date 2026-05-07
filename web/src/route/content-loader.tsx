@@ -8,7 +8,7 @@ export function ContentLoader({ activeRoute }: { activeRoute: string }) {
     if (!Component) {
         return (
             <div className="flex items-center justify-center h-64">
-                <p className="text-muted-foreground">Route not found: {activeRoute}</p>
+                <p className="text-muted-foreground">未找到路由：{activeRoute}</p>
             </div>
         );
     }
