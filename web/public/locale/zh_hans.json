@@ -45,7 +45,7 @@
     },
     "navbar": {
         "home": "主页",
-        "channel": "渠道",
+        "channel": "供应商",
         "group": "分组",
         "router": "路由",
         "key": "密钥",
@@ -69,7 +69,7 @@
             "filter": {
                 "title": "筛选",
                 "channel": {
-                    "all": "全部渠道",
+                    "all": "全部供应商",
                     "enabled": "仅启用",
                     "disabled": "仅禁用"
                 },
@@ -183,7 +183,7 @@
                 "label": "最大冷却时间（秒）",
                 "placeholder": "请输入最大冷却时间"
             },
-            "hint": "当渠道连续失败达到阈值后触发熔断，冷却时间按指数退避增长，上限为最大冷却时间"
+            "hint": "当供应商连续失败达到阈值后触发熔断，冷却时间按指数退避增长，上限为最大冷却时间"
         },
         "saved": "已保存",
         "backup": {
@@ -264,20 +264,20 @@
             "updateFailed": "价格更新失败"
         },
         "llmSync": {
-            "title": "渠道同步",
+            "title": "供应商同步",
             "syncInterval": {
                 "label": "自动同步间隔（小时）",
                 "placeholder": "请输入间隔（小时）"
             },
             "manualSync": {
-                "label": "手动同步渠道",
+                "label": "手动同步供应商",
                 "button": "立即同步",
                 "syncing": "同步中..."
             },
             "lastSync": "上次同步",
             "neverSynced": "从未同步",
-            "syncSuccess": "渠道同步成功",
-            "syncFailed": "渠道同步失败"
+            "syncSuccess": "供应商同步成功",
+            "syncFailed": "供应商同步失败"
         },
         "account": {
             "title": "账户设置",
@@ -375,12 +375,12 @@
             "firstTokenTimeOut": "首字超时",
             "firstTokenTimeOutHint": "单位秒，仅流式响应起效，0 表示不限制",
             "sessionKeepTime": "会话保持",
-            "sessionKeepTimeHint": "单位秒，会话期间保持使用同一渠道，0 表示禁用",
+            "sessionKeepTimeHint": "单位秒，会话期间保持使用同一供应商，0 表示禁用",
             "items": "已选模型",
             "addItem": "添加模型",
             "autoAdd": "自动添加",
             "clear": "清空",
-            "selectChannel": "渠道",
+            "selectChannel": "供应商",
             "selectModel": "模型"
         },
         "mode": {
@@ -454,14 +454,14 @@
             "requestCount": "请求次数",
             "totalCost": "总成本",
             "toast": {
-                "enabled": "渠道已启用",
-                "disabled": "渠道已禁用"
+                "enabled": "供应商已启用",
+                "disabled": "供应商已禁用"
             }
         },
         "detail": {
             "title": {
-                "edit": "编辑渠道",
-                "view": "渠道详情"
+                "edit": "编辑供应商",
+                "view": "供应商详情"
             },
             "sections": {
                 "requests": "请求详情",
@@ -495,14 +495,14 @@
             }
         },
         "create": {
-            "dialogTitle": "创建新渠道",
-            "submit": "创建渠道",
+            "dialogTitle": "添加供应商",
+            "submit": "添加供应商",
             "submitting": "创建中..."
         },
         "form": {
             "add": "添加",
-            "name": "渠道名称",
-            "type": "渠道类型",
+            "name": "供应商名称",
+            "type": "供应商类型",
             "baseUrls": "Base URLs",
             "baseUrlUrl": "地址",
             "baseUrlDelay": "延迟(ms)",
@@ -512,8 +512,8 @@
             "customHeaderKey": "Header Key",
             "customHeaderValue": "Header Value",
             "customHeaderAdd": "添加 Header",
-            "channelProxy": "渠道代理",
-            "channelProxyPlaceholder": "可选：仅对该渠道生效（覆盖全局代理）",
+            "channelProxy": "供应商代理",
+            "channelProxyPlaceholder": "可选：仅对该供应商生效（覆盖全局代理）",
             "paramOverride": "参数覆盖",
             "paramOverridePlaceholder": "可选：JSON 字符串，用于覆盖请求参数",
             "model": "模型",

@@ -49,7 +49,7 @@
       "sizes": "1437x918",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "渠道管理"
+      "label": "供应商管理"
     },
     {
       "src": "./screenshot/mobile-home.png",
@@ -63,13 +63,13 @@
       "sizes": "1290x2796",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "移动端渠道"
+      "label": "移动端供应商"
     }
   ],
   "shortcuts": [
     {
-      "name": "渠道管理",
-      "short_name": "渠道",
+      "name": "供应商管理",
+      "short_name": "供应商",
       "url": "./",
       "icons": [
         {

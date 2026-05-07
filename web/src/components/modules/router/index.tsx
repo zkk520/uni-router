@@ -40,7 +40,7 @@ function endpointLabel(endpoint: RouteEndpoint, options: RouteOptionChannel[]) {
     const channel = options.find((item) => item.id === endpoint.channel_id);
     const key = channel?.keys.find((item) => item.id === endpoint.channel_key_id);
     return {
-        channelName: channel?.name ?? `渠道 #${endpoint.channel_id}`,
+        channelName: channel?.name ?? `供应商 #${endpoint.channel_id}`,
         keyName: key?.remark || key?.masked_key || `密钥 #${endpoint.channel_key_id}`,
         keyEnabled: key?.enabled ?? false,
     };
