@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 export type AttemptStatus = 'success' | 'failed' | 'circuit_break' | 'skipped';
 
 /**
- * 单次渠道尝试信息
+ * 单次供应商尝试信息
  */
 export interface ChannelAttempt {
     channel_id: number;
@@ -38,8 +38,8 @@ export interface RelayLog {
     router_name?: string;
     endpoint_id?: number;
     endpoint_name?: string;
-    channel: number;             // 实际使用的渠道ID
-    channel_name: string;        // 渠道名称
+    channel: number;             // 实际使用的供应商 ID
+    channel_name: string;        // 供应商名称
     actual_model_name: string;   // 实际使用模型名称
     input_tokens: number;        // 输入Token
     output_tokens: number;       // 输出Token

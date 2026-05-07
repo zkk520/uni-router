@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 import { formatCount, formatMoney, formatTime } from '@/lib/utils';
 import { StatsChannel, type StatsMetricsFormatted } from './stats';
 /**
- * 渠道类型枚举
+ * 供应商类型枚举
  */
 export enum ChannelType {
     OpenAIChat = 0,
@@ -47,7 +47,7 @@ export type ChannelKey = {
 };
 
 /**
- * 渠道完整数据（与后端 model.Channel 对齐；数组字段在前端保证为 []）
+ * 供应商完整数据（与后端 model.Channel 对齐；数组字段在前端保证为 []）
  */
 export type Channel = {
     id: number;
@@ -76,7 +76,7 @@ type ChannelServer = Omit<Channel, 'base_urls' | 'custom_header' | 'keys'> & {
 };
 
 /**
- * 创建渠道请求：必填字段 + 可选字段
+ * 创建供应商请求：必填字段 + 可选字段
  */
 export type CreateChannelRequest = {
     name: string;
@@ -96,7 +96,7 @@ export type CreateChannelRequest = {
 };
 
 /**
- * 更新渠道请求：id + 可选字段 + keys diff
+ * 更新供应商请求：id + 可选字段 + keys diff
  */
 export type UpdateChannelRequest = {
     id: number;
@@ -130,7 +130,7 @@ export type FetchModelRequest = {
 };
 
 /**
- * 获取渠道列表 Hook
+ * 获取供应商列表 Hook
  * 
  * @example
  * const { data: channels, isLoading, error } = useChannelList();
@@ -172,7 +172,7 @@ export function useChannelList() {
 }
 
 /**
- * 创建渠道 Hook
+ * 创建供应商 Hook
  * 
  * @example
  * const createChannel = useCreateChannel();
@@ -193,19 +193,19 @@ export function useCreateChannel() {
             return apiClient.post<ChannelServer>('/api/v1/channel/create', data);
         },
         onSuccess: (data) => {
-            logger.log('渠道创建成功:', data);
+            logger.log('供应商创建成功:', data);
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'list'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
-            logger.error('渠道创建失败:', error);
+            logger.error('供应商创建失败:', error);
         },
     });
 }
 
 /**
- * 更新渠道 Hook
+ * 更新供应商 Hook
  * 
  * @example
  * const updateChannel = useUpdateChannel();
@@ -229,23 +229,23 @@ export function useUpdateChannel() {
             return apiClient.post<ChannelServer>('/api/v1/channel/update', data);
         },
         onSuccess: (data) => {
-            logger.log('渠道更新成功:', data);
+            logger.log('供应商更新成功:', data);
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
-            logger.error('渠道更新失败:', error);
+            logger.error('供应商更新失败:', error);
         },
     });
 }
 
 /**
- * 删除渠道 Hook
+ * 删除供应商 Hook
  * 
  * @example
  * const deleteChannel = useDeleteChannel();
  * 
- * deleteChannel.mutate(1); // 删除 ID 为 1 的渠道
+ * deleteChannel.mutate(1); // 删除 ID 为 1 的供应商
  */
 export function useDeleteChannel() {
     const queryClient = useQueryClient();
@@ -255,24 +255,24 @@ export function useDeleteChannel() {
             return apiClient.delete<null>(`/api/v1/channel/delete/${id}`);
         },
         onSuccess: () => {
-            logger.log('渠道删除成功');
+            logger.log('供应商删除成功');
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
-            logger.error('渠道删除失败:', error);
+            logger.error('供应商删除失败:', error);
         },
     });
 }
 
 /**
- * 启用/禁用渠道 Hook
+ * 启用/禁用供应商 Hook
  * 
  * @example
  * const enableChannel = useEnableChannel();
  * 
- * enableChannel.mutate({ id: 1, enabled: true }); // 启用 ID 为 1 的渠道
- * enableChannel.mutate({ id: 1, enabled: false }); // 禁用 ID 为 1 的渠道
+ * enableChannel.mutate({ id: 1, enabled: true }); // 启用 ID 为 1 的供应商
+ * enableChannel.mutate({ id: 1, enabled: false }); // 禁用 ID 为 1 的供应商
  */
 export function useEnableChannel() {
     const queryClient = useQueryClient();
@@ -282,17 +282,17 @@ export function useEnableChannel() {
             return apiClient.post<null>('/api/v1/channel/enable', data);
         },
         onSuccess: () => {
-            logger.log('渠道状态更新成功');
+            logger.log('供应商状态更新成功');
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
         },
         onError: (error) => {
-            logger.error('渠道状态更新失败:', error);
+            logger.error('供应商状态更新失败:', error);
         },
     });
 }
 
 /**
- * 获取渠道模型列表 Hook
+ * 获取供应商模型列表 Hook
  * 
  * @example
  * const fetchModel = useFetchModel();
@@ -322,7 +322,7 @@ export function useFetchModel() {
 }
 
 /**
- * 获取渠道最后同步时间 Hook
+ * 获取供应商最后同步时间 Hook
  * 
  * @example
  * const lastSyncTime = useLastSyncTime();
@@ -341,7 +341,7 @@ export function useLastSyncTime() {
     });
 }
 /**
- * 同步渠道 Hook
+ * 同步供应商 Hook
  * 
  * @example
  * const syncChannel = useSyncChannel();
@@ -355,11 +355,11 @@ export function useSyncChannel() {
             return apiClient.post<null>('/api/v1/channel/sync');
         },
         onSuccess: () => {
-            logger.log('渠道同步成功');
+            logger.log('供应商同步成功');
             queryClient.invalidateQueries({ queryKey: ['channels', 'last-sync-time'] });
         },
         onError: (error) => {
-            logger.error('渠道同步失败:', error);
+            logger.error('供应商同步失败:', error);
         },
     });
 }

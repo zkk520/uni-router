@@ -20,7 +20,7 @@ export interface LLMInfo extends LLMPrice {
 }
 
 /**
- * LLM 渠道关联信息
+ * LLM 供应商关联信息
  */
 export interface LLMChannel {
     name: string;
@@ -52,7 +52,7 @@ export function useModelList() {
 }
 
 /**
- * 获取 LLM 模型与渠道关联列表 Hook
+ * 获取 LLM 模型与供应商关联列表 Hook
  * 
  * @example
  * const { data: channelModels, isLoading, error } = useModelChannelList();
