@@ -74,10 +74,55 @@ go run main.go start
 
 **Development Mode**
 
+Recommended: start backend and frontend in two terminals so their logs stay separate.
+
+Terminal 1, start the backend:
+
+```powershell
+.\dev-api.cmd
+```
+
+Terminal 2, start the frontend:
+
+```powershell
+.\dev-web.cmd
+```
+
+You can also start both services from the repository root with aggregated logs:
+
+```powershell
+.\dev.cmd
+```
+
+If frontend dependencies are not installed yet, run:
+
+```powershell
+.\dev-web.cmd -Install
+```
+
+To check dependencies and ports without starting services, run:
+
+```powershell
+.\dev.cmd -Check
+```
+
+To inspect or stop services already using the dev ports, run:
+
+```powershell
+.\dev.cmd -Status
+.\dev.cmd -Stop Backend
+.\dev.cmd -Stop Frontend
+.\dev.cmd -Stop All
+```
+
+The scripts use backend `http://127.0.0.1:8080` and frontend `http://127.0.0.1:3000`, while setting `OCTOPUS_DEBUG` and `NEXT_PUBLIC_API_BASE_URL` for local development. In split mode, press `Ctrl+C` in each terminal to stop that service. In one-command mode, press `Ctrl+C` to stop the services managed by the aggregate script.
+
+You can also start them manually:
+
 ```bash
 cd web && pnpm install && NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8080" pnpm run dev
 ## Open a new terminal, start the backend service
-go run main.go start
+OCTOPUS_DEBUG=true go run main.go start
 ## Access the frontend at
 http://localhost:3000
 ```

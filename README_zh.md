@@ -74,10 +74,55 @@ go run main.go start
 
 **开发模式**
 
+推荐在两个终端中分别启动前后端，这样日志不会混在一起。
+
+终端 1，启动后端：
+
+```powershell
+.\dev-api.cmd
+```
+
+终端 2，启动前端：
+
+```powershell
+.\dev-web.cmd
+```
+
+也可以在项目根目录一键启动前后端；这种方式会把前后端日志聚合到同一个终端：
+
+```powershell
+.\dev.cmd
+```
+
+首次启动如果还没有安装前端依赖，可执行：
+
+```powershell
+.\dev-web.cmd -Install
+```
+
+仅检查环境与端口是否可用，不启动服务：
+
+```powershell
+.\dev.cmd -Check
+```
+
+查看或停止已经占用开发端口的服务：
+
+```powershell
+.\dev.cmd -Status
+.\dev.cmd -Stop Backend
+.\dev.cmd -Stop Frontend
+.\dev.cmd -Stop All
+```
+
+脚本会自动使用后端 `http://127.0.0.1:8080` 与前端 `http://127.0.0.1:3000`，并设置开发所需的 `OCTOPUS_DEBUG` 和 `NEXT_PUBLIC_API_BASE_URL`。分开启动时，在对应终端按 `Ctrl+C` 停止对应服务；一键启动时按 `Ctrl+C` 停止聚合脚本管理的服务。
+
+也可以手动分别启动：
+
 ```bash
 cd web && pnpm install && NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8080" pnpm run dev
 ## 新建终端,启动后端服务
-go run main.go start
+OCTOPUS_DEBUG=true go run main.go start
 ## 访问前端地址
 http://localhost:3000
 ```
