@@ -227,8 +227,16 @@ if ($Stop -ne "None") {
     exit 0
 }
 
-$Go = Resolve-RequiredCommand "go"
-$Pnpm = Resolve-RequiredCommand "pnpm"
+$NeedsBackend = $Start -eq "All" -or $Start -eq "Backend"
+$NeedsFrontend = $Start -eq "All" -or $Start -eq "Frontend"
+
+if ($NeedsBackend) {
+    $Go = Resolve-RequiredCommand "go"
+}
+
+if ($NeedsFrontend) {
+    $Pnpm = Resolve-RequiredCommand "pnpm"
+}
 
 if ($Start -eq "Backend") {
     Start-BackendForeground
