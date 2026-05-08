@@ -21,6 +21,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from '@/components/common/Toast';
 import { cn } from '@/lib/utils';
 
@@ -400,13 +411,32 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                             <TestTube2 className="size-4" />
                                             测试
                                         </Button>
-                                        <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => updateRouter.mutate({ id: router.id, endpoints_to_delete: [endpoint.id] })}
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="destructive" size="sm">
+                                                    <Trash2 className="size-4" />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>删除端点？</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        将从当前路由中删除“{endpoint.name}”。已有请求不会受影响，但后续转发不会再使用这个端点。
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>取消</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        className="bg-destructive text-white hover:bg-destructive/90"
+                                                        onClick={() => updateRouter.mutate({ id: router.id, endpoints_to_delete: [endpoint.id] }, {
+                                                            onError: (error) => toast.error('删除失败', { description: String(error) }),
+                                                        })}
+                                                    >
+                                                        删除端点
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     </div>
                                 </div>
                                 <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -510,18 +540,36 @@ export function Router() {
                                 {router.endpoints?.length ?? 0} 个端点 / {router.bound_api_key_count ?? 0} 个密钥
                             </div>
                             <div className="mt-2 flex justify-end">
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        deleteRouter.mutate(router.id, {
-                                            onError: (error) => toast.error('删除失败', { description: String(error) }),
-                                        });
-                                    }}
-                                    className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                >
-                                    <X className="size-4" />
-                                </button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                        >
+                                            <X className="size-4" />
+                                        </button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>删除路由？</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                将删除“{router.name}”及其所有端点。已绑定 API Key 的路由无法删除，系统会阻止该操作。
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>取消</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                className="bg-destructive text-white hover:bg-destructive/90"
+                                                onClick={() => deleteRouter.mutate(router.id, {
+                                                    onError: (error) => toast.error('删除失败', { description: String(error) }),
+                                                })}
+                                            >
+                                                删除路由
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </div>
                         </div>
                     ))}
