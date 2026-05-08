@@ -70,6 +70,9 @@ func RouteProfileCreate(route *model.RouteProfile, ctx context.Context) error {
 	if !route.FailoverEnabled {
 		route.FailoverEnabled = true
 	}
+	if err := ensureUniqueRouteEndpoints(route.Endpoints); err != nil {
+		return err
+	}
 	for i := range route.Endpoints {
 		normalizeEndpoint(&route.Endpoints[i], now)
 	}
@@ -83,6 +86,21 @@ func RouteProfileUpdate(req *model.RouteProfileUpdateRequest, ctx context.Contex
 	oldRoute, ok := routeCache.Get(req.ID)
 	if !ok {
 		return nil, fmt.Errorf("router not found")
+	}
+	if len(req.EndpointsToAdd) > 0 {
+		deleted := map[int]bool{}
+		for _, id := range req.EndpointsToDelete {
+			deleted[id] = true
+		}
+		existing := make([]model.RouteEndpoint, 0, len(oldRoute.Endpoints))
+		for _, ep := range oldRoute.Endpoints {
+			if !deleted[ep.ID] {
+				existing = append(existing, ep)
+			}
+		}
+		if err := ensureUniqueRouteEndpointAdds(existing, req.EndpointsToAdd); err != nil {
+			return nil, err
+		}
 	}
 
 	now := time.Now().Unix()
@@ -407,6 +425,38 @@ func normalizeEndpoint(ep *model.RouteEndpoint, now int64) {
 	}
 	ep.CreatedAt = now
 	ep.UpdatedAt = now
+}
+
+type routeEndpointIdentity struct {
+	ChannelID    int
+	ChannelKeyID int
+}
+
+func ensureUniqueRouteEndpointAdds(existing []model.RouteEndpoint, additions []model.RouteEndpointAddRequest) error {
+	seen := map[routeEndpointIdentity]bool{}
+	for _, ep := range existing {
+		seen[routeEndpointIdentity{ChannelID: ep.ChannelID, ChannelKeyID: ep.ChannelKeyID}] = true
+	}
+	for _, ep := range additions {
+		key := routeEndpointIdentity{ChannelID: ep.ChannelID, ChannelKeyID: ep.ChannelKeyID}
+		if seen[key] {
+			return fmt.Errorf("endpoint already exists in router")
+		}
+		seen[key] = true
+	}
+	return nil
+}
+
+func ensureUniqueRouteEndpoints(endpoints []model.RouteEndpoint) error {
+	seen := map[routeEndpointIdentity]bool{}
+	for _, ep := range endpoints {
+		key := routeEndpointIdentity{ChannelID: ep.ChannelID, ChannelKeyID: ep.ChannelKeyID}
+		if seen[key] {
+			return fmt.Errorf("endpoint already exists in router")
+		}
+		seen[key] = true
+	}
+	return nil
 }
 
 func weightedEndpointOrder(items []model.RouteEndpoint) []model.RouteEndpoint {
