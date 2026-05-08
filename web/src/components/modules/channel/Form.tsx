@@ -1,4 +1,4 @@
-import { AutoGroupType, ChannelType, type Channel, useFetchModel } from '@/api/endpoints/channel';
+import { ChannelType, type Channel, useFetchModel } from '@/api/endpoints/channel';
 import {
     Select,
     SelectContent,
@@ -38,7 +38,6 @@ export interface ChannelFormData {
     enabled: boolean;
     proxy: boolean;
     auto_sync: boolean;
-    auto_group: AutoGroupType;
     match_regex: string;
 }
 
@@ -464,26 +463,6 @@ export function ChannelForm({
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 px-4 pb-4 space-y-4 border-t">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label htmlFor={`${idPrefix}-auto-group`} className="text-sm font-medium text-card-foreground">
-                                    {t('autoGroup')}
-                                </label>
-                                <Select
-                                    value={String(formData.auto_group)}
-                                    onValueChange={(value) => onFormDataChange({ ...formData, auto_group: Number(value) as AutoGroupType })}
-                                >
-                                    <SelectTrigger id={`${idPrefix}-auto-group`} className="rounded-xl w-full border border-border px-4 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent className='rounded-xl'>
-                                        <SelectItem className='rounded-xl' value={String(AutoGroupType.None)}>{t('autoGroupNone')}</SelectItem>
-                                        <SelectItem className='rounded-xl' value={String(AutoGroupType.Fuzzy)}>{t('autoGroupFuzzy')}</SelectItem>
-                                        <SelectItem className='rounded-xl' value={String(AutoGroupType.Exact)}>{t('autoGroupExact')}</SelectItem>
-                                        <SelectItem className='rounded-xl' value={String(AutoGroupType.Regex)}>{t('autoGroupRegex')}</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
                             <div className="space-y-2">
                                 <label htmlFor={`${idPrefix}-channel-proxy`} className="text-sm font-medium text-card-foreground">
                                     {t('channelProxy')}

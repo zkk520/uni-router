@@ -115,21 +115,6 @@ export function AppContainer() {
                             );
                             break;
                         }
-                        case 'group': {
-                            prefetches.push(
-                                queryClient.prefetchQuery({
-                                    queryKey: ['groups', 'list'],
-                                    queryFn: async () => apiClient.get('/api/v1/group/list'),
-                                })
-                            );
-                            prefetches.push(
-                                queryClient.prefetchQuery({
-                                    queryKey: ['models', 'channel'],
-                                    queryFn: async () => apiClient.get('/api/v1/model/channel'),
-                                })
-                            );
-                            break;
-                        }
                         case 'model': {
                             prefetches.push(
                                 queryClient.prefetchQuery({
@@ -139,7 +124,7 @@ export function AppContainer() {
                             );
                             break;
                         }
-                        case 'setting': {
+                        case 'token': {
                             prefetches.push(
                                 queryClient.prefetchQuery({
                                     queryKey: ['apikeys', 'list'],

@@ -65,21 +65,8 @@ func SyncModelsTask() {
 				continue
 			}
 		}
-		// 批量删除消失的模型对应的 GroupItem
 		if len(deletedModels) > 0 {
 			log.Infof("deleted channel %s models: %v", channel.Name, deletedModels)
-			keys := make([]model.GroupIDAndLLMName, len(deletedModels))
-			for i, m := range deletedModels {
-				keys[i] = model.GroupIDAndLLMName{ChannelID: channel.ID, ModelName: m}
-			}
-			if err := op.GroupItemBatchDelByChannelAndModels(keys, ctx); err != nil {
-				log.Errorf("failed to batch delete group items for channel %s: %v", channel.Name, err)
-			}
-		}
-
-		// 自动分组
-		if len(newModels) > 0 {
-			helper.ChannelAutoGroup(&channel, ctx)
 		}
 	}
 	llmPrice, err := op.LLMList(ctx)

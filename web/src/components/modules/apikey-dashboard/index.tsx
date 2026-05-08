@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
-import { toast } from '@/components/common/Toast';
 import { useAPIKeyDashboardStats } from '@/api/endpoints/apikey';
 import { useAuthStore } from '@/api/endpoints/user';
 import { useSettingStore } from '@/stores/setting';
@@ -10,9 +9,6 @@ import { AnimatedNumber } from '@/components/common/AnimatedNumber';
 import Logo from '@/components/modules/logo';
 import { PageWrapper } from '@/components/common/PageWrapper';
 import { CopyIconButton } from '@/components/common/CopyButton';
-import { useCopyToClipboard } from '@uidotdev/usehooks';
-import { useCallback } from 'react';
-import type { JSX } from 'react';
 import {
     ArrowDownToLine,
     ArrowUpFromLine,
@@ -23,12 +19,10 @@ import {
     LogOut,
     Calendar,
     Wallet,
-    Copy,
     Sun,
     Moon,
     Languages,
     Zap,
-    Layers,
     Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,21 +35,6 @@ export function APIKeyDashboard() {
     const { logout } = useAuthStore();
     const { theme, setTheme } = useTheme();
     const { locale, setLocale } = useSettingStore();
-    const [, copyToClipboard] = useCopyToClipboard();
-
-    const copyWithToast = useCallback(
-        async (text: string, label: string) => {
-            try {
-                await copyToClipboard(text);
-                toast.success(`${label} copied`);
-                return true;
-            } catch {
-                toast.error(t('error'));
-                return false;
-            }
-        },
-        [copyToClipboard, t]
-    );
 
     if (error || !data) {
         return (
@@ -80,25 +59,6 @@ export function APIKeyDashboard() {
     const expireAt = info.expire_at ? dayjs.unix(info.expire_at) : null;
     const isExpired = expireAt ? expireAt.isBefore(dayjs()) : false;
     const daysUntilExpire = expireAt ? expireAt.diff(dayjs(), 'day') : null;
-
-    const supportedModels = info.supported_models
-        ? info.supported_models
-            .split(',')
-            .map((m) => m.trim())
-            .filter(Boolean)
-        : [];
-
-    const supportedModelButtons: JSX.Element[] = supportedModels.map((model) => (
-        <Button
-            key={model}
-            variant="secondary"
-            size="sm"
-            className="h-8 rounded-lg px-3 text-sm transition-colors hover:bg-primary hover:text-primary-foreground"
-            onClick={() => void copyWithToast(model, model)}
-        >
-            {model}
-        </Button>
-    ));
 
     const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
     const toggleLanguage = () => {
@@ -271,19 +231,6 @@ export function APIKeyDashboard() {
                             </div>
                         </div>
                     </div>
-
-                    {/* Supported Models */}
-                    {info.supported_models && info.supported_models.trim().length > 0 && (
-                        <div className="rounded-2xl border bg-card p-6">
-                            <div className="flex items-center gap-2 mb-4">
-                                <Layers className="w-5 h-5 text-chart-3" />
-                                <span className="font-semibold">{t('supportedModels')}</span>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {supportedModelButtons}
-                            </div>
-                        </div>
-                    )}
                 </PageWrapper>
             </main>
         </div>

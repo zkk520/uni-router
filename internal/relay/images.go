@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
-	"slices"
 	"strings"
 	"time"
 
@@ -21,7 +20,6 @@ import (
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/price"
-	"github.com/bestruirui/octopus/internal/relay/balancer"
 	"github.com/bestruirui/octopus/internal/relay/bodycache"
 	"github.com/bestruirui/octopus/internal/server/resp"
 	"github.com/bestruirui/octopus/internal/transformer/outbound"
@@ -94,85 +92,96 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 		stream = s
 	}
 
-	// supported_models 校验（复用 APIKeyAuth 注入）
-	supportedModels := strings.TrimSpace(c.GetString("supported_models"))
-	if supportedModels != "" {
-		supportedModelsArray := strings.Split(supportedModels, ",")
-		if !slices.Contains(supportedModelsArray, requestModel) {
-			resp.Error(c, http.StatusBadRequest, "model not supported")
-			return
-		}
-	}
-
-	// 获取通道分组
-	group, err := op.GroupGetEnabledMap(requestModel, ctx)
-	if err != nil {
-		resp.Error(c, http.StatusNotFound, "model not found")
+	apiKey, err := op.APIKeyGet(apiKeyID, ctx)
+	if err != nil || apiKey.RouterID <= 0 {
+		resp.Error(c, http.StatusBadRequest, "API key must be bound to a router")
 		return
 	}
-
-	// 创建迭代器（策略排序 + 粘性优先）
-	iter := balancer.NewIterator(group, apiKeyID, requestModel)
-	if iter.Len() == 0 {
-		resp.Error(c, http.StatusServiceUnavailable, "no available channel")
+	routeDetail, err := op.RouteProfileGet(apiKey.RouterID, ctx)
+	if err != nil || len(routeDetail.Endpoints) == 0 {
+		resp.Error(c, http.StatusServiceUnavailable, "router not available")
+		return
+	}
+	route := routeDetail.RouteProfile
+	candidates := op.RouteSelectCandidates(route)
+	if len(candidates) == 0 {
+		resp.Error(c, http.StatusServiceUnavailable, "no available endpoint")
 		return
 	}
 
 	// 初始化 Metrics（Images 独立，避免 b64_json 内存膨胀）
 	metrics := newImagesRelayMetrics(apiKeyID, requestModel)
+	metrics.RouterID = route.ID
+	metrics.RouterName = route.Name
 	metrics.RequestContent = buildImagesRequestContentForLog(isMultipart, bc, jsonPayload)
 
 	var lastErr error
+	var attempts []model.ChannelAttempt
+	attemptNum := 0
 
-	for iter.Next() {
+	for idx, ep := range candidates {
 		select {
 		case <-ctx.Done():
 			log.Infof("request context canceled, stopping retry")
-			metrics.Save(ctx, false, context.Canceled, iter.Attempts())
+			metrics.Save(ctx, false, context.Canceled, attempts)
 			return
 		default:
 		}
 
-		item := iter.Item()
-
-		// 获取通道
-		channel, err := op.ChannelGet(item.ChannelID, ctx)
+		channel, usedKey, err := op.RouteEndpointValidate(ep, ctx)
 		if err != nil {
-			log.Warnf("failed to get channel %d: %v", item.ChannelID, err)
-			iter.Skip(item.ChannelID, 0, fmt.Sprintf("channel_%d", item.ChannelID), fmt.Sprintf("channel not found: %v", err))
+			attemptNum++
+			attempts = append(attempts, model.ChannelAttempt{
+				ChannelID:    ep.ChannelID,
+				ChannelKeyID: ep.ChannelKeyID,
+				ChannelName:  fmt.Sprintf("channel_%d", ep.ChannelID),
+				EndpointID:   ep.ID,
+				EndpointName: ep.Name,
+				ModelName:    requestModel,
+				AttemptNum:   attemptNum,
+				Status:       model.AttemptSkipped,
+				Msg:          err.Error(),
+			})
 			lastErr = err
-			continue
-		}
-		if !channel.Enabled {
-			iter.Skip(channel.ID, 0, channel.Name, "channel disabled")
 			continue
 		}
 
 		// channel.Type 限制：仅 OpenAI Chat/Responses
 		if channel.Type != outbound.OutboundTypeOpenAIChat && channel.Type != outbound.OutboundTypeOpenAIResponse {
-			iter.Skip(channel.ID, 0, channel.Name, fmt.Sprintf("unsupported channel type: %d", channel.Type))
+			msg := fmt.Sprintf("unsupported channel type: %d", channel.Type)
+			attemptNum++
+			attempts = append(attempts, model.ChannelAttempt{
+				ChannelID:    channel.ID,
+				ChannelKeyID: usedKey.ID,
+				ChannelName:  channel.Name,
+				EndpointID:   ep.ID,
+				EndpointName: ep.Name,
+				ModelName:    requestModel,
+				AttemptNum:   attemptNum,
+				Status:       model.AttemptSkipped,
+				Msg:          msg,
+			})
+			lastErr = fmt.Errorf("%s", msg)
 			continue
 		}
 
-		usedKey := channel.GetChannelKey()
-		if usedKey.ChannelKey == "" {
-			iter.Skip(channel.ID, 0, channel.Name, "no available key")
-			continue
+		log.Infof("router %s forwarding images model %s to endpoint %s/channel %s (attempt %d/%d, stream=%t)",
+			route.Name, requestModel, ep.Name, channel.Name, idx+1, len(candidates), stream)
+
+		attemptNum++
+		start := time.Now()
+		attempt := model.ChannelAttempt{
+			ChannelID:    channel.ID,
+			ChannelKeyID: usedKey.ID,
+			ChannelName:  channel.Name,
+			EndpointID:   ep.ID,
+			EndpointName: ep.Name,
+			ModelName:    requestModel,
+			AttemptNum:   attemptNum,
 		}
-
-		// 熔断检查（熔断 key 使用 actualModel=item.ModelName）
-		if iter.SkipCircuitBreak(channel.ID, usedKey.ID, channel.Name) {
-			continue
-		}
-
-		log.Infof("images request model %s, mode: %d, forwarding to channel: %s model: %s (attempt %d/%d, sticky=%t, stream=%t)",
-			requestModel, group.Mode, channel.Name, item.ModelName,
-			iter.Index()+1, iter.Len(), iter.IsSticky(), stream)
-
-		span := iter.StartAttempt(channel.ID, usedKey.ID, channel.Name)
 
 		// 尝试一次转发
-		statusCode, written, usage, upstreamCT, fwdErr := imagesAttempt(ctx, endpoint, c, bc, isMultipart, boundary, jsonPayload, stream, channel, usedKey.ChannelKey, group.FirstTokenTimeOut, metrics, item.ModelName)
+		statusCode, written, usage, upstreamCT, fwdErr := imagesAttempt(ctx, endpoint, c, bc, isMultipart, boundary, jsonPayload, stream, channel, usedKey.ChannelKey, 0, metrics)
 
 		// 更新 channel key 状态
 		usedKey.StatusCode = statusCode
@@ -180,47 +189,54 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 
 		if fwdErr == nil {
 			// ====== 成功 ======
-			metrics.ActualModel = item.ModelName
+			metrics.ActualModel = requestModel
+			metrics.EndpointID = ep.ID
+			metrics.EndpointName = ep.Name
 			if usage != nil {
-				metrics.SetUsageFromImages(item.ModelName, *usage)
+				metrics.SetUsageFromImages(requestModel, *usage)
 			}
 			metrics.ResponseContent = buildImagesResponseContentForLog(stream, upstreamCT, usage)
 
 			usedKey.TotalCost += metrics.Stats.InputCost + metrics.Stats.OutputCost
 			op.ChannelKeyUpdate(usedKey)
 
-			span.End(model.AttemptSuccess, statusCode, "")
+			attempt.Status = model.AttemptSuccess
+			attempt.Duration = int(time.Since(start).Milliseconds())
+			attempts = append(attempts, attempt)
+			_ = op.RouteEndpointMarkStatus(ep.ID, model.RouteEndpointStatusNormal, "", ctx)
 
 			// Channel 维度统计
 			op.StatsChannelUpdate(channel.ID, model.StatsMetrics{
-				WaitTime:       span.Duration().Milliseconds(),
+				WaitTime:       int64(attempt.Duration),
 				RequestSuccess: 1,
 			})
 
-			// 熔断器：记录成功
-			balancer.RecordSuccess(channel.ID, usedKey.ID, item.ModelName)
-			// 会话保持：更新粘性记录
-			balancer.SetSticky(apiKeyID, requestModel, channel.ID, usedKey.ID)
-
-			metrics.Save(ctx, true, nil, iter.Attempts())
+			metrics.Save(ctx, true, nil, attempts)
 			return
 		}
 
 		// ====== 失败 ======
 		op.ChannelKeyUpdate(usedKey)
-		span.End(model.AttemptFailed, statusCode, fwdErr.Error())
+		attempt.Status = model.AttemptFailed
+		attempt.Duration = int(time.Since(start).Milliseconds())
+		attempt.Msg = fwdErr.Error()
+		attempts = append(attempts, attempt)
+		if shouldTripRouteEndpoint(statusCode, fwdErr) {
+			_ = op.RouteEndpointMarkStatus(ep.ID, model.RouteEndpointStatusError, fwdErr.Error(), ctx)
+		}
 
 		// Channel 维度统计
 		op.StatsChannelUpdate(channel.ID, model.StatsMetrics{
-			WaitTime:      span.Duration().Milliseconds(),
+			WaitTime:      int64(attempt.Duration),
 			RequestFailed: 1,
 		})
 
-		// 熔断器：记录失败
-		balancer.RecordFailure(channel.ID, usedKey.ID, item.ModelName)
-
 		if written || c.Writer.Written() {
-			metrics.Save(ctx, false, fwdErr, iter.Attempts())
+			metrics.Save(ctx, false, fwdErr, attempts)
+			return
+		}
+		if !route.FailoverEnabled {
+			metrics.Save(ctx, false, fwdErr, attempts)
 			return
 		}
 
@@ -228,7 +244,7 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 	}
 
 	// 所有通道都失败
-	metrics.Save(ctx, false, lastErr, iter.Attempts())
+	metrics.Save(ctx, false, lastErr, attempts)
 	resp.Error(c, http.StatusBadGateway, "all channels failed")
 }
 
@@ -242,6 +258,10 @@ type imagesRelayMetrics struct {
 	APIKeyID     int
 	RequestModel string
 	ActualModel  string
+	RouterID     int
+	RouterName   string
+	EndpointID   int
+	EndpointName string
 	StartTime    time.Time
 	FirstToken   time.Time
 
@@ -320,6 +340,10 @@ func (m *imagesRelayMetrics) saveLog(ctx context.Context, err error, duration ti
 	relayLog := model.RelayLog{
 		Time:             m.StartTime.Unix(),
 		RequestModelName: m.RequestModel,
+		RouterID:         m.RouterID,
+		RouterName:       m.RouterName,
+		EndpointID:       m.EndpointID,
+		EndpointName:     m.EndpointName,
 		ChannelName:      channelName,
 		ChannelId:        channelID,
 		ActualModelName:  actualModel,
@@ -376,10 +400,10 @@ func buildImagesResponseContentForLog(stream bool, upstreamCT string, usage *ima
 	}
 	// 不记录 b64_json，仅记录 usage
 	type respForLog struct {
-		Stream      bool        `json:"stream"`
-		ContentType string      `json:"content_type,omitempty"`
+		Stream      bool         `json:"stream"`
+		ContentType string       `json:"content_type,omitempty"`
 		Usage       *imagesUsage `json:"usage,omitempty"`
-		Note        string      `json:"note,omitempty"`
+		Note        string       `json:"note,omitempty"`
 	}
 	obj := respForLog{
 		Stream:      stream,
@@ -506,7 +530,6 @@ func imagesAttempt(
 	channelKey string,
 	firstTokenTimeOutSec int,
 	metrics *imagesRelayMetrics,
-	actualModel string,
 ) (statusCode int, written bool, usage *imagesUsage, upstreamCT string, err error) {
 	// 构建 URL（baseUrl.Path 后追加 endpoint）
 	baseURL := channel.GetBaseUrl()
@@ -533,7 +556,7 @@ func imagesAttempt(
 			}
 			defer src.Close()
 
-			if err := copyMultipartReplaceModel(src, boundary, mw, actualModel); err != nil {
+			if err := copyMultipartPreserveModel(src, boundary, mw); err != nil {
 				_ = pw.CloseWithError(err)
 				return
 			}
@@ -545,12 +568,11 @@ func imagesAttempt(
 			_ = pw.Close()
 		}()
 	} else {
-		// JSON：仅改写 model 字段，其余保持不变
+		// JSON：保持 model 字段和其他参数原样，确保项目只负责路由转发
 		// 注意：每次尝试都重新 marshal 生成 body，确保可重试重建
 		if jsonPayload == nil {
 			return 0, false, nil, "", errors.New("nil json payload")
 		}
-		jsonPayload["model"] = actualModel
 		b, err := json.Marshal(jsonPayload)
 		if err != nil {
 			return 0, false, nil, "", fmt.Errorf("failed to marshal json: %w", err)
@@ -629,7 +651,7 @@ func copyHeadersToUpstream(req *http.Request, c *gin.Context, channel *model.Cha
 	}
 }
 
-func copyMultipartReplaceModel(src io.Reader, boundary string, dst *multipart.Writer, newModel string) error {
+func copyMultipartPreserveModel(src io.Reader, boundary string, dst *multipart.Writer) error {
 	mr := multipart.NewReader(src, boundary)
 
 	for {
@@ -652,17 +674,6 @@ func copyMultipartReplaceModel(src io.Reader, boundary string, dst *multipart.Wr
 		if err != nil {
 			_ = part.Close()
 			return err
-		}
-
-		if part.FormName() == "model" && part.FileName() == "" {
-			// 丢弃原值，写入替换后的 model（继续复制后续 part）
-			_, _ = io.Copy(io.Discard, part)
-			_, werr := io.WriteString(pw, newModel)
-			_ = part.Close()
-			if werr != nil {
-				return werr
-			}
-			continue
 		}
 
 		_, err = io.Copy(pw, part)
@@ -756,8 +767,8 @@ func proxySSE(ctx context.Context, c *gin.Context, respUp *http.Response, firstT
 	}
 
 	var (
-		firstWrite      = true
-		currentEvent    string
+		firstWrite       = true
+		currentEvent     string
 		completedScanner = newUsageScanner()
 	)
 

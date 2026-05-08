@@ -4,11 +4,11 @@ import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { KeyRound, Plus, Loader, Trash2, Check, X, Info, CalendarDays, Pencil, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { PageWrapper } from '@/components/common/PageWrapper';
 import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import {
     MorphingDialog,
     MorphingDialogContainer,
@@ -23,7 +23,6 @@ import {
     useDeleteAPIKey,
     type APIKey,
 } from '@/api/endpoints/apikey';
-import { useGroupList } from '@/api/endpoints/group';
 import { useRouterList } from '@/api/endpoints/router';
 import { useStatsAPIKey } from '@/api/endpoints/stats';
 import { cn } from '@/lib/utils';
@@ -60,18 +59,6 @@ function normalizeMoneyInput(input: string): string {
     return rest.length > 0 ? `${intPart}.${rest.join('').slice(0, 6)}` : intPart;
 }
 
-function toggleModel(current: string | undefined, model: string): string | undefined {
-    const models = current ? current.split(',').filter(Boolean) : [];
-    const next = models.includes(model)
-        ? models.filter((m) => m !== model)
-        : [...models, model];
-    return next.length ? next.join(',') : undefined;
-}
-
-function hasModel(supported: string | undefined, model: string): boolean {
-    return supported ? supported.split(',').includes(model) : false;
-}
-
 interface APIKeyFormProps {
     apiKey?: APIKey;
     isPending: boolean;
@@ -82,7 +69,6 @@ interface APIKeyFormProps {
 
 function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKeyFormProps) {
     const t = useTranslations('setting');
-    const { data: groups = [] } = useGroupList();
     const { data: routers = [] } = useRouterList();
 
     const [form, setForm] = useState<Omit<APIKey, 'id' | 'api_key'>>(() => ({
@@ -90,7 +76,6 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
         enabled: apiKey?.enabled ?? true,
         expire_at: apiKey?.expire_at,
         max_cost: apiKey?.max_cost,
-        supported_models: apiKey?.supported_models,
         router_id: apiKey?.router_id,
     }));
     const [maxCostInput, setMaxCostInput] = useState(() =>
@@ -106,11 +91,6 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
         return '00:00';
     });
     const [expireOpen, setExpireOpen] = useState(false);
-
-    const availableModels = useMemo(() => {
-        const names = groups.map((g) => g.name).filter(Boolean);
-        return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
-    }, [groups]);
 
     const expireDate = parseExpireDate(form.expire_at);
     const neverExpire = !form.expire_at;
@@ -165,7 +145,7 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
 
     const handleSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.name.trim()) return;
+        if (!form.name.trim() || !form.router_id) return;
         onSubmit(form);
     }, [form, onSubmit]);
 
@@ -278,52 +258,16 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
                 </div>
             </div>
 
-            <div className="grid gap-1">
-                <div className="text-xs text-muted-foreground">{t('apiKey.form.supportedModels')}</div>
-                <div className="max-h-40 overflow-auto rounded-xl p-2">
-                    {availableModels.length === 0 ? (
-                        <div className="text-xs text-muted-foreground py-2 text-center">
-                            {t('apiKey.form.noModels')}
-                        </div>
-                    ) : (
-                        <div className="flex flex-wrap gap-2">
-                            {availableModels.map((m) => {
-                                const checked = hasModel(form.supported_models, m);
-                                return (
-                                    <button
-                                        key={m}
-                                        type="button"
-                                        disabled={isPending}
-                                        onClick={() => updateForm({ supported_models: toggleModel(form.supported_models, m) })}
-                                        className="text-left disabled:opacity-50"
-                                    >
-                                        <Badge
-                                            variant={checked ? 'default' : 'outline'}
-                                            className={cn(
-                                                'cursor-pointer select-none',
-                                                !checked && 'bg-background/40 hover:bg-background/70'
-                                            )}
-                                        >
-                                            {m}
-                                        </Badge>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-                <div className="text-[11px] text-muted-foreground/80">{t('apiKey.form.modelsHint')}</div>
-            </div>
-
             <div className="grid gap-1 text-xs text-muted-foreground">
                 Router
                 <select
                     value={form.router_id ?? 0}
                     onChange={(e) => updateForm({ router_id: Number(e.target.value) || undefined })}
                     disabled={isPending}
+                    required
                     className="h-9 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
                 >
-                    <option value={0}>Use legacy Group routing</option>
+                    <option value={0}>Select router</option>
                     {routers.map((router) => (
                         <option key={router.id} value={router.id}>
                             {router.name}
@@ -353,7 +297,7 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
                 </button>
                 <button
                     type="submit"
-                    disabled={isPending || !form.name.trim()}
+                    disabled={isPending || !form.name.trim() || !form.router_id}
                     className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
                 >
                     {isPending ? <Loader className="size-4 animate-spin" /> : <Check className="size-4" />}
@@ -810,5 +754,20 @@ export function SettingAPIKey() {
                 </MorphingDialog>
             )}
         />
+    );
+}
+
+export function TokenManagement() {
+    return (
+        <div className="h-full min-h-0 overflow-y-auto overscroll-contain rounded-t-3xl">
+            <PageWrapper className="mx-auto w-full max-w-3xl pb-24 md:pb-4">
+                <APIKeyPanelBase
+                    key="token-management-panel"
+                    idPrefix="token-management"
+                    containerClassName="relative flex h-[calc(100dvh-11rem)] min-h-[420px] flex-col gap-5 rounded-3xl border border-border bg-card p-6"
+                    listClassName="min-h-0 flex-1 space-y-2 overflow-y-auto"
+                />
+            </PageWrapper>
+        </div>
     );
 }

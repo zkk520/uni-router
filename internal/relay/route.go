@@ -81,7 +81,7 @@ func handleRoute(internalRequest *model.InternalLLMRequest, inAdapter model.Inbo
 			continue
 		}
 
-		internalRequest.Model = op.RouteApplyModelMapping(ep, requestModel)
+		internalRequest.Model = op.RouteRequestModel(requestModel)
 		req.endpointID = ep.ID
 		req.endpointName = ep.Name
 		metrics.EndpointID = ep.ID

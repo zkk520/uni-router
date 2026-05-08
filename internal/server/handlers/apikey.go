@@ -3,7 +3,6 @@ package handlers
 import (
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
@@ -12,7 +11,6 @@ import (
 	"github.com/bestruirui/octopus/internal/server/resp"
 	"github.com/bestruirui/octopus/internal/server/router"
 	"github.com/gin-gonic/gin"
-	"github.com/samber/lo"
 )
 
 func init() {
@@ -55,7 +53,7 @@ func createAPIKey(c *gin.Context) {
 	}
 	req.APIKey = auth.GenerateAPIKey()
 	if err := op.APIKeyCreate(&req, c.Request.Context()); err != nil {
-		resp.Error(c, http.StatusInternalServerError, err.Error())
+		resp.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	resp.Success(c, req)
@@ -77,7 +75,7 @@ func updateAPIKey(c *gin.Context) {
 		return
 	}
 	if err := op.APIKeyUpdate(&req, c.Request.Context()); err != nil {
-		resp.Error(c, http.StatusInternalServerError, err.Error())
+		resp.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	resp.Success(c, req)
@@ -105,24 +103,6 @@ func getStatsAPIKeyById(c *gin.Context) {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	models, err := op.GroupListModel(c.Request.Context())
-	if err != nil {
-		resp.Error(c, http.StatusInternalServerError, err.Error())
-		return
-	}
-	var modelsString string
-	if info.SupportedModels == "" {
-		modelsString = strings.Join(models, ", ")
-	} else {
-		supportedModels := lo.Map(strings.Split(info.SupportedModels, ","), func(s string, _ int) string {
-			return strings.TrimSpace(s)
-		})
-		models = lo.Filter(models, func(m string, _ int) bool {
-			return lo.Contains(supportedModels, m)
-		})
-		modelsString = strings.Join(models, ", ")
-	}
-	info.SupportedModels = modelsString
 	resp.Success(c, map[string]any{
 		"stats": stats,
 		"info":  info,

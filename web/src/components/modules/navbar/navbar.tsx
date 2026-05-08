@@ -6,18 +6,20 @@ import { useNavStore, type NavItem } from "@/components/modules/navbar"
 import { ROUTES } from "@/route/config"
 import { usePreload } from "@/route/use-preload"
 import { ENTRANCE_VARIANTS } from "@/lib/animations/fluid-transitions"
+import { useTranslations } from "next-intl"
 
 export function NavBar() {
     const { activeItem, setActiveItem } = useNavStore()
     const { preload } = usePreload()
+    const t = useTranslations("navbar")
 
     return (
         <div className="relative z-50 md:min-h-screen">
             <motion.nav
                 aria-label="Main Navigation"
                 className={cn(
-                    "fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-3",
-                    "md:sticky md:top-30 md:left-auto md:bottom-auto md:translate-x-0 md:flex-col md:gap-3",
+                    "fixed bottom-6 left-1/2 -translate-x-1/2 flex max-w-[calc(100vw-1rem)] items-center gap-0.5 p-2",
+                    "md:sticky md:top-30 md:left-auto md:bottom-auto md:max-w-none md:translate-x-0 md:flex-col md:gap-2 md:p-3",
                     "bg-sidebar text-sidebar-foreground border border-sidebar-border rounded-3xl",
                     "custom-shadow"
                 )}
@@ -27,14 +29,18 @@ export function NavBar() {
             >
                 {ROUTES.map((route, index) => {
                     const isActive = activeItem === route.id
+                    const label = t(route.id)
                     return (
                         <motion.button
                             key={route.id}
                             type="button"
+                            aria-label={label}
+                            title={label}
                             onClick={() => setActiveItem(route.id as NavItem)}
                             onMouseEnter={() => preload(route.id)}
                             className={cn(
-                                "relative p-2 md:p-3 rounded-2xl z-20",
+                                "relative z-20 flex min-w-0 w-[calc((100vw-2.75rem)/7)] max-w-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5 text-center",
+                                "md:w-24 md:max-w-none md:flex-row md:justify-start md:gap-2 md:px-3 md:py-2.5 md:text-left",
                                 isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/60 hover:bg-sidebar-accent"
                             )}
                             initial={{ opacity: 0, scale: 0.8 }}
@@ -56,8 +62,11 @@ export function NavBar() {
                                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                 />
                             )}
-                            <span className="relative z-10">
-                                <route.icon strokeWidth={2} />
+                            <span className="relative z-10 flex shrink-0">
+                                <route.icon className="size-5 md:size-4" strokeWidth={2} />
+                            </span>
+                            <span className="relative z-10 w-full truncate text-[10px] font-medium leading-tight md:text-xs">
+                                {label}
                             </span>
                         </motion.button>
                     )

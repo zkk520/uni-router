@@ -7,7 +7,6 @@ import (
 
 	"github.com/bestruirui/octopus/internal/conf"
 	dbmodel "github.com/bestruirui/octopus/internal/model"
-	"github.com/bestruirui/octopus/internal/relay/balancer"
 	"github.com/bestruirui/octopus/internal/transformer/model"
 	"github.com/gin-gonic/gin"
 )
@@ -60,7 +59,6 @@ type relayRequest struct {
 	metrics         *RelayMetrics
 	apiKeyID        int
 	requestModel    string
-	iter            *balancer.Iterator
 	routeAttempts   []dbmodel.ChannelAttempt
 	routeAttemptNum int
 	routerID        int

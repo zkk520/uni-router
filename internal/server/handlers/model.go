@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
 
+	"github.com/bestruirui/octopus/internal/helper"
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/price"
@@ -11,7 +11,6 @@ import (
 	"github.com/bestruirui/octopus/internal/server/resp"
 	"github.com/bestruirui/octopus/internal/server/router"
 	"github.com/gin-gonic/gin"
-	"github.com/samber/lo"
 )
 
 func init() {
@@ -55,24 +54,37 @@ func init() {
 }
 
 func getModelList(c *gin.Context) {
-	models, err := op.GroupListModel(c.Request.Context())
-	if err != nil {
-		resp.Error(c, http.StatusInternalServerError, err.Error())
-		return
-	}
 	apiKeyId := c.GetInt("api_key_id")
 	apiKey, err := op.APIKeyGet(apiKeyId, c.Request.Context())
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if apiKey.SupportedModels != "" {
-		supportedModels := lo.Map(strings.Split(apiKey.SupportedModels, ","), func(s string, _ int) string {
-			return strings.TrimSpace(s)
-		})
-		models = lo.Filter(models, func(m string, _ int) bool {
-			return lo.Contains(supportedModels, m)
-		})
+	if apiKey.RouterID <= 0 {
+		resp.Error(c, http.StatusBadRequest, "API key must be bound to a router")
+		return
+	}
+	route, err := op.RouteProfileGet(apiKey.RouterID, c.Request.Context())
+	if err != nil {
+		resp.Error(c, http.StatusServiceUnavailable, "router not available")
+		return
+	}
+	ep, ok := op.RouteSelectModelListEndpoint(route.RouteProfile)
+	if !ok {
+		resp.Error(c, http.StatusServiceUnavailable, "no available endpoint")
+		return
+	}
+	channel, usedKey, err := op.RouteEndpointValidate(ep, c.Request.Context())
+	if err != nil {
+		resp.Error(c, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	fetchReq := *channel
+	fetchReq.Keys = []model.ChannelKey{usedKey}
+	models, err := helper.FetchModels(c.Request.Context(), fetchReq)
+	if err != nil {
+		resp.Error(c, http.StatusBadGateway, err.Error())
+		return
 	}
 
 	if c.GetString("request_type") == "anthropic" {

@@ -157,10 +157,6 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 		selectFields = append(selectFields, "auto_sync")
 		updates.AutoSync = *req.AutoSync
 	}
-	if req.AutoGroup != nil {
-		selectFields = append(selectFields, "auto_group")
-		updates.AutoGroup = *req.AutoGroup
-	}
 	if req.CustomHeader != nil {
 		selectFields = append(selectFields, "custom_header")
 		updates.CustomHeader = *req.CustomHeader
@@ -276,21 +272,6 @@ func ChannelDel(id int, ctx context.Context) error {
 		}
 	}()
 
-	// 获取所有受影响的 GroupID，用于刷新缓存
-	var affectedGroupIDs []int
-	if err := tx.Model(&model.GroupItem{}).
-		Where("channel_id = ?", id).
-		Pluck("group_id", &affectedGroupIDs).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to get affected groups: %w", err)
-	}
-
-	// 删除所有引用该渠道的 GroupItem
-	if err := tx.Where("channel_id = ?", id).Delete(&model.GroupItem{}).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete group items: %w", err)
-	}
-
 	// 删除渠道 keys
 	if err := tx.Where("channel_id = ?", id).Delete(&model.ChannelKey{}).Error; err != nil {
 		tx.Rollback()
@@ -321,13 +302,6 @@ func ChannelDel(id int, ctx context.Context) error {
 		}
 	}
 	StatsChannelDel(id)
-
-	// 刷新受影响的分组缓存
-	for _, groupID := range affectedGroupIDs {
-		if err := groupRefreshCacheByID(groupID, ctx); err != nil {
-			log.Warnf("failed to refresh group cache for group %d: %v", groupID, err)
-		}
-	}
 
 	return nil
 }

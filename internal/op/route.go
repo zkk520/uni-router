@@ -2,7 +2,6 @@ package op
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -23,17 +22,17 @@ type RouteProfileDetail struct {
 }
 
 type RouteOptionChannel struct {
-	ID      int                    `json:"id"`
-	Name    string                 `json:"name"`
-	Enabled bool                   `json:"enabled"`
-	Models  []string               `json:"models"`
+	ID      int                     `json:"id"`
+	Name    string                  `json:"name"`
+	Enabled bool                    `json:"enabled"`
+	Models  []string                `json:"models"`
 	Keys    []RouteOptionChannelKey `json:"keys"`
 }
 
 type RouteOptionChannelKey struct {
-	ID       int    `json:"id"`
-	Enabled  bool   `json:"enabled"`
-	Remark   string `json:"remark"`
+	ID        int    `json:"id"`
+	Enabled   bool   `json:"enabled"`
+	Remark    string `json:"remark"`
 	MaskedKey string `json:"masked_key"`
 }
 
@@ -159,9 +158,6 @@ func RouteProfileUpdate(req *model.RouteProfileUpdateRequest, ctx context.Contex
 		if item.Status != nil {
 			up["status"] = *item.Status
 		}
-		if item.ModelMapping != nil {
-			up["model_mapping"] = *item.ModelMapping
-		}
 		if err := tx.Model(&model.RouteEndpoint{}).
 			Where("id = ? AND router_id = ?", item.ID, req.ID).
 			Updates(up).Error; err != nil {
@@ -181,7 +177,6 @@ func RouteProfileUpdate(req *model.RouteProfileUpdateRequest, ctx context.Contex
 				Priority:     item.Priority,
 				Weight:       item.Weight,
 				Enabled:      item.Enabled,
-				ModelMapping: item.ModelMapping,
 			}
 			normalizeEndpoint(&ep, now)
 			newItems = append(newItems, ep)
@@ -360,17 +355,38 @@ func RouteSelectCandidates(route model.RouteProfile) []model.RouteEndpoint {
 	return enabled
 }
 
-func RouteApplyModelMapping(ep model.RouteEndpoint, requestModel string) string {
-	if strings.TrimSpace(ep.ModelMapping) == "" {
-		return requestModel
+func RouteSelectModelListEndpoint(route model.RouteProfile) (model.RouteEndpoint, bool) {
+	enabled := make([]model.RouteEndpoint, 0, len(route.Endpoints))
+	for _, ep := range route.Endpoints {
+		if !ep.Enabled || ep.Status == model.RouteEndpointStatusError {
+			continue
+		}
+		enabled = append(enabled, ep)
 	}
-	var mapping map[string]string
-	if err := json.Unmarshal([]byte(ep.ModelMapping), &mapping); err != nil {
-		return requestModel
+	if len(enabled) == 0 {
+		for _, ep := range route.Endpoints {
+			if ep.Enabled {
+				enabled = append(enabled, ep)
+			}
+		}
 	}
-	if mapped := strings.TrimSpace(mapping[requestModel]); mapped != "" {
-		return mapped
+	if len(enabled) == 0 {
+		return model.RouteEndpoint{}, false
 	}
+	sort.Slice(enabled, func(i, j int) bool {
+		return enabled[i].Priority < enabled[j].Priority
+	})
+	if route.PreferredEndpointID > 0 {
+		for _, ep := range enabled {
+			if ep.ID == route.PreferredEndpointID {
+				return ep, true
+			}
+		}
+	}
+	return enabled[0], true
+}
+
+func RouteRequestModel(requestModel string) string {
 	return requestModel
 }
 

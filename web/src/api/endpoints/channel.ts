@@ -15,16 +15,6 @@ export enum ChannelType {
     OpenAIEmbedding = 5,
 }
 
-/**
- * 自动分组类型枚举
- */
-export enum AutoGroupType {
-    None = 0,   // 不自动分组
-    Fuzzy = 1,  // 模糊匹配
-    Exact = 2,  // 准确匹配
-    Regex = 3,  // 正则匹配
-}
-
 export type BaseUrl = {
     url: string;
     delay: number;
@@ -60,7 +50,6 @@ export type Channel = {
     custom_model: string;
     proxy: boolean;
     auto_sync: boolean;
-    auto_group: AutoGroupType;
     custom_header: CustomHeader[];
     param_override?: string | null;
     channel_proxy?: string | null;
@@ -88,7 +77,6 @@ export type CreateChannelRequest = {
     custom_model?: string;
     proxy?: boolean;
     auto_sync?: boolean;
-    auto_group?: AutoGroupType;
     custom_header?: CustomHeader[];
     channel_proxy?: string | null;
     param_override?: string | null;
@@ -108,7 +96,6 @@ export type UpdateChannelRequest = {
     custom_model?: string;
     proxy?: boolean;
     auto_sync?: boolean;
-    auto_group?: AutoGroupType;
     custom_header?: CustomHeader[];
     channel_proxy?: string | null;
     param_override?: string | null;

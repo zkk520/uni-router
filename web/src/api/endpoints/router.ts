@@ -15,7 +15,6 @@ export interface RouteEndpoint {
     weight: number;
     enabled: boolean;
     status: RouteEndpointStatus;
-    model_mapping?: string;
     last_checked_at?: number;
     last_error?: string;
 }

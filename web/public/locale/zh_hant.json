@@ -40,17 +40,16 @@
         "expireAt": "過期時間",
         "neverExpire": "永不過期",
         "daysLeft": "天後到期",
-        "expired": "已過期",
-        "supportedModels": "支援的模型"
+        "expired": "已過期"
     },
     "navbar": {
         "home": "主頁",
         "channel": "供應源",
-        "group": "分組",
         "router": "路由",
         "key": "金鑰",
         "model": "價格",
         "log": "日誌",
+        "token": "令牌管理",
         "setting": "設定"
     },
     "toolbar": {
@@ -72,11 +71,6 @@
                     "all": "全部供應源",
                     "enabled": "僅啟用",
                     "disabled": "僅停用"
-                },
-                "group": {
-                    "all": "全部分組",
-                    "withMembers": "有成員",
-                    "empty": "空分組"
                 },
                 "model": {
                     "all": "全部模型",
@@ -220,9 +214,6 @@
                 "expireAt": "過期日期",
                 "selectDate": "選擇日期",
                 "neverExpire": "永不過期",
-                "supportedModels": "支援的模型",
-                "noModels": "暫無可選模型",
-                "modelsHint": "不選擇則為無限制",
                 "enabled": "是否啟用",
                 "cancel": "取消",
                 "create": "建立",
@@ -340,57 +331,6 @@
             "clearFailed": "清空失敗"
         }
     },
-    "group": {
-        "toast": {
-            "created": "建立成功",
-            "createFailed": "建立失敗",
-            "updated": "更新成功",
-            "updateFailed": "更新失敗",
-            "deleted": "刪除成功",
-            "autoAddFailed": "自動新增失敗"
-        },
-        "create": {
-            "title": "建立分組",
-            "submit": "建立",
-            "submitting": "建立中..."
-        },
-        "card": {
-            "empty": "暫無規則"
-        },
-        "detail": {
-            "actions": {
-                "edit": "編輯",
-                "cancel": "取消",
-                "save": "儲存",
-                "copyName": "複製名稱",
-                "delete": "刪除",
-                "confirmDelete": "確認刪除"
-            }
-        },
-        "form": {
-            "name": "分組名稱",
-            "matchRegex": "匹配正規",
-            "matchRegexPlaceholder": "留空則預設按分組名稱模糊比對",
-            "matchRegexInvalid": "正規無效",
-            "firstTokenTimeOut": "首字逾時",
-            "firstTokenTimeOutHint": "單位秒，僅串流響應起效，0 表示不限制",
-            "sessionKeepTime": "會話保持",
-            "sessionKeepTimeHint": "單位秒，會話期間保持使用同一供應源，0 表示停用",
-            "items": "已選模型",
-            "addItem": "新增模型",
-            "autoAdd": "自動新增",
-            "clear": "清空",
-            "selectChannel": "供應源",
-            "selectModel": "模型"
-        },
-        "mode": {
-            "roundRobin": "輪詢",
-            "random": "隨機",
-            "failover": "故障轉移",
-            "weighted": "加權分配"
-        },
-        "empty": "暫無分組，點擊左上角按鈕建立"
-    },
     "model": {
         "create": {
             "title": "建立模型",
@@ -429,6 +369,16 @@
         "list": {
             "noMore": "沒有更多日誌了"
         },
+        "filters": {
+            "title": "篩選",
+            "statusAll": "全部狀態",
+            "statusSuccess": "成功",
+            "statusFailed": "失敗",
+            "allKeys": "全部密鑰",
+            "allRouters": "全部路由",
+            "allEndpoints": "全部端點",
+            "reset": "重置"
+        },
         "card": {
             "error": "錯誤",
             "errorInfo": "錯誤訊息",
@@ -450,7 +400,6 @@
             "failover": "已故障轉移",
             "skipped": "跳過",
             "circuitBreak": "熔斷",
-            "legacyRouting": "傳統分組路由",
             "unknownRouter": "未知路由",
             "routeAttempts": "路由嘗試",
             "apiKey": "密鑰",
@@ -460,16 +409,6 @@
             "requestModel": "請求模型",
             "actualModel": "實際模型",
             "finalStatus": "最終狀態"
-        },
-        "filters": {
-            "title": "篩選",
-            "statusAll": "全部狀態",
-            "statusSuccess": "成功",
-            "statusFailed": "失敗",
-            "allKeys": "全部密鑰",
-            "allRouters": "全部路由",
-            "allEndpoints": "全部端點",
-            "reset": "重置"
         }
     },
     "channel": {
@@ -558,11 +497,6 @@
             "typeGemini": "Gemini",
             "typeVolcengine": "火山引擎",
             "autoSync": "自動同步",
-            "autoGroup": "自動分組",
-            "autoGroupNone": "不自動分組",
-            "autoGroupFuzzy": "模糊比對",
-            "autoGroupExact": "準確比對",
-            "autoGroupRegex": "正規比對",
             "matchRegex": "匹配正規",
             "matchRegexPlaceholder": "可選：用於匹配請求模型名稱的正規表示式",
             "remark": "備註"

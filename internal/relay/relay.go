@@ -5,18 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/bestruirui/octopus/internal/helper"
-	dbmodel "github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/relay/balancer"
 	"github.com/bestruirui/octopus/internal/server/resp"
 	"github.com/bestruirui/octopus/internal/transformer/inbound"
 	"github.com/bestruirui/octopus/internal/transformer/model"
-	"github.com/bestruirui/octopus/internal/transformer/outbound"
 	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/gin-gonic/gin"
 	"github.com/tmaxmax/go-sse"
@@ -29,14 +25,6 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 	if err != nil {
 		return
 	}
-	supportedModels := c.GetString("supported_models")
-	if supportedModels != "" {
-		supportedModelsArray := strings.Split(supportedModels, ",")
-		if !slices.Contains(supportedModelsArray, internalRequest.Model) {
-			resp.Error(c, http.StatusBadRequest, "model not supported")
-			return
-		}
-	}
 
 	requestModel := internalRequest.Model
 	apiKeyID := c.GetInt("api_key_id")
@@ -45,177 +33,7 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 		handleRoute(internalRequest, inAdapter, apiKeyID, requestModel, apiKey.RouterID, c)
 		return
 	}
-
-	// 获取通道分组
-	group, err := op.GroupGetEnabledMap(requestModel, c.Request.Context())
-	if err != nil {
-		resp.Error(c, http.StatusNotFound, "model not found")
-		return
-	}
-
-	// 创建迭代器（策略排序 + 粘性优先）
-	iter := balancer.NewIterator(group, apiKeyID, requestModel)
-	if iter.Len() == 0 {
-		resp.Error(c, http.StatusServiceUnavailable, "no available channel")
-		return
-	}
-
-	// 初始化 Metrics
-	metrics := NewRelayMetrics(apiKeyID, requestModel, internalRequest)
-
-	// 请求级上下文
-	req := &relayRequest{
-		c:               c,
-		inAdapter:       inAdapter,
-		internalRequest: internalRequest,
-		metrics:         metrics,
-		apiKeyID:        apiKeyID,
-		requestModel:    requestModel,
-		iter:            iter,
-	}
-
-	var lastErr error
-
-	for iter.Next() {
-		select {
-		case <-c.Request.Context().Done():
-			log.Infof("request context canceled, stopping retry")
-			metrics.Save(c.Request.Context(), false, context.Canceled, iter.Attempts())
-			return
-		default:
-		}
-
-		item := iter.Item()
-
-		// 获取通道
-		channel, err := op.ChannelGet(item.ChannelID, c.Request.Context())
-		if err != nil {
-			log.Warnf("failed to get channel %d: %v", item.ChannelID, err)
-			iter.Skip(item.ChannelID, 0, fmt.Sprintf("channel_%d", item.ChannelID), fmt.Sprintf("channel not found: %v", err))
-			lastErr = err
-			continue
-		}
-		if !channel.Enabled {
-			iter.Skip(channel.ID, 0, channel.Name, "channel disabled")
-			continue
-		}
-
-		usedKey := channel.GetChannelKey()
-		if usedKey.ChannelKey == "" {
-			iter.Skip(channel.ID, 0, channel.Name, "no available key")
-			continue
-		}
-
-		// 熔断检查
-		if iter.SkipCircuitBreak(channel.ID, usedKey.ID, channel.Name) {
-			continue
-		}
-
-		// 出站适配器
-		outAdapter := outbound.Get(channel.Type)
-		if outAdapter == nil {
-			iter.Skip(channel.ID, usedKey.ID, channel.Name, fmt.Sprintf("unsupported channel type: %d", channel.Type))
-			continue
-		}
-
-		// 类型兼容性检查
-		if internalRequest.IsEmbeddingRequest() && !outbound.IsEmbeddingChannelType(channel.Type) {
-			iter.Skip(channel.ID, usedKey.ID, channel.Name, "channel type not compatible with embedding request")
-			continue
-		}
-		if internalRequest.IsChatRequest() && !outbound.IsChatChannelType(channel.Type) {
-			iter.Skip(channel.ID, usedKey.ID, channel.Name, "channel type not compatible with chat request")
-			continue
-		}
-
-		// 设置实际模型
-		internalRequest.Model = item.ModelName
-
-		log.Infof("request model %s, mode: %d, forwarding to channel: %s model: %s (attempt %d/%d, sticky=%t)",
-			requestModel, group.Mode, channel.Name, item.ModelName,
-			iter.Index()+1, iter.Len(), iter.IsSticky())
-
-		// 构造尝试级上下文 -- 只写变化的 4 个字段
-		ra := &relayAttempt{
-			relayRequest:         req,
-			outAdapter:           outAdapter,
-			channel:              channel,
-			usedKey:              usedKey,
-			firstTokenTimeOutSec: group.FirstTokenTimeOut,
-		}
-
-		result := ra.attempt()
-		if result.Success {
-			metrics.Save(c.Request.Context(), true, nil, iter.Attempts())
-			return
-		}
-		if result.Written {
-			metrics.Save(c.Request.Context(), false, result.Err, iter.Attempts())
-			return
-		}
-		lastErr = result.Err
-	}
-
-	// 所有通道都失败
-	metrics.Save(c.Request.Context(), false, lastErr, iter.Attempts())
-	resp.Error(c, http.StatusBadGateway, "all channels failed")
-}
-
-// attempt 统一管理一次通道尝试的完整生命周期
-func (ra *relayAttempt) attempt() attemptResult {
-	span := ra.iter.StartAttempt(ra.channel.ID, ra.usedKey.ID, ra.channel.Name)
-
-	// 转发请求
-	statusCode, fwdErr := ra.forward()
-
-	// 更新 channel key 状态
-	ra.usedKey.StatusCode = statusCode
-	ra.usedKey.LastUseTimeStamp = time.Now().Unix()
-
-	if fwdErr == nil {
-		// ====== 成功 ======
-		ra.collectResponse()
-		ra.usedKey.TotalCost += ra.metrics.Stats.InputCost + ra.metrics.Stats.OutputCost
-		op.ChannelKeyUpdate(ra.usedKey)
-
-		span.End(dbmodel.AttemptSuccess, statusCode, "")
-
-		// Channel 维度统计
-		op.StatsChannelUpdate(ra.channel.ID, dbmodel.StatsMetrics{
-			WaitTime:       span.Duration().Milliseconds(),
-			RequestSuccess: 1,
-		})
-
-		// 熔断器：记录成功
-		balancer.RecordSuccess(ra.channel.ID, ra.usedKey.ID, ra.internalRequest.Model)
-		// 会话保持：更新粘性记录
-		balancer.SetSticky(ra.apiKeyID, ra.requestModel, ra.channel.ID, ra.usedKey.ID)
-
-		return attemptResult{Success: true}
-	}
-
-	// ====== 失败 ======
-	op.ChannelKeyUpdate(ra.usedKey)
-	span.End(dbmodel.AttemptFailed, statusCode, fwdErr.Error())
-
-	// Channel 维度统计
-	op.StatsChannelUpdate(ra.channel.ID, dbmodel.StatsMetrics{
-		WaitTime:      span.Duration().Milliseconds(),
-		RequestFailed: 1,
-	})
-
-	// 熔断器：记录失败
-	balancer.RecordFailure(ra.channel.ID, ra.usedKey.ID, ra.internalRequest.Model)
-
-	written := ra.c.Writer.Written()
-	if written {
-		ra.collectResponse()
-	}
-	return attemptResult{
-		Success: false,
-		Written: written,
-		Err:     fmt.Errorf("channel %s failed: %v", ra.channel.Name, fwdErr),
-	}
+	resp.Error(c, http.StatusBadRequest, "API key must be bound to a router")
 }
 
 // parseRequest 解析并验证入站请求

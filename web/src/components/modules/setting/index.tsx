@@ -3,7 +3,6 @@
 import { PageWrapper } from '@/components/common/PageWrapper';
 import { SettingAppearance } from './Appearance';
 import { SettingSystem } from './System';
-import { SettingAPIKey } from './APIKey';
 import { SettingLLMPrice } from './LLMPrice';
 import { SettingAccount } from './Account';
 import { SettingInfo } from './Info';
@@ -22,7 +21,6 @@ export function Setting() {
                 <SettingSystem key="setting-system" />
                 <SettingLog key="setting-log" />
                 <SettingLLMPrice key="setting-llmprice" />
-                <SettingAPIKey key="setting-apikey" />
                 <SettingLLMSync key="setting-llmsync" />
                 <SettingCircuitBreaker key="setting-circuit-breaker" />
                 <SettingBackup key="setting-backup" />

@@ -136,7 +136,6 @@ function AddEndpointForm({
     onAdd: (endpoint: RouteEndpointAddRequest) => void;
 }) {
     const [channelId, setChannelId] = useState<number>(options[0]?.id ?? 0);
-    const [mapping, setMapping] = useState('');
 
     const channel = options.find((item) => item.id === channelId) ?? options[0];
     const keys = channel?.keys ?? [];
@@ -156,7 +155,6 @@ function AddEndpointForm({
             priority: 1,
             weight: 1,
             enabled: true,
-            model_mapping: mapping.trim(),
         });
     };
 
@@ -195,12 +193,6 @@ function AddEndpointForm({
                         ))}
                     </select>
                 </div>
-                <Input
-                    value={mapping}
-                    onChange={(e) => setMapping(e.target.value)}
-                    placeholder='可选模型映射 JSON，例如 {"claude":"provider/claude"}'
-                    className="rounded-xl"
-                />
                 {duplicate ? (
                     <div className="text-xs text-destructive">该端点已在此路由中。</div>
                 ) : null}

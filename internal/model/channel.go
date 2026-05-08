@@ -6,15 +6,6 @@ import (
 	"github.com/bestruirui/octopus/internal/transformer/outbound"
 )
 
-type AutoGroupType int
-
-const (
-	AutoGroupTypeNone  AutoGroupType = 0 //不自动分组
-	AutoGroupTypeFuzzy AutoGroupType = 1 //模糊匹配
-	AutoGroupTypeExact AutoGroupType = 2 //准确匹配
-	AutoGroupTypeRegex AutoGroupType = 3 //正则匹配
-)
-
 type Channel struct {
 	ID            int                   `json:"id" gorm:"primaryKey"`
 	Name          string                `json:"name" gorm:"unique;not null"`
@@ -26,7 +17,6 @@ type Channel struct {
 	CustomModel   string                `json:"custom_model"`
 	Proxy         bool                  `json:"proxy" gorm:"default:false"`
 	AutoSync      bool                  `json:"auto_sync" gorm:"default:false"`
-	AutoGroup     AutoGroupType         `json:"auto_group" gorm:"default:0"`
 	CustomHeader  []CustomHeader        `json:"custom_header" gorm:"serializer:json"`
 	ParamOverride *string               `json:"param_override"`
 	ChannelProxy  *string               `json:"channel_proxy"`
@@ -66,7 +56,6 @@ type ChannelUpdateRequest struct {
 	CustomModel   *string                `json:"custom_model,omitempty"`
 	Proxy         *bool                  `json:"proxy,omitempty"`
 	AutoSync      *bool                  `json:"auto_sync,omitempty"`
-	AutoGroup     *AutoGroupType         `json:"auto_group,omitempty"`
 	CustomHeader  *[]CustomHeader        `json:"custom_header,omitempty"`
 	ChannelProxy  *string                `json:"channel_proxy,omitempty"`
 	ParamOverride *string                `json:"param_override,omitempty"`

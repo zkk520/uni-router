@@ -41,16 +41,12 @@ function formatDuration(ms: number): string {
     return `${(ms / 1000).toFixed(2)}s`;
 }
 
-function isRouteLog(log: RelayLog): boolean {
-    return !!(log.router_name || log.endpoint_name || log.router_id || log.endpoint_id);
-}
-
 type LogTranslator = (key: string) => string;
 
 function routeName(log: RelayLog, t: LogTranslator): string {
     if (log.router_name?.trim()) return log.router_name.trim();
     if (log.router_id) return `Router #${log.router_id}`;
-    return isRouteLog(log) ? t('unknownRouter') : t('legacyRouting');
+    return t('unknownRouter');
 }
 
 function endpointName(log: RelayLog): string {

@@ -15,9 +15,6 @@ func InitCache() error {
 	if err := channelRefreshCache(ctx); err != nil {
 		return fmt.Errorf("channel refresh cache error: %v", err)
 	}
-	if err := groupRefreshCache(ctx); err != nil {
-		return fmt.Errorf("group refresh cache error: %v", err)
-	}
 	if err := routeRefreshCache(ctx); err != nil {
 		return fmt.Errorf("router refresh cache error: %v", err)
 	}

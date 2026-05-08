@@ -40,17 +40,16 @@
         "expireAt": "Expires",
         "neverExpire": "Never",
         "daysLeft": "days left",
-        "expired": "Expired",
-        "supportedModels": "Supported Models"
+        "expired": "Expired"
     },
     "navbar": {
         "home": "Home",
         "channel": "Channel",
-        "group": "Group",
         "router": "Router",
         "key": "Key",
         "model": "Price",
         "log": "Log",
+        "token": "Tokens",
         "setting": "Setting"
     },
     "toolbar": {
@@ -72,11 +71,6 @@
                     "all": "All channels",
                     "enabled": "Enabled only",
                     "disabled": "Disabled only"
-                },
-                "group": {
-                    "all": "All groups",
-                    "withMembers": "With members",
-                    "empty": "Empty groups"
                 },
                 "model": {
                     "all": "All models",
@@ -220,9 +214,6 @@
                 "expireAt": "Expire Date",
                 "selectDate": "Select date",
                 "neverExpire": "Never Expire",
-                "supportedModels": "Supported Models",
-                "noModels": "No models available",
-                "modelsHint": "Leave empty for unlimited",
                 "enabled": "Enabled",
                 "cancel": "Cancel",
                 "create": "Create",
@@ -340,57 +331,6 @@
             "clearFailed": "Failed to clear logs"
         }
     },
-    "group": {
-        "toast": {
-            "created": "Created successfully",
-            "createFailed": "Create failed",
-            "updated": "Updated successfully",
-            "updateFailed": "Update failed",
-            "deleted": "Deleted successfully",
-            "autoAddFailed": "Auto add failed"
-        },
-        "create": {
-            "title": "Create Group",
-            "submit": "Create",
-            "submitting": "Creating..."
-        },
-        "card": {
-            "empty": "No rules"
-        },
-        "detail": {
-            "actions": {
-                "edit": "Edit",
-                "cancel": "Cancel",
-                "save": "Save",
-                "copyName": "Copy Name",
-                "delete": "Delete",
-                "confirmDelete": "Confirm Delete"
-            }
-        },
-        "form": {
-            "name": "Group Name",
-            "matchRegex": "Match Regex",
-            "matchRegexPlaceholder": "Leave empty to use default fuzzy match by group name",
-            "matchRegexInvalid": "Invalid regex",
-            "firstTokenTimeOut": "First Token Timeout",
-            "firstTokenTimeOutHint": "Unit: seconds, only effective for streaming response, 0 = no limit",
-            "sessionKeepTime": "Session Keep Time",
-            "sessionKeepTimeHint": "Unit: seconds, keeps using the same channel within a session, 0 = disabled",
-            "items": "Selected Models",
-            "addItem": "Add Model",
-            "autoAdd": "Auto Add",
-            "clear": "Clear",
-            "selectChannel": "Channel",
-            "selectModel": "Model"
-        },
-        "mode": {
-            "roundRobin": "Round Robin",
-            "random": "Random",
-            "failover": "Failover",
-            "weighted": "Weighted"
-        },
-        "empty": "No groups yet, click the button above to create one"
-    },
     "model": {
         "create": {
             "title": "Create Model",
@@ -429,6 +369,16 @@
         "list": {
             "noMore": "No more logs"
         },
+        "filters": {
+            "title": "Filters",
+            "statusAll": "All statuses",
+            "statusSuccess": "Success",
+            "statusFailed": "Failed",
+            "allKeys": "All keys",
+            "allRouters": "All routers",
+            "allEndpoints": "All endpoints",
+            "reset": "Reset"
+        },
         "card": {
             "error": "Error",
             "errorInfo": "Error Info",
@@ -450,7 +400,6 @@
             "failover": "Failover",
             "skipped": "Skipped",
             "circuitBreak": "Circuit break",
-            "legacyRouting": "Legacy group routing",
             "unknownRouter": "Unknown router",
             "routeAttempts": "Route attempts",
             "apiKey": "Key",
@@ -460,16 +409,6 @@
             "requestModel": "Request model",
             "actualModel": "Actual model",
             "finalStatus": "Final status"
-        },
-        "filters": {
-            "title": "Filters",
-            "statusAll": "All statuses",
-            "statusSuccess": "Success",
-            "statusFailed": "Failed",
-            "allKeys": "All keys",
-            "allRouters": "All routers",
-            "allEndpoints": "All endpoints",
-            "reset": "Reset"
         }
     },
     "channel": {
@@ -558,11 +497,6 @@
             "typeGemini": "Gemini",
             "typeVolcengine": "Volcengine",
             "autoSync": "Auto Sync",
-            "autoGroup": "Auto Group",
-            "autoGroupNone": "None",
-            "autoGroupFuzzy": "Fuzzy",
-            "autoGroupExact": "Exact",
-            "autoGroupRegex": "Regex",
             "matchRegex": "Match Regex",
             "matchRegexPlaceholder": "Optional: regex pattern to match request model names",
             "remark": "Remark"
