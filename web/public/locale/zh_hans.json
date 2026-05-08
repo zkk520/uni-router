@@ -446,7 +446,30 @@
             "retryDetails": "重试详情",
             "attempts": "次尝试",
             "success": "成功",
-            "failed": "失败"
+            "failed": "失败",
+            "failover": "已故障转移",
+            "skipped": "跳过",
+            "circuitBreak": "熔断",
+            "legacyRouting": "传统分组路由",
+            "unknownRouter": "未知路由",
+            "routeAttempts": "路由尝试",
+            "apiKey": "密钥",
+            "router": "路由",
+            "endpoint": "端点",
+            "provider": "供应商",
+            "requestModel": "请求模型",
+            "actualModel": "实际模型",
+            "finalStatus": "最终状态"
+        },
+        "filters": {
+            "title": "筛选",
+            "statusAll": "全部状态",
+            "statusSuccess": "成功",
+            "statusFailed": "失败",
+            "allKeys": "全部密钥",
+            "allRouters": "全部路由",
+            "allEndpoints": "全部端点",
+            "reset": "重置"
         }
     },
     "channel": {

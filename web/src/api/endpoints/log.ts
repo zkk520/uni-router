@@ -61,6 +61,10 @@ export interface LogListParams {
     page_size?: number;
     start_time?: number;
     end_time?: number;
+    api_key_name?: string;
+    router_id?: number;
+    endpoint_id?: number;
+    status?: 'success' | 'failed';
 }
 
 /**
@@ -88,7 +92,30 @@ export function useClearLogs() {
     });
 }
 
-const logsInfiniteQueryKey = (pageSize: number) => ['logs', 'infinite', pageSize] as const;
+function normalizeFilters(filters: Omit<LogListParams, 'page' | 'page_size'> = {}) {
+    return {
+        start_time: filters.start_time,
+        end_time: filters.end_time,
+        api_key_name: filters.api_key_name?.trim() || undefined,
+        router_id: filters.router_id && filters.router_id > 0 ? filters.router_id : undefined,
+        endpoint_id: filters.endpoint_id && filters.endpoint_id > 0 ? filters.endpoint_id : undefined,
+        status: filters.status,
+    };
+}
+
+function logMatchesFilters(log: RelayLog, filters: ReturnType<typeof normalizeFilters>) {
+    if (filters.start_time != null && filters.end_time != null) {
+        if (log.time < filters.start_time || log.time > filters.end_time) return false;
+    }
+    if (filters.api_key_name && log.request_api_key_name !== filters.api_key_name) return false;
+    if (filters.router_id && log.router_id !== filters.router_id) return false;
+    if (filters.endpoint_id && log.endpoint_id !== filters.endpoint_id) return false;
+    if (filters.status === 'success' && log.error) return false;
+    if (filters.status === 'failed' && !log.error) return false;
+    return true;
+}
+
+const logsInfiniteQueryKey = (pageSize: number, filters: ReturnType<typeof normalizeFilters>) => ['logs', 'infinite', pageSize, filters] as const;
 
 /**
  * 日志管理 Hook
@@ -103,8 +130,9 @@ const logsInfiniteQueryKey = (pageSize: number) => ['logs', 'infinite', pageSize
  * // 滚动到底部时加载更多
  * if (hasMore && !isLoadingMore) loadMore();
  */
-export function useLogs(options: { pageSize?: number } = {}) {
+export function useLogs(options: { pageSize?: number; filters?: Omit<LogListParams, 'page' | 'page_size'> } = {}) {
     const { pageSize = 20 } = options;
+    const filters = useMemo(() => normalizeFilters(options.filters), [options.filters]);
 
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState<Error | null>(null);
@@ -113,12 +141,18 @@ export function useLogs(options: { pageSize?: number } = {}) {
     const queryClient = useQueryClient();
 
     const logsQuery = useInfiniteQuery({
-        queryKey: logsInfiniteQueryKey(pageSize),
+        queryKey: logsInfiniteQueryKey(pageSize, filters),
         initialPageParam: 1,
         queryFn: async ({ pageParam }) => {
             const params = new URLSearchParams();
             params.set('page', String(pageParam));
             params.set('page_size', String(pageSize));
+            if (filters.start_time != null) params.set('start_time', String(filters.start_time));
+            if (filters.end_time != null) params.set('end_time', String(filters.end_time));
+            if (filters.api_key_name) params.set('api_key_name', filters.api_key_name);
+            if (filters.router_id) params.set('router_id', String(filters.router_id));
+            if (filters.endpoint_id) params.set('endpoint_id', String(filters.endpoint_id));
+            if (filters.status) params.set('status', filters.status);
             const result = await apiClient.get<RelayLog[] | null>(`/api/v1/log/list?${params.toString()}`);
             return result ?? [];
         },
@@ -177,8 +211,9 @@ export function useLogs(options: { pageSize?: number } = {}) {
                 eventSource.onmessage = (event) => {
                     try {
                         const log: RelayLog = JSON.parse(event.data);
+                        if (!logMatchesFilters(log, filters)) return;
                         queryClient.setQueryData(
-                            logsInfiniteQueryKey(pageSize),
+                            logsInfiniteQueryKey(pageSize, filters),
                             (old: InfiniteData<RelayLog[], number> | undefined) => {
                                 if (!old) {
                                     return { pages: [[log]], pageParams: [1] };
@@ -217,11 +252,11 @@ export function useLogs(options: { pageSize?: number } = {}) {
             eventSourceRef.current = null;
             setIsConnected(false);
         };
-    }, [pageSize, queryClient]);
+    }, [filters, pageSize, queryClient]);
 
     const clear = useCallback(() => {
-        queryClient.removeQueries({ queryKey: logsInfiniteQueryKey(pageSize) });
-    }, [pageSize, queryClient]);
+        queryClient.removeQueries({ queryKey: logsInfiniteQueryKey(pageSize, filters) });
+    }, [filters, pageSize, queryClient]);
 
     return {
         logs,

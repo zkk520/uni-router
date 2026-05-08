@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, KeyRound } from 'lucide-react';
+import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, KeyRound, Route, Waypoints, Server, CheckCircle2, XCircle, Ban, ShieldAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import JsonView from '@uiw/react-json-view';
@@ -41,6 +41,79 @@ function formatDuration(ms: number): string {
     return `${(ms / 1000).toFixed(2)}s`;
 }
 
+function isRouteLog(log: RelayLog): boolean {
+    return !!(log.router_name || log.endpoint_name || log.router_id || log.endpoint_id);
+}
+
+type LogTranslator = (key: string) => string;
+
+function routeName(log: RelayLog, t: LogTranslator): string {
+    if (log.router_name?.trim()) return log.router_name.trim();
+    if (log.router_id) return `Router #${log.router_id}`;
+    return isRouteLog(log) ? t('unknownRouter') : t('legacyRouting');
+}
+
+function endpointName(log: RelayLog): string {
+    return log.endpoint_name?.trim() || (log.endpoint_id ? `Endpoint #${log.endpoint_id}` : '');
+}
+
+function finalStatus(log: RelayLog): 'success' | 'failed' | 'failover' {
+    if (log.error) return 'failed';
+    if ((log.total_attempts ?? log.attempts?.length ?? 0) > 1) return 'failover';
+    return 'success';
+}
+
+function statusMeta(status: ChannelAttempt['status'], t: LogTranslator) {
+    switch (status) {
+        case 'success':
+            return {
+                label: t('success'),
+                className: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+                Icon: CheckCircle2,
+            };
+        case 'failed':
+            return {
+                label: t('failed'),
+                className: 'bg-destructive/15 text-destructive border-destructive/20',
+                Icon: XCircle,
+            };
+        case 'skipped':
+            return {
+                label: t('skipped'),
+                className: 'bg-muted text-muted-foreground border-border',
+                Icon: Ban,
+            };
+        case 'circuit_break':
+            return {
+                label: t('circuitBreak'),
+                className: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20',
+                Icon: ShieldAlert,
+            };
+        default:
+            return {
+                label: status,
+                className: 'bg-muted text-muted-foreground border-border',
+                Icon: Ban,
+            };
+    }
+}
+
+function LogStatusBadge({ log }: { log: RelayLog }) {
+    const t = useTranslations('log.card');
+    const status = finalStatus(log);
+    const cls = status === 'success'
+        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+        : status === 'failover'
+            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+            : 'bg-destructive/15 text-destructive';
+
+    return (
+        <Badge variant="secondary" className={cn('shrink-0 border-0 px-1.5 py-0 text-xs', cls)}>
+            {t(status)}
+        </Badge>
+    );
+}
+
 interface RetryBadgeWithTooltipProps {
     channelName: string;
     brandColor: string;
@@ -67,14 +140,9 @@ function RetryBadgeWithTooltip({ channelName, brandColor, attempts }: RetryBadge
                     <div key={idx} className="flex flex-col w-full">
                         <div className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50 transition-colors">
                             <Badge
-                                className={cn(
-                                    "h-5 shrink-0 px-1.5 text-[10px] font-bold uppercase shadow-none border-0",
-                                    attempt.status === 'success'
-                                        ? "bg-primary/15 text-primary"
-                                        : "bg-destructive/15 text-destructive"
-                                )}
+                                className={cn("h-5 shrink-0 px-1.5 text-[10px] font-bold uppercase shadow-none border", statusMeta(attempt.status, t).className)}
                             >
-                                {attempt.status === 'success' ? t('success') : t('failed')}
+                                {statusMeta(attempt.status, t).label}
                             </Badge>
                             <div className="flex min-w-0 flex-col flex-1">
                                 <span className="truncate text-xs font-semibold text-foreground">
@@ -191,9 +259,12 @@ export function LogCard({ log }: { log: RelayLog }) {
         [log.actual_model_name]
     );
     const requestAPIKeyName = useMemo(() => log.request_api_key_name?.trim() ?? '', [log.request_api_key_name]);
+    const routeLabel = routeName(log, t);
+    const endpointLabel = endpointName(log);
 
     const hasError = !!log.error;
     const hasMultipleAttempts = log.attempts && log.attempts.length > 1;
+    const hasAttempts = log.attempts && log.attempts.length > 0;
     const [isDiagnosticExpanded, setIsDiagnosticExpanded] = useState(false);
 
     return (
@@ -208,10 +279,24 @@ export function LogCard({ log }: { log: RelayLog }) {
                     <div className={cn("p-4 grid grid-cols-[auto_1fr] gap-4", hasError ? "items-start" : "items-center")}>
                         <ModelAvatar size={40} />
                         <div className="min-w-0 flex flex-col gap-3">
-                            <div className="flex items-center gap-2 min-w-0 text-sm">
+                            <div className="flex flex-wrap items-center gap-2 min-w-0 text-sm">
                                 <span className="font-semibold text-card-foreground truncate" title={log.request_model_name}>
                                     {log.request_model_name}
                                 </span>
+                                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
+                                <Badge variant="outline" className="shrink-0 max-w-[180px] gap-1 truncate border-border bg-muted/30 px-1.5 py-0 text-xs">
+                                    <Route className="size-3 shrink-0" />
+                                    <span className="truncate" title={routeLabel}>{routeLabel}</span>
+                                </Badge>
+                                {endpointLabel && (
+                                    <>
+                                        <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
+                                        <Badge variant="outline" className="shrink-0 max-w-[180px] gap-1 truncate border-border bg-muted/30 px-1.5 py-0 text-xs">
+                                            <Waypoints className="size-3 shrink-0" />
+                                            <span className="truncate" title={endpointLabel}>{endpointLabel}</span>
+                                        </Badge>
+                                    </>
+                                )}
                                 <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
                                 {hasMultipleAttempts ? (
                                     <RetryBadgeWithTooltip
@@ -228,9 +313,11 @@ export function LogCard({ log }: { log: RelayLog }) {
                                         {log.channel_name}
                                     </Badge>
                                 )}
+                                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
                                 <span className="text-muted-foreground truncate" title={log.actual_model_name}>
                                     {log.actual_model_name}
                                 </span>
+                                <LogStatusBadge log={log} />
                                 {log.attempts?.some(a => a.sticky) && (
                                     <Pin className="size-3.5 shrink-0 text-amber-500" />
                                 )}
@@ -287,6 +374,20 @@ export function LogCard({ log }: { log: RelayLog }) {
                             <ModelAvatar size={28} />
                             <span className="font-semibold text-card-foreground">{log.request_model_name}</span>
                             <ArrowRight className="size-3.5 text-muted-foreground/50" />
+                            <Badge variant="outline" className="max-w-[200px] gap-1 truncate border-border bg-muted/30 text-xs">
+                                <Route className="size-3 shrink-0" />
+                                <span className="truncate" title={routeLabel}>{routeLabel}</span>
+                            </Badge>
+                            {endpointLabel && (
+                                <>
+                                    <ArrowRight className="size-3.5 text-muted-foreground/50" />
+                                    <Badge variant="outline" className="max-w-[200px] gap-1 truncate border-border bg-muted/30 text-xs">
+                                        <Waypoints className="size-3 shrink-0" />
+                                        <span className="truncate" title={endpointLabel}>{endpointLabel}</span>
+                                    </Badge>
+                                </>
+                            )}
+                            <ArrowRight className="size-3.5 text-muted-foreground/50" />
                             {hasMultipleAttempts ? (
                                 <RetryBadgeWithTooltip
                                     channelName={log.channel_name}
@@ -302,7 +403,9 @@ export function LogCard({ log }: { log: RelayLog }) {
                                     {log.channel_name}
                                 </Badge>
                             )}
+                            <ArrowRight className="size-3.5 text-muted-foreground/50" />
                             <span className="text-muted-foreground">{log.actual_model_name}</span>
+                            <LogStatusBadge log={log} />
                             {log.attempts?.some(a => a.sticky) && (
                                 <Pin className="size-3.5 shrink-0 text-amber-500" />
                             )}
@@ -310,7 +413,24 @@ export function LogCard({ log }: { log: RelayLog }) {
 
                         <MorphingDialogDescription className="flex-1 min-h-0">
                             <div className="flex flex-col min-h-0 h-full gap-4">
-                                {(hasError || hasMultipleAttempts) && (
+                                <div className="grid shrink-0 grid-cols-2 gap-2 rounded-2xl border border-border bg-muted/30 p-3 text-xs md:grid-cols-4 lg:grid-cols-7">
+                                    {[
+                                        { label: t('apiKey'), value: requestAPIKeyName || '-' },
+                                        { label: t('router'), value: routeLabel },
+                                        { label: t('endpoint'), value: endpointLabel || '-' },
+                                        { label: t('provider'), value: log.channel_name || '-' },
+                                        { label: t('requestModel'), value: log.request_model_name || '-' },
+                                        { label: t('actualModel'), value: log.actual_model_name || '-' },
+                                        { label: t('finalStatus'), value: t(finalStatus(log)) },
+                                    ].map((item) => (
+                                        <div key={item.label} className="min-w-0 rounded-xl bg-background/40 p-2">
+                                            <div className="mb-1 text-[10px] uppercase text-muted-foreground">{item.label}</div>
+                                            <div className="truncate font-medium text-foreground" title={item.value}>{item.value}</div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {(hasError || hasAttempts) && (
                                     <div className={cn(
                                         "flex-initial min-h-0 flex flex-col rounded-2xl border overflow-hidden max-h-[40%]",
                                         hasError
@@ -324,7 +444,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                             )}
                                             onClick={() => setIsDiagnosticExpanded(!isDiagnosticExpanded)}
                                         >
-                                            {hasError ? (
+                                        {hasError ? (
                                                 <AlertCircle className="size-4 text-destructive" />
                                             ) : (
                                                 <RotateCw className="size-4 text-muted-foreground" />
@@ -333,10 +453,10 @@ export function LogCard({ log }: { log: RelayLog }) {
                                                 "text-sm font-medium",
                                                 hasError ? "text-destructive" : "text-secondary-foreground"
                                             )}>
-                                                {hasError ? t('errorInfo') : t('retryDetails')}
+                                                {hasError ? t('errorInfo') : t('routeAttempts')}
                                             </span>
                                             <div className="ml-auto flex items-center gap-2">
-                                                {hasMultipleAttempts && (
+                                                {hasAttempts && (
                                                     <Badge
                                                         variant="outline"
                                                         className={cn(
@@ -383,22 +503,39 @@ export function LogCard({ log }: { log: RelayLog }) {
                                                             </div>
                                                         )}
 
-                                                        {hasMultipleAttempts && (
-                                                            <div className="flex flex-col gap-2">
+                                                        {hasAttempts && (
+                                                            <div className="relative flex flex-col gap-2 pl-3">
+                                                                <div className="absolute left-[18px] top-4 bottom-4 w-px bg-border" />
                                                                 {log.attempts!.map((attempt, idx) => (
                                                                     <div
                                                                         key={idx}
                                                                         className={cn(
-                                                                            "text-xs p-2.5 rounded-xl border transition-colors flex flex-col gap-2",
-                                                                            attempt.status === 'success'
-                                                                                ? "bg-primary/5 border-primary/20 hover:bg-primary/10"
-                                                                                : "bg-destructive/5 border-destructive/20 hover:bg-destructive/10"
+                                                                            "relative ml-5 text-xs p-2.5 rounded-xl border transition-colors flex flex-col gap-2 bg-background/70",
+                                                                            statusMeta(attempt.status, t).className
                                                                         )}
                                                                     >
-                                                                        <div className="flex items-center gap-2">
+                                                                        {(() => {
+                                                                            const meta = statusMeta(attempt.status, t);
+                                                                            const Icon = meta.Icon;
+                                                                            return (
+                                                                                <span className={cn("absolute -left-[31px] top-2.5 z-10 flex size-5 items-center justify-center rounded-full border bg-card", meta.className)}>
+                                                                                    <Icon className="size-3" />
+                                                                                </span>
+                                                                            );
+                                                                        })()}
+                                                                        <div className="flex flex-wrap items-center gap-2">
+                                                                            <Badge variant="outline" className={cn("h-5 border px-1.5 text-[10px] font-bold uppercase", statusMeta(attempt.status, t).className)}>
+                                                                                #{attempt.attempt_num || idx + 1} {statusMeta(attempt.status, t).label}
+                                                                            </Badge>
                                                                             <span className="font-semibold text-foreground">
                                                                                 {attempt.endpoint_name || attempt.channel_name}
                                                                             </span>
+                                                                            {attempt.endpoint_name && (
+                                                                                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                                                                                    <Server className="size-3" />
+                                                                                    {attempt.channel_name}
+                                                                                </span>
+                                                                            )}
                                                                             <span className="text-muted-foreground">
                                                                                 ({attempt.model_name})
                                                                             </span>

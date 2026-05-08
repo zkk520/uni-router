@@ -446,7 +446,30 @@
             "retryDetails": "Retry Details",
             "attempts": "attempts",
             "success": "Success",
-            "failed": "Failed"
+            "failed": "Failed",
+            "failover": "Failover",
+            "skipped": "Skipped",
+            "circuitBreak": "Circuit break",
+            "legacyRouting": "Legacy group routing",
+            "unknownRouter": "Unknown router",
+            "routeAttempts": "Route attempts",
+            "apiKey": "Key",
+            "router": "Router",
+            "endpoint": "Endpoint",
+            "provider": "Provider",
+            "requestModel": "Request model",
+            "actualModel": "Actual model",
+            "finalStatus": "Final status"
+        },
+        "filters": {
+            "title": "Filters",
+            "statusAll": "All statuses",
+            "statusSuccess": "Success",
+            "statusFailed": "Failed",
+            "allKeys": "All keys",
+            "allRouters": "All routers",
+            "allEndpoints": "All endpoints",
+            "reset": "Reset"
         }
     },
     "channel": {
