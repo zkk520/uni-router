@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Cable, Check, Loader2, Plus, Trash2, X, TestTube2 } from 'lucide-react';
 import {
     useCreateRouter,
@@ -46,23 +46,98 @@ function endpointLabel(endpoint: RouteEndpoint, options: RouteOptionChannel[]) {
     };
 }
 
+function endpointKey(endpoint: Pick<RouteEndpoint, 'channel_id' | 'channel_key_id'>) {
+    return `${endpoint.channel_id}:${endpoint.channel_key_id}`;
+}
+
+function SectionTitle({ title, description }: { title: string; description: string }) {
+    return (
+        <div className="mb-3">
+            <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        </div>
+    );
+}
+
+function EditableName({
+    value,
+    onSave,
+    className,
+    placeholder,
+}: {
+    value: string;
+    onSave: (next: string, reset: () => void) => void;
+    className?: string;
+    placeholder?: string;
+}) {
+    const [draft, setDraft] = useState(value);
+    const skipNextBlur = useRef(false);
+
+    useEffect(() => {
+        setDraft(value);
+    }, [value]);
+
+    const reset = () => setDraft(value);
+    const commit = () => {
+        if (skipNextBlur.current) {
+            skipNextBlur.current = false;
+            return;
+        }
+        const next = draft.trim();
+        if (!next) {
+            reset();
+            return;
+        }
+        if (next === value) return;
+        onSave(next, reset);
+    };
+    const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Enter') {
+            event.currentTarget.blur();
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            skipNextBlur.current = true;
+            reset();
+            event.currentTarget.blur();
+        }
+    };
+
+    return (
+        <Input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className={className}
+        />
+    );
+}
+
 function AddEndpointForm({
     options,
+    endpoints,
     onAdd,
 }: {
     options: RouteOptionChannel[];
+    endpoints: RouteEndpoint[];
     onAdd: (endpoint: RouteEndpointAddRequest) => void;
 }) {
     const [channelId, setChannelId] = useState<number>(options[0]?.id ?? 0);
-    const channel = options.find((item) => item.id === channelId);
-    const [keyId, setKeyId] = useState<number>(channel?.keys[0]?.id ?? 0);
     const [mapping, setMapping] = useState('');
 
+    const channel = options.find((item) => item.id === channelId) ?? options[0];
     const keys = channel?.keys ?? [];
-    const selectedKey = keys.find((item) => item.id === keyId);
+    const [keyId, setKeyId] = useState<number>(keys[0]?.id ?? 0);
+    const effectiveKeyId = keys.some((item) => item.id === keyId) ? keyId : keys[0]?.id ?? 0;
+    const selectedKey = keys.find((item) => item.id === effectiveKeyId);
+    const duplicate = !!channel && !!selectedKey && endpoints.some((item) =>
+        item.channel_id === channel.id && item.channel_key_id === selectedKey.id
+    );
 
     const submit = () => {
-        if (!channel || !selectedKey) return;
+        if (!channel || !selectedKey || duplicate) return;
         onAdd({
             name: `${channel.name} / ${selectedKey.remark || selectedKey.masked_key}`,
             channel_id: channel.id,
@@ -75,45 +150,54 @@ function AddEndpointForm({
     };
 
     return (
-        <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3">
-            <div className="grid gap-2 md:grid-cols-2">
-                <select
-                    value={channelId}
-                    onChange={(e) => {
-                        const nextChannel = options.find((item) => item.id === Number(e.target.value));
-                        setChannelId(nextChannel?.id ?? 0);
-                        setKeyId(nextChannel?.keys[0]?.id ?? 0);
-                    }}
-                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                >
-                    {options.map((item) => (
-                        <option key={item.id} value={item.id}>
-                            {item.name}
-                        </option>
-                    ))}
-                </select>
-                <select
-                    value={keyId}
-                    onChange={(e) => setKeyId(Number(e.target.value))}
-                    className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                >
-                    {keys.map((item) => (
-                        <option key={item.id} value={item.id}>
-                            {item.remark || '无备注'} ({item.masked_key})
-                        </option>
-                    ))}
-                </select>
-            </div>
-            <Input
-                value={mapping}
-                onChange={(e) => setMapping(e.target.value)}
-                placeholder='可选模型映射 JSON，例如 {"claude":"provider/claude"}'
-                className="rounded-xl"
+        <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-4">
+            <SectionTitle
+                title="添加候选端点"
+                description="从已有供应商和密钥中选择一条上游路径，加入当前路由的端点池。"
             />
-            <Button type="button" onClick={submit} disabled={!channel || !selectedKey} className="rounded-xl">
-                <Plus className="size-4 mr-2" />
-                添加端点
-            </Button>
+            <div className="grid gap-3">
+                <div className="grid gap-2 md:grid-cols-2">
+                    <select
+                        value={channel?.id ?? 0}
+                        onChange={(e) => {
+                            const nextChannel = options.find((item) => item.id === Number(e.target.value));
+                            setChannelId(nextChannel?.id ?? 0);
+                            setKeyId(nextChannel?.keys[0]?.id ?? 0);
+                        }}
+                        className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                    >
+                        {options.map((item) => (
+                            <option key={item.id} value={item.id}>
+                                {item.name}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        value={effectiveKeyId}
+                        onChange={(e) => setKeyId(Number(e.target.value))}
+                        className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                    >
+                        {keys.map((item) => (
+                            <option key={item.id} value={item.id}>
+                                {item.remark || '无备注'} ({item.masked_key})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <Input
+                    value={mapping}
+                    onChange={(e) => setMapping(e.target.value)}
+                    placeholder='可选模型映射 JSON，例如 {"claude":"provider/claude"}'
+                    className="rounded-xl"
+                />
+                {duplicate ? (
+                    <div className="text-xs text-destructive">该端点已在此路由中。</div>
+                ) : null}
+                <Button type="button" onClick={submit} disabled={!channel || !selectedKey || duplicate} className="rounded-xl">
+                    <Plus className="size-4 mr-2" />
+                    添加端点
+                </Button>
+            </div>
         </div>
     );
 }
@@ -126,6 +210,21 @@ function RouterDetail({ routerId }: { routerId: number }) {
     const testEndpoint = useTestRouterEndpoint();
 
     const endpoints = useMemo(() => [...(router?.endpoints ?? [])].sort((a, b) => a.priority - b.priority), [router]);
+    const duplicateEndpointIds = useMemo(() => {
+        const firstByKey = new Map<string, number>();
+        const duplicates = new Set<number>();
+        for (const endpoint of endpoints) {
+            const key = endpointKey(endpoint);
+            const first = firstByKey.get(key);
+            if (first == null) {
+                firstByKey.set(key, endpoint.id);
+            } else {
+                duplicates.add(first);
+                duplicates.add(endpoint.id);
+            }
+        }
+        return duplicates;
+    }, [endpoints]);
 
     if (!router) {
         return (
@@ -137,15 +236,19 @@ function RouterDetail({ routerId }: { routerId: number }) {
 
     const update = (patch: Partial<RouteProfile>) => {
         updateRouter.mutate({ id: router.id, ...patch }, {
-            onSuccess: () => toast.success('路由已保存'),
             onError: (error) => toast.error('路由保存失败', { description: String(error) }),
         });
     };
 
-    const updateEndpoint = (endpoint: RouteEndpoint, patch: Partial<RouteEndpoint>) => {
+    const updateEndpoint = (endpoint: RouteEndpoint, patch: Partial<RouteEndpoint>, options?: { onError?: () => void }) => {
         updateRouter.mutate({
             id: router.id,
             endpoints_to_update: [{ id: endpoint.id, ...patch }],
+        }, {
+            onError: (error) => {
+                options?.onError?.();
+                toast.error('端点保存失败', { description: String(error) });
+            },
         });
     };
 
@@ -167,17 +270,30 @@ function RouterDetail({ routerId }: { routerId: number }) {
         updateRouter.mutate({
             id: router.id,
             endpoints_to_add: [{ ...endpoint, priority: maxPriority + 1 }],
-        }, { onSuccess: () => toast.success('端点已添加') });
+        }, {
+            onSuccess: () => toast.success('端点已添加'),
+            onError: (error) => toast.error('端点添加失败', { description: String(error) }),
+        });
     };
 
     return (
         <div className="flex h-full min-h-0 flex-col gap-4">
             <div className="rounded-2xl border border-border bg-card p-4">
+                <SectionTitle
+                    title="路由策略"
+                    description="定义这条路由的名称、分配模式，以及上游失败后是否继续尝试其他端点。"
+                />
                 <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-center">
-                    <Input
+                    <EditableName
                         value={router.name}
-                        onChange={(e) => update({ name: e.target.value })}
+                        onSave={(name, reset) => updateRouter.mutate({ id: router.id, name }, {
+                            onError: (error) => {
+                                reset();
+                                toast.error('路由保存失败', { description: String(error) });
+                            },
+                        })}
                         className="rounded-xl font-semibold"
+                        placeholder="路由名称"
                     />
                     <select
                         value={router.mode}
@@ -194,100 +310,133 @@ function RouterDetail({ routerId }: { routerId: number }) {
                 </div>
             </div>
 
-            <AddEndpointForm options={options} onAdd={addEndpoint} />
+            <AddEndpointForm options={options} endpoints={endpoints} onAdd={addEndpoint} />
 
-            <div className="min-h-0 flex-1 overflow-auto space-y-3 pr-1">
-                {endpoints.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                        添加端点后此路由才能使用。
-                    </div>
-                ) : endpoints.map((endpoint) => {
-                    const label = endpointLabel(endpoint, options);
-                    const current = router.preferred_endpoint_id === endpoint.id;
-                    const invalid = !label.keyEnabled;
-                    const totalWeight = endpoints.reduce((sum, item) => sum + Math.max(1, item.weight || 1), 0);
-                    const percent = Math.round((Math.max(1, endpoint.weight || 1) / totalWeight) * 100);
-                    return (
-                        <div
-                            key={endpoint.id}
-                            className={cn(
-                                'rounded-2xl border bg-card p-4 transition-colors',
-                                current ? 'border-primary/60' : 'border-border',
-                                invalid && 'border-destructive/40'
-                            )}
-                        >
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <span className={cn('size-2 rounded-full', statusClass(endpoint.status))} />
-                                        <Input
-                                            value={endpoint.name}
-                                            onChange={(e) => updateEndpoint(endpoint, { name: e.target.value })}
-                                            className="h-8 max-w-[360px] rounded-lg border-0 bg-transparent px-1 font-semibold shadow-none"
-                                        />
-                                        {current ? <Badge>当前</Badge> : null}
-                                    </div>
-                                    <div className="mt-1 text-xs text-muted-foreground">
-                                        {label.channelName} / {label.keyName}
-                                        {invalid ? <span className="ml-2 text-destructive">上游密钥无效</span> : null}
-                                    </div>
-                                    {endpoint.last_error ? (
-                                        <div className="mt-2 text-xs text-destructive line-clamp-2">{endpoint.last_error}</div>
-                                    ) : null}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Button variant="secondary" size="sm" onClick={() => reorder(endpoint, -1)}>上移</Button>
-                                    <Button variant="secondary" size="sm" onClick={() => reorder(endpoint, 1)}>下移</Button>
-                                    <Button
-                                        variant={current ? 'secondary' : 'default'}
-                                        size="sm"
-                                        disabled={current || invalid || endpoint.status === 'error'}
-                                        onClick={() => switchEndpoint.mutate({ router_id: router.id, endpoint_id: endpoint.id }, {
-                                            onSuccess: () => toast.success(`已切换到 ${endpoint.name}`),
-                                        })}
-                                    >
-                                        <Check className="size-4 mr-1" />
-                                        {current ? '使用中' : '切换'}
-                                    </Button>
-                                    <Button variant="secondary" size="sm" onClick={() => testEndpoint.mutate(endpoint.id)}>
-                                        <TestTube2 className="size-4" />
-                                    </Button>
-                                    <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() => updateRouter.mutate({ id: router.id, endpoints_to_delete: [endpoint.id] })}
-                                    >
-                                        <Trash2 className="size-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                            <div className="mt-3 grid gap-3 md:grid-cols-3">
-                                <label className="text-xs text-muted-foreground">
-                                    优先级
-                                    <Input
-                                        type="number"
-                                        value={endpoint.priority}
-                                        onChange={(e) => updateEndpoint(endpoint, { priority: Number(e.target.value) || 1 })}
-                                        className="mt-1 rounded-xl"
-                                    />
-                                </label>
-                                <label className="text-xs text-muted-foreground">
-                                    权重 {router.mode === 'weighted' ? `(${percent}%)` : ''}
-                                    <Input
-                                        type="number"
-                                        value={endpoint.weight}
-                                        onChange={(e) => updateEndpoint(endpoint, { weight: Number(e.target.value) || 1 })}
-                                        className="mt-1 rounded-xl"
-                                    />
-                                </label>
-                                <label className="flex items-center gap-2 pt-5 text-sm">
-                                    <Switch checked={endpoint.enabled} onCheckedChange={(checked) => updateEndpoint(endpoint, { enabled: checked })} />
-                                    启用
-                                </label>
-                            </div>
+            <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-border bg-card p-4">
+                <SectionTitle
+                    title="端点池"
+                    description={router.mode === 'weighted'
+                        ? '加权模式会按权重比例选择已启用端点。'
+                        : '手动模式优先使用当前端点；开启故障转移后，失败时继续尝试后续端点。'}
+                />
+                <div className="min-h-0 flex-1 overflow-auto space-y-3 pr-1">
+                    {endpoints.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                            添加端点后此路由才能使用。
                         </div>
-                    );
-                })}
+                    ) : endpoints.map((endpoint) => {
+                        const label = endpointLabel(endpoint, options);
+                        const current = router.preferred_endpoint_id === endpoint.id;
+                        const invalid = !label.keyEnabled;
+                        const duplicate = duplicateEndpointIds.has(endpoint.id);
+                        const totalWeight = endpoints.reduce((sum, item) => sum + Math.max(1, item.weight || 1), 0);
+                        const percent = Math.round((Math.max(1, endpoint.weight || 1) / totalWeight) * 100);
+                        return (
+                            <div
+                                key={endpoint.id}
+                                className={cn(
+                                    'rounded-2xl border bg-background p-4 transition-colors',
+                                    current ? 'border-primary/60' : 'border-border',
+                                    duplicate && 'border-amber-500/70',
+                                    invalid && 'border-destructive/40'
+                                )}
+                            >
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className={cn('size-2 rounded-full', statusClass(endpoint.status))} />
+                                            <EditableName
+                                                value={endpoint.name}
+                                                onSave={(name, reset) => updateEndpoint(endpoint, { name }, { onError: reset })}
+                                                className="h-8 max-w-[360px] rounded-lg border-0 bg-transparent px-1 font-semibold shadow-none"
+                                            />
+                                            {current ? <Badge>{router.mode === 'weighted' ? '已选' : '当前'}</Badge> : null}
+                                            {duplicate ? <Badge variant="outline" className="border-amber-500/70 text-amber-700">重复</Badge> : null}
+                                        </div>
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            {label.channelName} / {label.keyName}
+                                            {invalid ? <span className="ml-2 text-destructive">上游密钥无效</span> : null}
+                                        </div>
+                                        {duplicate ? (
+                                            <div className="mt-2 text-xs text-amber-700">同一供应商和密钥已被重复添加，请删除多余端点。</div>
+                                        ) : null}
+                                        {endpoint.last_error ? (
+                                            <div className="mt-2 text-xs text-destructive line-clamp-2">{endpoint.last_error}</div>
+                                        ) : null}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="secondary" size="sm" onClick={() => reorder(endpoint, -1)}>上移</Button>
+                                        <Button variant="secondary" size="sm" onClick={() => reorder(endpoint, 1)}>下移</Button>
+                                        {router.mode === 'manual' ? (
+                                            <Button
+                                                variant={current ? 'secondary' : 'default'}
+                                                size="sm"
+                                                disabled={current || invalid || endpoint.status === 'error'}
+                                                onClick={() => switchEndpoint.mutate({ router_id: router.id, endpoint_id: endpoint.id }, {
+                                                    onSuccess: () => toast.success(`已切换到 ${endpoint.name}`),
+                                                })}
+                                            >
+                                                <Check className="size-4 mr-1" />
+                                                {current ? '当前使用' : '设为当前'}
+                                            </Button>
+                                        ) : (
+                                            <Badge variant="outline">权重 {percent}%</Badge>
+                                        )}
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            title="测试端点"
+                                            onClick={() => testEndpoint.mutate(endpoint.id, {
+                                                onSuccess: (result) => {
+                                                    if (result.success) {
+                                                        toast.success('端点测试成功', { description: `${result.latency_ms}ms` });
+                                                    } else {
+                                                        toast.error('端点测试失败', { description: result.error });
+                                                    }
+                                                },
+                                                onError: (error) => toast.error('端点测试失败', { description: String(error) }),
+                                            })}
+                                        >
+                                            <TestTube2 className="size-4" />
+                                            测试
+                                        </Button>
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => updateRouter.mutate({ id: router.id, endpoints_to_delete: [endpoint.id] })}
+                                        >
+                                            <Trash2 className="size-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                                    <label className="text-xs text-muted-foreground">
+                                        优先级
+                                        <Input
+                                            type="number"
+                                            value={endpoint.priority}
+                                            onChange={(e) => updateEndpoint(endpoint, { priority: Number(e.target.value) || 1 })}
+                                            className="mt-1 rounded-xl"
+                                        />
+                                    </label>
+                                    <label className="text-xs text-muted-foreground">
+                                        权重 {router.mode === 'weighted' ? `(${percent}%)` : ''}
+                                        <Input
+                                            type="number"
+                                            value={endpoint.weight}
+                                            onChange={(e) => updateEndpoint(endpoint, { weight: Number(e.target.value) || 1 })}
+                                            className="mt-1 rounded-xl"
+                                        />
+                                    </label>
+                                    <label className="flex items-center gap-2 pt-5 text-sm">
+                                        <Switch checked={endpoint.enabled} onCheckedChange={(checked) => updateEndpoint(endpoint, { enabled: checked })} />
+                                        启用
+                                    </label>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
