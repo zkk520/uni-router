@@ -58,6 +58,7 @@ func InitDB(dbType, dsn string, debug bool) error {
 		&model.RouteProfile{},
 		&model.RouteEndpoint{},
 		&model.LLMInfo{},
+		&model.PriceRule{},
 		&model.APIKey{},
 		&model.Setting{},
 		&model.StatsTotal{},

@@ -32,6 +32,9 @@ func DBExportAll(ctx context.Context, includeLogs, includeStats bool) (*model.DB
 	if err := conn.Find(&d.LLMInfos).Error; err != nil {
 		return nil, fmt.Errorf("export llm_infos: %w", err)
 	}
+	if err := conn.Find(&d.PriceRules).Error; err != nil {
+		return nil, fmt.Errorf("export price_rules: %w", err)
+	}
 	if err := conn.Find(&d.APIKeys).Error; err != nil {
 		return nil, fmt.Errorf("export api_keys: %w", err)
 	}
@@ -97,6 +100,11 @@ func DBImportIncremental(ctx context.Context, dump *model.DBDump) (*model.DBImpo
 			return fmt.Errorf("import llm_infos: %w", err)
 		} else {
 			res.RowsAffected["llm_infos"] = n
+		}
+		if n, err := createDoNothing(tx, dump.PriceRules); err != nil {
+			return fmt.Errorf("import price_rules: %w", err)
+		} else {
+			res.RowsAffected["price_rules"] = n
 		}
 		if n, err := createDoNothing(tx, dump.APIKeys); err != nil {
 			return fmt.Errorf("import api_keys: %w", err)
