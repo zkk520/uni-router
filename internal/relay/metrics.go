@@ -28,19 +28,12 @@ type RelayMetrics struct {
 	InternalResponse *transformerModel.InternalLLMResponse
 
 	// 统计指标
-	ActualModel   string
-	Stats         model.StatsMetrics
-	RouterID      int
-	RouterName    string
-	EndpointID    int
-	EndpointName  string
-	ChannelID     int
-	ChannelKeyID  int
-	ChannelName   string
-	PriceRuleID   int
-	PriceSource   string
-	PriceCurrency string
-	PriceSnapshot string
+	ActualModel string
+	Stats       model.StatsMetrics
+	RouterID    int
+	RouterName  string
+	EndpointID  int
+	EndpointName string
 }
 
 func NewRelayMetrics(apiKeyID int, requestModel string, req *transformerModel.InternalLLMRequest) *RelayMetrics {
@@ -68,45 +61,14 @@ func (m *RelayMetrics) SetInternalResponse(resp *transformerModel.InternalLLMRes
 	m.Stats.InputToken = usage.PromptTokens
 	m.Stats.OutputToken = usage.CompletionTokens
 
+	modelPrice := price.GetLLMPrice(actualModel)
+	if modelPrice == nil {
+		return
+	}
 	if usage.PromptTokensDetails == nil {
 		usage.PromptTokensDetails = &transformerModel.PromptTokensDetails{
 			CachedTokens: 0,
 		}
-	}
-
-	if rule, ok := op.ResolvePriceRule(op.PriceRuleResolveRequest{
-		ChannelID:    m.ChannelID,
-		ChannelKeyID: m.ChannelKeyID,
-		ModelName:    actualModel,
-		ProviderName: m.ChannelName,
-	}); ok {
-		usageForPrice := op.TokenUsageForPrice{
-			InputTokens:      int(usage.PromptTokens),
-			OutputTokens:     int(usage.CompletionTokens),
-			CacheReadTokens:  int(usage.PromptTokensDetails.CachedTokens),
-			CacheWriteTokens: int(usage.CacheCreationInputTokens),
-		}
-		totalCost := op.CalculateTokenCost(rule, usageForPrice)
-		if usage.CompletionTokens > 0 {
-			outputOnly := op.CalculateTokenCost(rule, op.TokenUsageForPrice{OutputTokens: int(usage.CompletionTokens)})
-			m.Stats.OutputCost = outputOnly
-			m.Stats.InputCost = totalCost - outputOnly
-		} else {
-			m.Stats.InputCost = totalCost
-			m.Stats.OutputCost = 0
-		}
-		m.PriceRuleID = rule.ID
-		m.PriceSource = "rule"
-		m.PriceCurrency = string(rule.Currency)
-		if snapshot, err := json.Marshal(rule); err == nil {
-			m.PriceSnapshot = string(snapshot)
-		}
-		return
-	}
-
-	modelPrice := price.GetLLMPrice(actualModel)
-	if modelPrice == nil {
-		return
 	}
 	if usage.AnthropicUsage {
 		m.Stats.InputCost = (float64(usage.PromptTokensDetails.CachedTokens)*modelPrice.CacheRead +
@@ -116,11 +78,6 @@ func (m *RelayMetrics) SetInternalResponse(resp *transformerModel.InternalLLMRes
 		m.Stats.InputCost = (float64(usage.PromptTokensDetails.CachedTokens)*modelPrice.CacheRead + float64(usage.PromptTokens-usage.PromptTokensDetails.CachedTokens)*modelPrice.Input) * 1e-6
 	}
 	m.Stats.OutputCost = float64(usage.CompletionTokens) * modelPrice.Output * 1e-6
-	m.PriceSource = "fallback"
-	m.PriceCurrency = "USD"
-	if snapshot, err := json.Marshal(modelPrice); err == nil {
-		m.PriceSnapshot = string(snapshot)
-	}
 }
 
 func (m *RelayMetrics) Save(ctx context.Context, success bool, err error, attempts []model.ChannelAttempt) {
@@ -190,10 +147,6 @@ func (m *RelayMetrics) saveLog(ctx context.Context, err error, duration time.Dur
 		UseTime:          int(duration.Milliseconds()),
 		Attempts:         attempts,
 		TotalAttempts:    len(attempts),
-		PriceRuleID:      m.PriceRuleID,
-		PriceSource:      m.PriceSource,
-		PriceCurrency:    m.PriceCurrency,
-		PriceSnapshot:    m.PriceSnapshot,
 	}
 
 	if apiKey, getErr := op.APIKeyGet(m.APIKeyID, ctx); getErr == nil {

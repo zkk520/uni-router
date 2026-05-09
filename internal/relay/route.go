@@ -103,9 +103,6 @@ func handleRoute(internalRequest *model.InternalLLMRequest, inAdapter model.Inbo
 		op.ChannelKeyUpdate(usedKey)
 
 		if fwdErr == nil {
-			metrics.ChannelID = channel.ID
-			metrics.ChannelKeyID = usedKey.ID
-			metrics.ChannelName = channel.Name
 			ra.collectResponse()
 			span(dbmodel.AttemptSuccess, statusCode, "")
 			_ = op.RouteEndpointMarkStatus(ep.ID, dbmodel.RouteEndpointStatusNormal, "", c.Request.Context())
