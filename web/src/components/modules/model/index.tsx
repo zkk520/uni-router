@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useModelList } from '@/api/endpoints/model';
 import { ModelItem } from './Item';
+import { PriceImportDialog } from './PriceImport';
 import { useSearchStore, useToolbarViewOptionsStore } from '@/components/modules/toolbar';
 import { VirtualizedGrid } from '@/components/common/VirtualizedGrid';
 
@@ -38,13 +39,18 @@ export function Model() {
     }, [sortedModels, searchTerm, filter]);
 
     return (
-        <VirtualizedGrid
-            items={visibleModels}
-            layout={layout}
-            columns={{ default: 1, md: 2, lg: 3 }}
-            estimateItemHeight={112}
-            getItemKey={(model) => `model-${model.name}`}
-            renderItem={(model) => <ModelItem model={model} layout={layout} />}
-        />
+        <div className="grid gap-4">
+            <div className="flex justify-end">
+                <PriceImportDialog />
+            </div>
+            <VirtualizedGrid
+                items={visibleModels}
+                layout={layout}
+                columns={{ default: 1, md: 2, lg: 3 }}
+                estimateItemHeight={112}
+                getItemKey={(model) => `model-${model.name}`}
+                renderItem={(model) => <ModelItem model={model} layout={layout} />}
+            />
+        </div>
     );
 }
