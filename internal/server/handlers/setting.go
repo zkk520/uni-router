@@ -158,7 +158,6 @@ func decodeDBDump(body []byte, dump *model.DBDump) error {
 		len(dump.Settings) == 0 &&
 		len(dump.APIKeys) == 0 &&
 		len(dump.LLMInfos) == 0 &&
-		len(dump.PriceRules) == 0 &&
 		len(dump.RelayLogs) == 0 &&
 		len(dump.StatsDaily) == 0 &&
 		len(dump.StatsHourly) == 0 &&

@@ -13,7 +13,6 @@ type DBDump struct {
 	Channels    []Channel    `json:"channels,omitempty"`
 	ChannelKeys []ChannelKey `json:"channel_keys,omitempty"`
 	LLMInfos    []LLMInfo    `json:"llm_infos,omitempty"`
-	PriceRules  []PriceRule  `json:"price_rules,omitempty"`
 	APIKeys     []APIKey     `json:"api_keys,omitempty"`
 	Settings    []Setting    `json:"settings,omitempty"`
 
