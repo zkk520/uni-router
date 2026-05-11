@@ -22,18 +22,20 @@ type RouteProfileDetail struct {
 }
 
 type RouteOptionChannel struct {
-	ID      int                     `json:"id"`
-	Name    string                  `json:"name"`
-	Enabled bool                    `json:"enabled"`
-	Models  []string                `json:"models"`
-	Keys    []RouteOptionChannelKey `json:"keys"`
+	ID          int                     `json:"id"`
+	Name        string                  `json:"name"`
+	Enabled     bool                    `json:"enabled"`
+	Models      []string                `json:"models"`
+	Keys        []RouteOptionChannelKey `json:"keys"`
+	PricingRule model.PricingRule       `json:"pricing_rule"`
 }
 
 type RouteOptionChannelKey struct {
-	ID        int    `json:"id"`
-	Enabled   bool   `json:"enabled"`
-	Remark    string `json:"remark"`
-	MaskedKey string `json:"masked_key"`
+	ID          int               `json:"id"`
+	Enabled     bool              `json:"enabled"`
+	Remark      string            `json:"remark"`
+	MaskedKey   string            `json:"masked_key"`
+	PricingRule model.PricingRule `json:"pricing_rule"`
 }
 
 func RouteProfileList(ctx context.Context) ([]RouteProfileDetail, error) {
@@ -158,6 +160,16 @@ func RouteProfileUpdate(req *model.RouteProfileUpdateRequest, ctx context.Contex
 		if item.Status != nil {
 			up["status"] = *item.Status
 		}
+		if item.UsePricingOverride != nil {
+			up["use_pricing_override"] = *item.UsePricingOverride
+		}
+		if item.PricingRuleOverride != nil {
+			rule := *item.PricingRuleOverride
+			if rule.Enabled {
+				rule = model.NormalizePricingRule(rule)
+			}
+			up["pricing_rule_override"] = rule
+		}
 		if err := tx.Model(&model.RouteEndpoint{}).
 			Where("id = ? AND router_id = ?", item.ID, req.ID).
 			Updates(up).Error; err != nil {
@@ -170,13 +182,15 @@ func RouteProfileUpdate(req *model.RouteProfileUpdateRequest, ctx context.Contex
 		newItems := make([]model.RouteEndpoint, 0, len(req.EndpointsToAdd))
 		for _, item := range req.EndpointsToAdd {
 			ep := model.RouteEndpoint{
-				RouterID:     req.ID,
-				Name:         item.Name,
-				ChannelID:    item.ChannelID,
-				ChannelKeyID: item.ChannelKeyID,
-				Priority:     item.Priority,
-				Weight:       item.Weight,
-				Enabled:      item.Enabled,
+				RouterID:            req.ID,
+				Name:                item.Name,
+				ChannelID:           item.ChannelID,
+				ChannelKeyID:        item.ChannelKeyID,
+				Priority:            item.Priority,
+				Weight:              item.Weight,
+				Enabled:             item.Enabled,
+				UsePricingOverride:  item.UsePricingOverride,
+				PricingRuleOverride: item.PricingRuleOverride,
 			}
 			normalizeEndpoint(&ep, now)
 			newItems = append(newItems, ep)
@@ -262,18 +276,20 @@ func RouteOptions(ctx context.Context) ([]RouteOptionChannel, error) {
 		keys := make([]RouteOptionChannelKey, 0, len(ch.Keys))
 		for _, k := range ch.Keys {
 			keys = append(keys, RouteOptionChannelKey{
-				ID:        k.ID,
-				Enabled:   k.Enabled,
-				Remark:    k.Remark,
-				MaskedKey: maskKey(k.ChannelKey),
+				ID:          k.ID,
+				Enabled:     k.Enabled,
+				Remark:      k.Remark,
+				MaskedKey:   maskKey(k.ChannelKey),
+				PricingRule: k.PricingRule,
 			})
 		}
 		options = append(options, RouteOptionChannel{
-			ID:      ch.ID,
-			Name:    ch.Name,
-			Enabled: ch.Enabled,
-			Models:  cleanModels,
-			Keys:    keys,
+			ID:          ch.ID,
+			Name:        ch.Name,
+			Enabled:     ch.Enabled,
+			Models:      cleanModels,
+			Keys:        keys,
+			PricingRule: ch.PricingRule,
 		})
 	}
 	return options, nil
@@ -438,6 +454,10 @@ func normalizeEndpoint(ep *model.RouteEndpoint, now int64) {
 	}
 	if ep.Status == "" {
 		ep.Status = model.RouteEndpointStatusUnknown
+	}
+	if ep.UsePricingOverride {
+		ep.PricingRuleOverride = model.NormalizePricingRule(ep.PricingRuleOverride)
+		ep.PricingRuleOverride.Enabled = true
 	}
 	ep.CreatedAt = now
 	ep.UpdatedAt = now

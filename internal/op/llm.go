@@ -20,6 +20,23 @@ func LLMList(ctx context.Context) ([]model.LLMInfo, error) {
 			LLMPrice: cost,
 		})
 	}
+	if len(models) == 0 {
+		seen := make(map[string]struct{})
+		for _, channel := range channelCache.GetAll() {
+			modelNames := strings.Split(channel.Model+","+channel.CustomModel, ",")
+			for _, modelName := range modelNames {
+				name := strings.ToLower(strings.TrimSpace(modelName))
+				if name == "" {
+					continue
+				}
+				if _, ok := seen[name]; ok {
+					continue
+				}
+				seen[name] = struct{}{}
+				models = append(models, model.LLMInfo{Name: name})
+			}
+		}
+	}
 	return models, nil
 }
 

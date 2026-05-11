@@ -27,19 +27,21 @@ type RouteProfile struct {
 }
 
 type RouteEndpoint struct {
-	ID            int                 `json:"id" gorm:"primaryKey"`
-	RouterID      int                 `json:"router_id" gorm:"not null;index"`
-	Name          string              `json:"name" gorm:"not null"`
-	ChannelID     int                 `json:"channel_id" gorm:"not null;index"`
-	ChannelKeyID  int                 `json:"channel_key_id" gorm:"not null;index"`
-	Priority      int                 `json:"priority"`
-	Weight        int                 `json:"weight"`
-	Enabled       bool                `json:"enabled" gorm:"default:true"`
-	Status        RouteEndpointStatus `json:"status" gorm:"not null;default:unknown"`
-	LastCheckedAt int64               `json:"last_checked_at"`
-	LastError     string              `json:"last_error" gorm:"type:text"`
-	CreatedAt     int64               `json:"created_at"`
-	UpdatedAt     int64               `json:"updated_at"`
+	ID                  int                 `json:"id" gorm:"primaryKey"`
+	RouterID            int                 `json:"router_id" gorm:"not null;index"`
+	Name                string              `json:"name" gorm:"not null"`
+	ChannelID           int                 `json:"channel_id" gorm:"not null;index"`
+	ChannelKeyID        int                 `json:"channel_key_id" gorm:"not null;index"`
+	Priority            int                 `json:"priority"`
+	Weight              int                 `json:"weight"`
+	Enabled             bool                `json:"enabled" gorm:"default:true"`
+	Status              RouteEndpointStatus `json:"status" gorm:"not null;default:unknown"`
+	LastCheckedAt       int64               `json:"last_checked_at"`
+	LastError           string              `json:"last_error" gorm:"type:text"`
+	UsePricingOverride  bool                `json:"use_pricing_override" gorm:"default:false"`
+	PricingRuleOverride PricingRule         `json:"pricing_rule_override" gorm:"serializer:json"`
+	CreatedAt           int64               `json:"created_at"`
+	UpdatedAt           int64               `json:"updated_at"`
 }
 
 type RouteProfileUpdateRequest struct {
@@ -54,21 +56,25 @@ type RouteProfileUpdateRequest struct {
 }
 
 type RouteEndpointAddRequest struct {
-	Name         string `json:"name" binding:"required"`
-	ChannelID    int    `json:"channel_id" binding:"required"`
-	ChannelKeyID int    `json:"channel_key_id" binding:"required"`
-	Priority     int    `json:"priority"`
-	Weight       int    `json:"weight"`
-	Enabled      bool   `json:"enabled"`
+	Name                string      `json:"name" binding:"required"`
+	ChannelID           int         `json:"channel_id" binding:"required"`
+	ChannelKeyID        int         `json:"channel_key_id" binding:"required"`
+	Priority            int         `json:"priority"`
+	Weight              int         `json:"weight"`
+	Enabled             bool        `json:"enabled"`
+	UsePricingOverride  bool        `json:"use_pricing_override"`
+	PricingRuleOverride PricingRule `json:"pricing_rule_override"`
 }
 
 type RouteEndpointUpdateRequest struct {
-	ID           int                  `json:"id" binding:"required"`
-	Name         *string              `json:"name,omitempty"`
-	ChannelID    *int                 `json:"channel_id,omitempty"`
-	ChannelKeyID *int                 `json:"channel_key_id,omitempty"`
-	Priority     *int                 `json:"priority,omitempty"`
-	Weight       *int                 `json:"weight,omitempty"`
-	Enabled      *bool                `json:"enabled,omitempty"`
-	Status       *RouteEndpointStatus `json:"status,omitempty"`
+	ID                  int                  `json:"id" binding:"required"`
+	Name                *string              `json:"name,omitempty"`
+	ChannelID           *int                 `json:"channel_id,omitempty"`
+	ChannelKeyID        *int                 `json:"channel_key_id,omitempty"`
+	Priority            *int                 `json:"priority,omitempty"`
+	Weight              *int                 `json:"weight,omitempty"`
+	Enabled             *bool                `json:"enabled,omitempty"`
+	Status              *RouteEndpointStatus `json:"status,omitempty"`
+	UsePricingOverride  *bool                `json:"use_pricing_override,omitempty"`
+	PricingRuleOverride *PricingRule         `json:"pricing_rule_override,omitempty"`
 }

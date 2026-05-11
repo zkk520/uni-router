@@ -192,6 +192,7 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 			metrics.ActualModel = requestModel
 			metrics.EndpointID = ep.ID
 			metrics.EndpointName = ep.Name
+			metrics.SetPricingContext(channel, usedKey)
 			if usage != nil {
 				metrics.SetUsageFromImages(requestModel, *usage)
 			}
@@ -204,12 +205,6 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 			attempt.Duration = int(time.Since(start).Milliseconds())
 			attempts = append(attempts, attempt)
 			_ = op.RouteEndpointMarkStatus(ep.ID, model.RouteEndpointStatusNormal, "", ctx)
-
-			// Channel 维度统计
-			op.StatsChannelUpdate(channel.ID, model.StatsMetrics{
-				WaitTime:       int64(attempt.Duration),
-				RequestSuccess: 1,
-			})
 
 			metrics.Save(ctx, true, nil, attempts)
 			return
@@ -224,12 +219,6 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 		if shouldTripRouteEndpoint(statusCode, fwdErr) {
 			_ = op.RouteEndpointMarkStatus(ep.ID, model.RouteEndpointStatusError, fwdErr.Error(), ctx)
 		}
-
-		// Channel 维度统计
-		op.StatsChannelUpdate(channel.ID, model.StatsMetrics{
-			WaitTime:      int64(attempt.Duration),
-			RequestFailed: 1,
-		})
 
 		if written || c.Writer.Written() {
 			metrics.Save(ctx, false, fwdErr, attempts)
@@ -255,15 +244,18 @@ type imagesUsage struct {
 }
 
 type imagesRelayMetrics struct {
-	APIKeyID     int
-	RequestModel string
-	ActualModel  string
-	RouterID     int
-	RouterName   string
-	EndpointID   int
-	EndpointName string
-	StartTime    time.Time
-	FirstToken   time.Time
+	APIKeyID       int
+	RequestModel   string
+	ActualModel    string
+	RouterID       int
+	RouterName     string
+	EndpointID     int
+	EndpointName   string
+	PricingChannel *model.Channel
+	PricingKey     *model.ChannelKey
+	PricingInfo    model.PricingInfo
+	StartTime      time.Time
+	FirstToken     time.Time
 
 	Stats model.StatsMetrics
 
@@ -285,29 +277,41 @@ func (m *imagesRelayMetrics) SetFirstTokenTime(t time.Time) {
 	}
 }
 
+func (m *imagesRelayMetrics) SetPricingContext(channel *model.Channel, key model.ChannelKey) {
+	m.PricingChannel = channel
+	pricingKey := key
+	m.PricingKey = &pricingKey
+}
+
 func (m *imagesRelayMetrics) SetUsageFromImages(actualModel string, u imagesUsage) {
 	m.ActualModel = actualModel
 	m.Stats.InputToken = int64(u.InputTokens)
 	m.Stats.OutputToken = int64(u.OutputTokens)
 
-	modelPrice := price.GetLLMPrice(actualModel)
-	if modelPrice == nil {
+	resolvedPrice := price.ResolveLLMPrice(actualModel, m.PricingChannel, m.PricingKey)
+	if resolvedPrice == nil {
 		return
 	}
+	modelPrice := resolvedPrice.Price
+	m.PricingInfo = resolvedPrice.Info
 
 	m.Stats.InputCost = float64(u.InputTokens) * modelPrice.Input * 1e-6
 	m.Stats.OutputCost = float64(u.OutputTokens) * modelPrice.Output * 1e-6
+	m.Stats.AddCurrencyCosts(m.PricingInfo, m.Stats.InputCost, m.Stats.OutputCost)
 }
 
 func (m *imagesRelayMetrics) Save(ctx context.Context, success bool, err error, attempts []model.ChannelAttempt) {
 	duration := time.Since(m.StartTime)
 
 	globalStats := model.StatsMetrics{
-		WaitTime:    duration.Milliseconds(),
-		InputToken:  m.Stats.InputToken,
-		OutputToken: m.Stats.OutputToken,
-		InputCost:   m.Stats.InputCost,
-		OutputCost:  m.Stats.OutputCost,
+		WaitTime:             duration.Milliseconds(),
+		InputToken:           m.Stats.InputToken,
+		OutputToken:          m.Stats.OutputToken,
+		InputCost:            m.Stats.InputCost,
+		OutputCost:           m.Stats.OutputCost,
+		InputCostByCurrency:  m.Stats.InputCostByCurrency,
+		OutputCostByCurrency: m.Stats.OutputCostByCurrency,
+		TotalCostByCurrency:  m.Stats.TotalCostByCurrency,
 	}
 	if success {
 		globalStats.RequestSuccess = 1
@@ -321,6 +325,20 @@ func (m *imagesRelayMetrics) Save(ctx context.Context, success bool, err error, 
 	op.StatsDailyUpdate(context.Background(), globalStats)
 	op.StatsAPIKeyUpdate(m.APIKeyID, globalStats)
 	op.StatsChannelUpdate(channelID, globalStats)
+	if m.PricingKey != nil && m.PricingKey.ID > 0 {
+		op.StatsChannelKeyUpdate(m.PricingKey.ID, globalStats)
+	}
+	actualModel := m.ActualModel
+	if actualModel == "" {
+		actualModel = m.RequestModel
+	}
+	if success && actualModel != "" {
+		op.StatsModelUpdate(model.StatsModel{
+			Name:         actualModel,
+			ChannelID:    channelID,
+			StatsMetrics: globalStats,
+		})
+	}
 
 	log.Infof("images relay complete: model=%s, channel=%d(%s), success=%t, duration=%dms, input_token=%d, output_token=%d, input_cost=%f, output_cost=%f, total_cost=%f, attempts=%d",
 		m.RequestModel, channelID, channelName, success, duration.Milliseconds(),
@@ -338,20 +356,29 @@ func (m *imagesRelayMetrics) saveLog(ctx context.Context, err error, duration ti
 	}
 
 	relayLog := model.RelayLog{
-		Time:             m.StartTime.Unix(),
-		RequestModelName: m.RequestModel,
-		RouterID:         m.RouterID,
-		RouterName:       m.RouterName,
-		EndpointID:       m.EndpointID,
-		EndpointName:     m.EndpointName,
-		ChannelName:      channelName,
-		ChannelId:        channelID,
-		ActualModelName:  actualModel,
-		UseTime:          int(duration.Milliseconds()),
-		Attempts:         attempts,
-		TotalAttempts:    len(attempts),
-		RequestContent:   m.RequestContent,
-		ResponseContent:  m.ResponseContent,
+		Time:                 m.StartTime.Unix(),
+		RequestModelName:     m.RequestModel,
+		RouterID:             m.RouterID,
+		RouterName:           m.RouterName,
+		EndpointID:           m.EndpointID,
+		EndpointName:         m.EndpointName,
+		ChannelKeyID:         channelKeyIDFromPricingKey(m.PricingKey),
+		ChannelName:          channelName,
+		ChannelId:            channelID,
+		ActualModelName:      actualModel,
+		UseTime:              int(duration.Milliseconds()),
+		Attempts:             attempts,
+		TotalAttempts:        len(attempts),
+		RequestContent:       m.RequestContent,
+		ResponseContent:      m.ResponseContent,
+		CostCurrency:         m.PricingInfo.Currency,
+		CostCurrencySymbol:   m.PricingInfo.CurrencySymbol,
+		PricingMultiplier:    m.PricingInfo.Multiplier,
+		PricingUnit:          m.PricingInfo.Unit,
+		PricingRuleSource:    m.PricingInfo.RuleSource,
+		InputCostByCurrency:  m.Stats.InputCostByCurrency,
+		OutputCostByCurrency: m.Stats.OutputCostByCurrency,
+		TotalCostByCurrency:  m.Stats.TotalCostByCurrency,
 	}
 
 	if apiKey, getErr := op.APIKeyGet(m.APIKeyID, ctx); getErr == nil {

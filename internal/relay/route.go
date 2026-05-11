@@ -86,6 +86,7 @@ func handleRoute(internalRequest *model.InternalLLMRequest, inAdapter model.Inbo
 		req.endpointName = ep.Name
 		metrics.EndpointID = ep.ID
 		metrics.EndpointName = ep.Name
+		metrics.SetPricingContext(channel, usedKey)
 
 		log.Infof("router %s forwarding model %s to endpoint %s/channel %s model %s (attempt %d/%d)",
 			route.Name, requestModel, ep.Name, channel.Name, internalRequest.Model, idx+1, len(candidates))
@@ -100,15 +101,17 @@ func handleRoute(internalRequest *model.InternalLLMRequest, inAdapter model.Inbo
 		statusCode, fwdErr := ra.forward()
 		usedKey.StatusCode = statusCode
 		usedKey.LastUseTimeStamp = time.Now().Unix()
-		op.ChannelKeyUpdate(usedKey)
 
 		if fwdErr == nil {
 			ra.collectResponse()
+			usedKey.TotalCost += metrics.Stats.InputCost + metrics.Stats.OutputCost
+			op.ChannelKeyUpdate(usedKey)
 			span(dbmodel.AttemptSuccess, statusCode, "")
 			_ = op.RouteEndpointMarkStatus(ep.ID, dbmodel.RouteEndpointStatusNormal, "", c.Request.Context())
 			metrics.Save(c.Request.Context(), true, nil, req.routeAttempts)
 			return
 		}
+		op.ChannelKeyUpdate(usedKey)
 
 		written := c.Writer.Written()
 		if written {

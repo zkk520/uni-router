@@ -98,3 +98,57 @@ func GetLLMPrice(modelName string) *model.LLMPrice {
 	}
 	return &price
 }
+
+type ResolvedLLMPrice struct {
+	BasePrice model.LLMPrice    `json:"base_price"`
+	Price     model.LLMPrice    `json:"price"`
+	Info      model.PricingInfo `json:"pricing_info"`
+}
+
+func ResolveLLMPrice(modelName string, channel *model.Channel, key *model.ChannelKey) *ResolvedLLMPrice {
+	basePrice := GetLLMPrice(modelName)
+	if basePrice == nil {
+		return nil
+	}
+	rule := resolvePricingRule(channel, key)
+	price := model.LLMPrice{
+		Input:      basePrice.Input * rule.Multiplier,
+		Output:     basePrice.Output * rule.Multiplier,
+		CacheRead:  basePrice.CacheRead * rule.Multiplier,
+		CacheWrite: basePrice.CacheWrite * rule.Multiplier,
+	}
+	return &ResolvedLLMPrice{
+		BasePrice: *basePrice,
+		Price:     price,
+		Info: model.PricingInfo{
+			Currency:       rule.Currency,
+			CurrencySymbol: rule.CurrencySymbol,
+			Unit:           rule.Unit,
+			Multiplier:     rule.Multiplier,
+			BaseSource:     rule.BaseSource,
+			RuleSource:     pricingRuleSource(channel, key),
+		},
+	}
+}
+
+func resolvePricingRule(channel *model.Channel, key *model.ChannelKey) model.PricingRule {
+	if key != nil && key.PricingRule.Enabled {
+		rule := model.NormalizePricingRule(key.PricingRule)
+		rule.Enabled = true
+		return rule
+	}
+	if channel != nil && channel.PricingRule.Enabled {
+		return model.NormalizePricingRule(channel.PricingRule)
+	}
+	return model.DefaultPricingRule()
+}
+
+func pricingRuleSource(channel *model.Channel, key *model.ChannelKey) string {
+	if key != nil && key.PricingRule.Enabled {
+		return "channel_key"
+	}
+	if channel != nil && channel.PricingRule.Enabled {
+		return "channel_default"
+	}
+	return "system_default"
+}

@@ -55,6 +55,9 @@ func DBExportAll(ctx context.Context, includeLogs, includeStats bool) (*model.DB
 		if err := conn.Find(&d.StatsChannel).Error; err != nil {
 			return nil, fmt.Errorf("export stats_channel: %w", err)
 		}
+		if err := conn.Find(&d.StatsChannelKey).Error; err != nil {
+			return nil, fmt.Errorf("export stats_channel_key: %w", err)
+		}
 		if err := conn.Find(&d.StatsAPIKey).Error; err != nil {
 			return nil, fmt.Errorf("export stats_api_key: %w", err)
 		}
@@ -125,7 +128,7 @@ func DBImportIncremental(ctx context.Context, dump *model.DBDump) (*model.DBImpo
 			} else {
 				res.RowsAffected["stats_hourly"] = n
 			}
-			if n, err := createUpsertAll(tx, dump.StatsModel, []clause.Column{{Name: "id"}}); err != nil {
+			if n, err := createUpsertAll(tx, dump.StatsModel, []clause.Column{{Name: "name"}, {Name: "channel_id"}}); err != nil {
 				return fmt.Errorf("import stats_model: %w", err)
 			} else {
 				res.RowsAffected["stats_model"] = n
@@ -134,6 +137,11 @@ func DBImportIncremental(ctx context.Context, dump *model.DBDump) (*model.DBImpo
 				return fmt.Errorf("import stats_channel: %w", err)
 			} else {
 				res.RowsAffected["stats_channel"] = n
+			}
+			if n, err := createUpsertAll(tx, dump.StatsChannelKey, []clause.Column{{Name: "channel_key_id"}}); err != nil {
+				return fmt.Errorf("import stats_channel_key: %w", err)
+			} else {
+				res.RowsAffected["stats_channel_key"] = n
 			}
 			if n, err := createUpsertAll(tx, dump.StatsAPIKey, []clause.Column{{Name: "api_key_id"}}); err != nil {
 				return fmt.Errorf("import stats_api_key: %w", err)

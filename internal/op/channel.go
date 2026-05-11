@@ -26,6 +26,14 @@ func ChannelList(ctx context.Context) ([]model.Channel, error) {
 }
 
 func ChannelCreate(channel *model.Channel, ctx context.Context) error {
+	if channel.PricingRule.Enabled {
+		channel.PricingRule = model.NormalizePricingRule(channel.PricingRule)
+	}
+	for i := range channel.Keys {
+		if channel.Keys[i].PricingRule.Enabled {
+			channel.Keys[i].PricingRule = model.NormalizePricingRule(channel.Keys[i].PricingRule)
+		}
+	}
 	if err := db.GetDB().WithContext(ctx).Create(channel).Error; err != nil {
 		return err
 	}
@@ -173,6 +181,14 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 		selectFields = append(selectFields, "match_regex")
 		updates.MatchRegex = req.MatchRegex
 	}
+	if req.PricingRule != nil {
+		selectFields = append(selectFields, "pricing_rule")
+		rule := *req.PricingRule
+		if rule.Enabled {
+			rule = model.NormalizePricingRule(rule)
+		}
+		updates.PricingRule = rule
+	}
 
 	// 只有当有字段需要更新时才执行 UPDATE
 	if len(selectFields) > 0 {
@@ -188,27 +204,44 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to delete channel keys: %w", err)
 		}
+		if err := tx.Where("channel_key_id IN ?", req.KeysToDelete).Delete(&model.StatsChannelKey{}).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to delete channel key stats: %w", err)
+		}
 	}
 
 	// 更新 keys（逐条，只更新提供的字段）
 	if len(req.KeysToUpdate) > 0 {
 		for _, ku := range req.KeysToUpdate {
-			updates := map[string]interface{}{}
+			selectFields := make([]string, 0, 4)
+			keyUpdate := model.ChannelKey{ID: ku.ID, ChannelID: req.ID}
 			if ku.Enabled != nil {
-				updates["enabled"] = *ku.Enabled
+				selectFields = append(selectFields, "enabled")
+				keyUpdate.Enabled = *ku.Enabled
 			}
 			if ku.ChannelKey != nil {
-				updates["channel_key"] = *ku.ChannelKey
+				selectFields = append(selectFields, "channel_key")
+				keyUpdate.ChannelKey = *ku.ChannelKey
 			}
 			if ku.Remark != nil {
-				updates["remark"] = *ku.Remark
+				selectFields = append(selectFields, "remark")
+				keyUpdate.Remark = *ku.Remark
 			}
-			if len(updates) == 0 {
+			if ku.PricingRule != nil {
+				rule := *ku.PricingRule
+				if rule.Enabled {
+					rule = model.NormalizePricingRule(rule)
+				}
+				selectFields = append(selectFields, "pricing_rule")
+				keyUpdate.PricingRule = rule
+			}
+			if len(selectFields) == 0 {
 				continue
 			}
 			if err := tx.Model(&model.ChannelKey{}).
 				Where("id = ? AND channel_id = ?", ku.ID, req.ID).
-				Updates(updates).Error; err != nil {
+				Select(selectFields).
+				Updates(&keyUpdate).Error; err != nil {
 				tx.Rollback()
 				return nil, fmt.Errorf("failed to update channel key %d: %w", ku.ID, err)
 			}
@@ -219,11 +252,16 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 	if len(req.KeysToAdd) > 0 {
 		newKeys := make([]model.ChannelKey, 0, len(req.KeysToAdd))
 		for _, ka := range req.KeysToAdd {
+			rule := ka.PricingRule
+			if rule.Enabled {
+				rule = model.NormalizePricingRule(rule)
+			}
 			newKeys = append(newKeys, model.ChannelKey{
-				ChannelID:  req.ID,
-				Enabled:    ka.Enabled,
-				ChannelKey: ka.ChannelKey,
-				Remark:     ka.Remark,
+				ChannelID:   req.ID,
+				Enabled:     ka.Enabled,
+				ChannelKey:  ka.ChannelKey,
+				Remark:      ka.Remark,
+				PricingRule: rule,
 			})
 		}
 		if err := tx.Create(&newKeys).Error; err != nil {
@@ -239,6 +277,9 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 	// 刷新缓存并返回最新数据
 	if err := channelRefreshCacheByID(req.ID, ctx); err != nil {
 		return nil, err
+	}
+	for _, keyID := range req.KeysToDelete {
+		_ = StatsChannelKeyDel(keyID)
 	}
 
 	channel, _ := channelCache.Get(req.ID)
@@ -283,6 +324,18 @@ func ChannelDel(id int, ctx context.Context) error {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete channel stats: %w", err)
 	}
+	keyIDs := make([]int, 0, len(ch.Keys))
+	for _, k := range ch.Keys {
+		if k.ID != 0 {
+			keyIDs = append(keyIDs, k.ID)
+		}
+	}
+	if len(keyIDs) > 0 {
+		if err := tx.Where("channel_key_id IN ?", keyIDs).Delete(&model.StatsChannelKey{}).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to delete channel key stats: %w", err)
+		}
+	}
 
 	// 删除渠道
 	if err := tx.Delete(&model.Channel{}, id).Error; err != nil {
@@ -299,6 +352,7 @@ func ChannelDel(id int, ctx context.Context) error {
 	for _, k := range ch.Keys {
 		if k.ID != 0 {
 			channelKeyCache.Del(k.ID)
+			_ = StatsChannelKeyDel(k.ID)
 		}
 	}
 	StatsChannelDel(id)

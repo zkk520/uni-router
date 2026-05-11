@@ -63,9 +63,8 @@ func listChannel(c *gin.Context) {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	for i, channel := range channels {
-		stats := op.StatsChannelGet(channel.ID)
-		channels[i].Stats = &stats
+	for i := range channels {
+		attachChannelStats(&channels[i])
 	}
 	resp.Success(c, channels)
 }
@@ -80,8 +79,7 @@ func createChannel(c *gin.Context) {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	stats := op.StatsChannelGet(channel.ID)
-	channel.Stats = &stats
+	attachChannelStats(&channel)
 	go func(channel *model.Channel) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
@@ -104,8 +102,7 @@ func updateChannel(c *gin.Context) {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	stats := op.StatsChannelGet(channel.ID)
-	channel.Stats = &stats
+	attachChannelStats(channel)
 	go func(channel *model.Channel) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
@@ -168,4 +165,13 @@ func syncChannel(c *gin.Context) {
 func getLastSyncTime(c *gin.Context) {
 	time := task.GetLastSyncModelsTime()
 	resp.Success(c, time)
+}
+
+func attachChannelStats(channel *model.Channel) {
+	stats := op.StatsChannelGet(channel.ID)
+	channel.Stats = &stats
+	for i := range channel.Keys {
+		keyStats := op.StatsChannelKeyGet(channel.Keys[i].ID)
+		channel.Keys[i].Stats = &keyStats
+	}
 }

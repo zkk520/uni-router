@@ -26,25 +26,34 @@ type ChannelAttempt struct {
 }
 
 type RelayLog struct {
-	ID                int64            `json:"id" gorm:"primaryKey;autoIncrement:false"` // Snowflake ID
-	Time              int64            `json:"time"`                                     // 时间戳（秒）
-	RequestModelName  string           `json:"request_model_name"`                       // 请求模型名称
-	RequestAPIKeyName string           `json:"request_api_key_name"`                     // 请求使用的 API Key 名称
-	RouterID          int              `json:"router_id,omitempty"`                      // Router ID
-	RouterName        string           `json:"router_name,omitempty"`                    // Router 名称
-	EndpointID        int              `json:"endpoint_id,omitempty"`                    // 实际使用端点 ID
-	EndpointName      string           `json:"endpoint_name,omitempty"`                  // 实际使用端点名称
-	ChannelId         int              `json:"channel"`                                  // 实际使用的渠道ID
-	ChannelName       string           `json:"channel_name"`                             // 渠道名称
-	ActualModelName   string           `json:"actual_model_name"`                        // 实际使用模型名称
-	InputTokens       int              `json:"input_tokens"`                             // 输入Token
-	OutputTokens      int              `json:"output_tokens"`                            // 输出 Token
-	Ftut              int              `json:"ftut"`                                     // 首字时间(毫秒)
-	UseTime           int              `json:"use_time"`                                 // 总用时(毫秒)
-	Cost              float64          `json:"cost"`                                     // 消耗费用
-	RequestContent    string           `json:"request_content"`                          // 请求内容
-	ResponseContent   string           `json:"response_content"`                         // 响应内容
-	Error             string           `json:"error"`                                    // 错误信息
-	Attempts          []ChannelAttempt `json:"attempts" gorm:"serializer:json"`          // 所有尝试记录
-	TotalAttempts     int              `json:"total_attempts"`                           // 总尝试次数
+	ID                   int64                          `json:"id" gorm:"primaryKey;autoIncrement:false"` // Snowflake ID
+	Time                 int64                          `json:"time"`                                     // 时间戳（秒）
+	RequestModelName     string                         `json:"request_model_name"`                       // 请求模型名称
+	RequestAPIKeyName    string                         `json:"request_api_key_name"`                     // 请求使用的 API Key 名称
+	RouterID             int                            `json:"router_id,omitempty"`                      // Router ID
+	RouterName           string                         `json:"router_name,omitempty"`                    // Router 名称
+	EndpointID           int                            `json:"endpoint_id,omitempty"`                    // 实际使用端点 ID
+	EndpointName         string                         `json:"endpoint_name,omitempty"`                  // 实际使用端点名称
+	ChannelId            int                            `json:"channel"`                                  // 实际使用的渠道ID
+	ChannelKeyID         int                            `json:"channel_key_id,omitempty"`                 // 实际使用的渠道 Key ID
+	ChannelName          string                         `json:"channel_name"`                             // 渠道名称
+	ActualModelName      string                         `json:"actual_model_name"`                        // 实际使用模型名称
+	InputTokens          int                            `json:"input_tokens"`                             // 输入Token
+	OutputTokens         int                            `json:"output_tokens"`                            // 输出 Token
+	Ftut                 int                            `json:"ftut"`                                     // 首字时间(毫秒)
+	UseTime              int                            `json:"use_time"`                                 // 总用时(毫秒)
+	Cost                 float64                        `json:"cost"`                                     // 消耗费用
+	CostCurrency         string                         `json:"cost_currency"`                            // 费用币种
+	CostCurrencySymbol   string                         `json:"cost_currency_symbol"`                     // 费用币种符号
+	PricingMultiplier    float64                        `json:"pricing_multiplier"`                       // 本次计费倍率
+	PricingUnit          string                         `json:"pricing_unit"`                             // 计费单位
+	PricingRuleSource    string                         `json:"pricing_rule_source"`                      // 计费规则来源
+	InputCostByCurrency  map[string]CostCurrencyMetrics `json:"input_cost_by_currency,omitempty" gorm:"serializer:json"`
+	OutputCostByCurrency map[string]CostCurrencyMetrics `json:"output_cost_by_currency,omitempty" gorm:"serializer:json"`
+	TotalCostByCurrency  map[string]CostCurrencyMetrics `json:"total_cost_by_currency,omitempty" gorm:"serializer:json"`
+	RequestContent       string                         `json:"request_content"`                 // 请求内容
+	ResponseContent      string                         `json:"response_content"`                // 响应内容
+	Error                string                         `json:"error"`                           // 错误信息
+	Attempts             []ChannelAttempt               `json:"attempts" gorm:"serializer:json"` // 所有尝试记录
+	TotalAttempts        int                            `json:"total_attempts"`                  // 总尝试次数
 }

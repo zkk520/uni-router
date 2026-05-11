@@ -28,12 +28,15 @@ type RelayMetrics struct {
 	InternalResponse *transformerModel.InternalLLMResponse
 
 	// 统计指标
-	ActualModel string
-	Stats       model.StatsMetrics
-	RouterID    int
-	RouterName  string
-	EndpointID  int
-	EndpointName string
+	ActualModel    string
+	Stats          model.StatsMetrics
+	RouterID       int
+	RouterName     string
+	EndpointID     int
+	EndpointName   string
+	PricingChannel *model.Channel
+	PricingKey     *model.ChannelKey
+	PricingInfo    model.PricingInfo
 }
 
 func NewRelayMetrics(apiKeyID int, requestModel string, req *transformerModel.InternalLLMRequest) *RelayMetrics {
@@ -49,6 +52,12 @@ func (m *RelayMetrics) SetFirstTokenTime(t time.Time) {
 	m.FirstTokenTime = t
 }
 
+func (m *RelayMetrics) SetPricingContext(channel *model.Channel, key model.ChannelKey) {
+	m.PricingChannel = channel
+	pricingKey := key
+	m.PricingKey = &pricingKey
+}
+
 func (m *RelayMetrics) SetInternalResponse(resp *transformerModel.InternalLLMResponse, actualModel string) {
 	m.InternalResponse = resp
 	m.ActualModel = actualModel
@@ -61,10 +70,12 @@ func (m *RelayMetrics) SetInternalResponse(resp *transformerModel.InternalLLMRes
 	m.Stats.InputToken = usage.PromptTokens
 	m.Stats.OutputToken = usage.CompletionTokens
 
-	modelPrice := price.GetLLMPrice(actualModel)
-	if modelPrice == nil {
+	resolvedPrice := price.ResolveLLMPrice(actualModel, m.PricingChannel, m.PricingKey)
+	if resolvedPrice == nil {
 		return
 	}
+	modelPrice := resolvedPrice.Price
+	m.PricingInfo = resolvedPrice.Info
 	if usage.PromptTokensDetails == nil {
 		usage.PromptTokensDetails = &transformerModel.PromptTokensDetails{
 			CachedTokens: 0,
@@ -78,17 +89,21 @@ func (m *RelayMetrics) SetInternalResponse(resp *transformerModel.InternalLLMRes
 		m.Stats.InputCost = (float64(usage.PromptTokensDetails.CachedTokens)*modelPrice.CacheRead + float64(usage.PromptTokens-usage.PromptTokensDetails.CachedTokens)*modelPrice.Input) * 1e-6
 	}
 	m.Stats.OutputCost = float64(usage.CompletionTokens) * modelPrice.Output * 1e-6
+	m.Stats.AddCurrencyCosts(m.PricingInfo, m.Stats.InputCost, m.Stats.OutputCost)
 }
 
 func (m *RelayMetrics) Save(ctx context.Context, success bool, err error, attempts []model.ChannelAttempt) {
 	duration := time.Since(m.StartTime)
 
 	globalStats := model.StatsMetrics{
-		WaitTime:    duration.Milliseconds(),
-		InputToken:  m.Stats.InputToken,
-		OutputToken: m.Stats.OutputToken,
-		InputCost:   m.Stats.InputCost,
-		OutputCost:  m.Stats.OutputCost,
+		WaitTime:             duration.Milliseconds(),
+		InputToken:           m.Stats.InputToken,
+		OutputToken:          m.Stats.OutputToken,
+		InputCost:            m.Stats.InputCost,
+		OutputCost:           m.Stats.OutputCost,
+		InputCostByCurrency:  m.Stats.InputCostByCurrency,
+		OutputCostByCurrency: m.Stats.OutputCostByCurrency,
+		TotalCostByCurrency:  m.Stats.TotalCostByCurrency,
 	}
 	if success {
 		globalStats.RequestSuccess = 1
@@ -102,6 +117,16 @@ func (m *RelayMetrics) Save(ctx context.Context, success bool, err error, attemp
 	op.StatsDailyUpdate(context.Background(), globalStats)
 	op.StatsAPIKeyUpdate(m.APIKeyID, globalStats)
 	op.StatsChannelUpdate(channelID, globalStats)
+	if m.PricingKey != nil && m.PricingKey.ID > 0 {
+		op.StatsChannelKeyUpdate(m.PricingKey.ID, globalStats)
+	}
+	if success && m.ActualModel != "" {
+		op.StatsModelUpdate(model.StatsModel{
+			Name:         m.ActualModel,
+			ChannelID:    channelID,
+			StatsMetrics: globalStats,
+		})
+	}
 
 	log.Infof("relay complete: model=%s, channel=%d(%s), success=%t, duration=%dms, input_token=%d, output_token=%d, input_cost=%f, output_cost=%f, total_cost=%f, attempts=%d",
 		m.RequestModel, channelID, channelName, success, duration.Milliseconds(),
@@ -135,18 +160,27 @@ func (m *RelayMetrics) saveLog(ctx context.Context, err error, duration time.Dur
 	}
 
 	relayLog := model.RelayLog{
-		Time:             m.StartTime.Unix(),
-		RequestModelName: m.RequestModel,
-		RouterID:         m.RouterID,
-		RouterName:       m.RouterName,
-		EndpointID:       m.EndpointID,
-		EndpointName:     m.EndpointName,
-		ChannelName:      channelName,
-		ChannelId:        channelID,
-		ActualModelName:  actualModel,
-		UseTime:          int(duration.Milliseconds()),
-		Attempts:         attempts,
-		TotalAttempts:    len(attempts),
+		Time:                 m.StartTime.Unix(),
+		RequestModelName:     m.RequestModel,
+		RouterID:             m.RouterID,
+		RouterName:           m.RouterName,
+		EndpointID:           m.EndpointID,
+		EndpointName:         m.EndpointName,
+		ChannelKeyID:         channelKeyIDFromPricingKey(m.PricingKey),
+		ChannelName:          channelName,
+		ChannelId:            channelID,
+		ActualModelName:      actualModel,
+		UseTime:              int(duration.Milliseconds()),
+		Attempts:             attempts,
+		TotalAttempts:        len(attempts),
+		CostCurrency:         m.PricingInfo.Currency,
+		CostCurrencySymbol:   m.PricingInfo.CurrencySymbol,
+		PricingMultiplier:    m.PricingInfo.Multiplier,
+		PricingUnit:          m.PricingInfo.Unit,
+		PricingRuleSource:    m.PricingInfo.RuleSource,
+		InputCostByCurrency:  m.Stats.InputCostByCurrency,
+		OutputCostByCurrency: m.Stats.OutputCostByCurrency,
+		TotalCostByCurrency:  m.Stats.TotalCostByCurrency,
 	}
 
 	if apiKey, getErr := op.APIKeyGet(m.APIKeyID, ctx); getErr == nil {
@@ -194,6 +228,13 @@ func (m *RelayMetrics) saveLog(ctx context.Context, err error, duration time.Dur
 	if logErr := op.RelayLogAdd(ctx, relayLog); logErr != nil {
 		log.Warnf("failed to save relay log: %v", logErr)
 	}
+}
+
+func channelKeyIDFromPricingKey(key *model.ChannelKey) int {
+	if key == nil {
+		return 0
+	}
+	return key.ID
 }
 
 // filterResponseForLog 创建响应的浅拷贝，过滤掉 images、MultipleContent 中的图片数据和 Audio.Data 以减少存储压力

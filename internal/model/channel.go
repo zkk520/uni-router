@@ -22,6 +22,7 @@ type Channel struct {
 	ChannelProxy  *string               `json:"channel_proxy"`
 	Stats         *StatsChannel         `json:"stats,omitempty" gorm:"foreignKey:ChannelID"`
 	MatchRegex    *string               `json:"match_regex"`
+	PricingRule   PricingRule           `json:"pricing_rule" gorm:"serializer:json"`
 }
 
 type BaseUrl struct {
@@ -35,14 +36,16 @@ type CustomHeader struct {
 }
 
 type ChannelKey struct {
-	ID               int     `json:"id" gorm:"primaryKey"`
-	ChannelID        int     `json:"channel_id"`
-	Enabled          bool    `json:"enabled" gorm:"default:true"`
-	ChannelKey       string  `json:"channel_key"`
-	StatusCode       int     `json:"status_code"`
-	LastUseTimeStamp int64   `json:"last_use_time_stamp"`
-	TotalCost        float64 `json:"total_cost"`
-	Remark           string  `json:"remark"`
+	ID               int              `json:"id" gorm:"primaryKey"`
+	ChannelID        int              `json:"channel_id"`
+	Enabled          bool             `json:"enabled" gorm:"default:true"`
+	ChannelKey       string           `json:"channel_key"`
+	StatusCode       int              `json:"status_code"`
+	LastUseTimeStamp int64            `json:"last_use_time_stamp"`
+	TotalCost        float64          `json:"total_cost"`
+	Remark           string           `json:"remark"`
+	PricingRule      PricingRule      `json:"pricing_rule" gorm:"serializer:json"`
+	Stats            *StatsChannelKey `json:"stats,omitempty" gorm:"foreignKey:ChannelKeyID"`
 }
 
 // ChannelUpdateRequest 渠道更新请求 - 仅包含变更的数据
@@ -60,6 +63,7 @@ type ChannelUpdateRequest struct {
 	ChannelProxy  *string                `json:"channel_proxy,omitempty"`
 	ParamOverride *string                `json:"param_override,omitempty"`
 	MatchRegex    *string                `json:"match_regex,omitempty"`
+	PricingRule   *PricingRule           `json:"pricing_rule,omitempty"`
 
 	KeysToAdd    []ChannelKeyAddRequest    `json:"keys_to_add,omitempty"`
 	KeysToUpdate []ChannelKeyUpdateRequest `json:"keys_to_update,omitempty"`
@@ -67,16 +71,18 @@ type ChannelUpdateRequest struct {
 }
 
 type ChannelKeyAddRequest struct {
-	Enabled    bool   `json:"enabled"`
-	ChannelKey string `json:"channel_key" binding:"required"`
-	Remark     string `json:"remark"`
+	Enabled     bool        `json:"enabled"`
+	ChannelKey  string      `json:"channel_key" binding:"required"`
+	Remark      string      `json:"remark"`
+	PricingRule PricingRule `json:"pricing_rule"`
 }
 
 type ChannelKeyUpdateRequest struct {
-	ID         int     `json:"id" binding:"required"`
-	Enabled    *bool   `json:"enabled,omitempty"`
-	ChannelKey *string `json:"channel_key,omitempty"`
-	Remark     *string `json:"remark,omitempty"`
+	ID          int          `json:"id" binding:"required"`
+	Enabled     *bool        `json:"enabled,omitempty"`
+	ChannelKey  *string      `json:"channel_key,omitempty"`
+	Remark      *string      `json:"remark,omitempty"`
+	PricingRule *PricingRule `json:"pricing_rule,omitempty"`
 }
 
 // ChannelFetchModelRequest is used by /channel/fetch-model (not persisted).
