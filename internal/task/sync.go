@@ -35,13 +35,30 @@ func SyncModelsTask() {
 		if !channel.AutoSync {
 			continue
 		}
-		fetchModels, err := helper.FetchModels(ctx, channel)
-		if err != nil {
-			log.Warnf("failed to fetch models for channel %s: %v", channel.Name, err)
+		fetchResult := helper.FetchModelsByKey(ctx, channel)
+		if len(fetchResult.Results) == 0 {
+			log.Warnf("failed to fetch models for channel %s: no enabled api key available", channel.Name)
 			continue
 		}
+		keyUpdates := make([]model.ChannelKeyUpdateRequest, 0, len(fetchResult.Results))
+		for _, result := range fetchResult.Results {
+			syncErr := result.Error
+			update := model.ChannelKeyUpdateRequest{
+				ID:              result.KeyID,
+				ModelsSyncedAt:  &result.ModelsSyncedAt,
+				ModelsSyncError: &syncErr,
+			}
+			if result.Success {
+				models := result.Models
+				update.Models = &models
+			}
+			keyUpdates = append(keyUpdates, update)
+			if !result.Success {
+				log.Warnf("failed to fetch models for channel %s key %s: %s", channel.Name, result.MaskedKey, result.Error)
+			}
+		}
 		oldModels := xstrings.SplitTrimCompact(",", channel.Model)
-		newModels := xstrings.TrimCompact(fetchModels)
+		newModels := effectiveSyncedModels(channel, fetchResult)
 		for _, m := range newModels {
 			m = strings.TrimSpace(m)
 			if m == "" {
@@ -55,18 +72,20 @@ func SyncModelsTask() {
 			totalNewModels = append(totalNewModels, m)
 		}
 		deletedModels, addedModels := diff.Diff(oldModels, newModels)
-		if len(deletedModels) > 0 || len(addedModels) > 0 {
-			fetchModelStr := strings.Join(newModels, ",")
-			if _, err := op.ChannelUpdate(&model.ChannelUpdateRequest{
-				ID:    channel.ID,
-				Model: &fetchModelStr,
-			}, ctx); err != nil {
-				log.Errorf("failed to update channel %s: %v", channel.Name, err)
-				continue
-			}
+		fetchModelStr := strings.Join(newModels, ",")
+		if _, err := op.ChannelUpdate(&model.ChannelUpdateRequest{
+			ID:           channel.ID,
+			Model:        &fetchModelStr,
+			KeysToUpdate: keyUpdates,
+		}, ctx); err != nil {
+			log.Errorf("failed to update channel %s: %v", channel.Name, err)
+			continue
 		}
 		if len(deletedModels) > 0 {
 			log.Infof("deleted channel %s models: %v", channel.Name, deletedModels)
+		}
+		if len(addedModels) > 0 {
+			log.Infof("added channel %s models: %v", channel.Name, addedModels)
 		}
 	}
 	llmPrice, err := op.LLMList(ctx)
@@ -95,4 +114,35 @@ func SyncModelsTask() {
 
 func GetLastSyncModelsTime() time.Time {
 	return lastSyncModelsTime
+}
+
+func effectiveSyncedModels(channel model.Channel, fetchResult model.ChannelFetchModelsResponse) []string {
+	models := make([]string, 0, len(fetchResult.Models))
+	seen := map[string]struct{}{}
+	add := func(items []string) {
+		for _, m := range items {
+			m = strings.TrimSpace(m)
+			if m == "" {
+				continue
+			}
+			if _, ok := seen[m]; ok {
+				continue
+			}
+			seen[m] = struct{}{}
+			models = append(models, m)
+		}
+	}
+	for _, result := range fetchResult.Results {
+		if result.Success {
+			add(result.Models)
+			continue
+		}
+		for _, key := range channel.Keys {
+			if key.ID == result.KeyID {
+				add(key.Models)
+				break
+			}
+		}
+	}
+	return models
 }

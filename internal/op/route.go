@@ -32,11 +32,14 @@ type RouteOptionChannel struct {
 }
 
 type RouteOptionChannelKey struct {
-	ID          int               `json:"id"`
-	Enabled     bool              `json:"enabled"`
-	Remark      string            `json:"remark"`
-	MaskedKey   string            `json:"masked_key"`
-	PricingRule model.PricingRule `json:"pricing_rule"`
+	ID              int               `json:"id"`
+	Enabled         bool              `json:"enabled"`
+	Remark          string            `json:"remark"`
+	MaskedKey       string            `json:"masked_key"`
+	Models          []string          `json:"models"`
+	ModelsSyncedAt  int64             `json:"models_synced_at"`
+	ModelsSyncError string            `json:"models_sync_error"`
+	PricingRule     model.PricingRule `json:"pricing_rule"`
 }
 
 func RouteProfileList(ctx context.Context) ([]RouteProfileDetail, error) {
@@ -282,11 +285,14 @@ func RouteOptions(ctx context.Context) ([]RouteOptionChannel, error) {
 		keys := make([]RouteOptionChannelKey, 0, len(ch.Keys))
 		for _, k := range ch.Keys {
 			keys = append(keys, RouteOptionChannelKey{
-				ID:          k.ID,
-				Enabled:     k.Enabled,
-				Remark:      k.Remark,
-				MaskedKey:   maskKey(k.ChannelKey),
-				PricingRule: k.PricingRule,
+				ID:              k.ID,
+				Enabled:         k.Enabled,
+				Remark:          k.Remark,
+				MaskedKey:       maskKey(k.ChannelKey),
+				Models:          append([]string(nil), k.Models...),
+				ModelsSyncedAt:  k.ModelsSyncedAt,
+				ModelsSyncError: k.ModelsSyncError,
+				PricingRule:     k.PricingRule,
 			})
 		}
 		options = append(options, RouteOptionChannel{

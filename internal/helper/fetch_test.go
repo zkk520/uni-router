@@ -1,6 +1,14 @@
 package helper
 
-import "testing"
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/bestruirui/octopus/internal/model"
+	"github.com/bestruirui/octopus/internal/transformer/outbound"
+)
 
 func TestAppendURLPath(t *testing.T) {
 	tests := []struct {
@@ -116,4 +124,59 @@ func TestDecodeModelListJSON(t *testing.T) {
 			t.Fatalf("decodeModelListJSON() = %#v, want parsed data", got)
 		}
 	})
+}
+
+func TestFetchModelsByKeyReturnsPartialSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Header.Get("Authorization") {
+		case "Bearer good-key":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"id":"gpt-4o"},{"id":"gpt-4o-mini"},{"id":"gpt-4o"}]}`))
+		default:
+			http.Error(w, `{"error":{"message":"invalid api key"}}`, http.StatusUnauthorized)
+		}
+	}))
+	defer server.Close()
+
+	got := FetchModelsByKey(context.Background(), model.Channel{
+		Type:     outbound.OutboundTypeOpenAIChat,
+		BaseUrls: []model.BaseUrl{{URL: server.URL + "/v1"}},
+		Keys: []model.ChannelKey{
+			{ID: 1, Enabled: true, ChannelKey: "good-key", Remark: "成功"},
+			{ID: 2, Enabled: true, ChannelKey: "bad-key", Remark: "失败"},
+		},
+	})
+
+	if len(got.Results) != 2 {
+		t.Fatalf("FetchModelsByKey results = %d, want 2", len(got.Results))
+	}
+	if !got.Results[0].Success || len(got.Results[0].Models) != 2 {
+		t.Fatalf("first key result = %#v, want success with deduped models", got.Results[0])
+	}
+	if got.Results[1].Success || got.Results[1].Error == "" {
+		t.Fatalf("second key result = %#v, want failure with error", got.Results[1])
+	}
+	if len(got.Models) != 2 || got.Models[0] != "gpt-4o" || got.Models[1] != "gpt-4o-mini" {
+		t.Fatalf("models = %#v, want successful key union", got.Models)
+	}
+}
+
+func TestFetchModelsByKeyAppliesMatchRegexPerKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"gpt-4o"},{"id":"text-embedding-3-small"}]}`))
+	}))
+	defer server.Close()
+	regex := "^gpt-"
+
+	got := FetchModelsByKey(context.Background(), model.Channel{
+		Type:       outbound.OutboundTypeOpenAIChat,
+		BaseUrls:   []model.BaseUrl{{URL: server.URL + "/v1"}},
+		Keys:       []model.ChannelKey{{ID: 1, Enabled: true, ChannelKey: "good-key"}},
+		MatchRegex: &regex,
+	})
+
+	if len(got.Models) != 1 || got.Models[0] != "gpt-4o" {
+		t.Fatalf("models = %#v, want regex-filtered model", got.Models)
+	}
 }

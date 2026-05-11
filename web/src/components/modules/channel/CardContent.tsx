@@ -52,8 +52,11 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                 total_cost: k.total_cost,
                 remark: k.remark,
                 pricing_rule: normalizePricingRule(k.pricing_rule),
+                models: k.models ?? [],
+                models_synced_at: k.models_synced_at ?? 0,
+                models_sync_error: k.models_sync_error ?? '',
             }))
-            : [{ enabled: true, channel_key: '', remark: '', pricing_rule: DEFAULT_PRICING_RULE }],
+            : [{ enabled: true, channel_key: '', remark: '', pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }],
         model: channel.model,
         custom_model: channel.custom_model,
         proxy: channel.proxy,
@@ -136,20 +139,26 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                 channel_key: k.channel_key,
                 remark: k.remark ?? '',
                 pricing_rule: normalizePricingRule(k.pricing_rule),
+                models: k.models ?? [],
+                models_synced_at: k.models_synced_at ?? 0,
+                models_sync_error: k.models_sync_error ?? '',
             }));
 
         const keys_to_update = nextKeys
             .filter((k) => typeof k.id === 'number' && originalByID.has(k.id as number))
             .map((k) => {
                 const orig = originalByID.get(k.id as number)!;
-                const u: { id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule } = { id: k.id as number };
+                const u: { id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule; models?: string[]; models_synced_at?: number; models_sync_error?: string } = { id: k.id as number };
                 if (k.enabled !== orig.enabled) u.enabled = k.enabled;
                 if (k.channel_key !== orig.channel_key) u.channel_key = k.channel_key;
                 if ((k.remark ?? '') !== orig.remark) u.remark = k.remark ?? '';
                 if (!pricingRuleEqual(k.pricing_rule, orig.pricing_rule)) u.pricing_rule = normalizePricingRule(k.pricing_rule);
+                if (JSON.stringify(k.models ?? []) !== JSON.stringify(orig.models ?? [])) u.models = k.models ?? [];
+                if ((k.models_synced_at ?? 0) !== (orig.models_synced_at ?? 0)) u.models_synced_at = k.models_synced_at ?? 0;
+                if ((k.models_sync_error ?? '') !== (orig.models_sync_error ?? '')) u.models_sync_error = k.models_sync_error ?? '';
                 return Object.keys(u).length > 1 ? u : null;
             })
-            .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule }>;
+            .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule; models?: string[]; models_synced_at?: number; models_sync_error?: string }>;
 
         if (keys_to_add.length > 0) req.keys_to_add = keys_to_add;
         if (keys_to_update.length > 0) req.keys_to_update = keys_to_update;
@@ -374,22 +383,23 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                             const keyTotalCost = formatCurrencyCosts(key.stats?.total_cost_by_currency, key.stats ? key.stats.input_cost + key.stats.output_cost : key.total_cost);
                                             const keyRule = normalizePricingRule(key.pricing_rule);
                                             return (
-                                            <div key={key.id} className="flex items-center gap-3 p-3 sm:p-4 border-b last:border-0 hover:bg-accent/5 transition-colors">
-                                                <div className={cn("size-2 shrink-0 rounded-full", key.enabled ? "bg-emerald-500" : "bg-destructive")} />
+                                            <div key={key.id} className="p-3 sm:p-4 border-b last:border-0 hover:bg-accent/5 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={cn("size-2 shrink-0 rounded-full", key.enabled ? "bg-emerald-500" : "bg-destructive")} />
 
-                                                <span className="font-mono text-sm truncate min-w-0 flex-1">
-                                                    {key.channel_key.length > 10
-                                                        ? `${key.channel_key.slice(0, 4)}...${key.channel_key.slice(-4)}`
-                                                        : key.channel_key}
-                                                </span>
-
-                                                {key.remark && (
-                                                    <span className="text-xs text-muted-foreground truncate max-w-24" title={key.remark}>
-                                                        {key.remark}
+                                                    <span className="font-mono text-sm truncate min-w-0 flex-1">
+                                                        {key.channel_key.length > 10
+                                                            ? `${key.channel_key.slice(0, 4)}...${key.channel_key.slice(-4)}`
+                                                            : key.channel_key}
                                                     </span>
-                                                )}
 
-                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {key.remark && (
+                                                        <span className="text-xs text-muted-foreground truncate max-w-24" title={key.remark}>
+                                                            {key.remark}
+                                                        </span>
+                                                    )}
+
+                                                    <div className="flex items-center gap-2 shrink-0">
                                                     {key.last_use_time_stamp > 0 && (
                                                         <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline-block">
                                                             {new Date(key.last_use_time_stamp * 1000).toLocaleString()}
@@ -423,6 +433,20 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                                     <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
                                                         {keyRule.enabled ? `${keyRule.multiplier || 1}x` : '继承'}
                                                     </Badge>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-2 flex flex-wrap items-center gap-2 pl-5 text-xs text-muted-foreground">
+                                                    <Badge variant={key.models_sync_error ? 'destructive' : 'secondary'} className="h-5 px-1.5 text-[10px]">
+                                                        模型 {key.models?.length ?? 0}
+                                                    </Badge>
+                                                    {key.models_synced_at > 0 ? (
+                                                        <span>同步 {new Date(key.models_synced_at * 1000).toLocaleString()}</span>
+                                                    ) : (
+                                                        <span>尚未同步模型</span>
+                                                    )}
+                                                    {key.models_sync_error ? (
+                                                        <span className="truncate text-destructive" title={key.models_sync_error}>{key.models_sync_error}</span>
+                                                    ) : null}
                                                 </div>
                                             </div>
                                             );

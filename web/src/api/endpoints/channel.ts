@@ -77,6 +77,9 @@ export type ChannelKey = {
     total_cost: number;
     remark: string;
     pricing_rule: PricingRule;
+    models: string[];
+    models_synced_at: number;
+    models_sync_error: string;
     stats?: StatsChannelKey;
 };
 
@@ -117,7 +120,7 @@ export type CreateChannelRequest = {
     type: ChannelType;
     enabled?: boolean;
     base_urls: BaseUrl[];
-    keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'pricing_rule'>>;
+    keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'pricing_rule' | 'models' | 'models_synced_at' | 'models_sync_error'>>;
     model: string;
     custom_model?: string;
     proxy?: boolean;
@@ -148,8 +151,8 @@ export type UpdateChannelRequest = {
     match_regex?: string | null;
     pricing_rule?: PricingRule;
     // keys diff
-    keys_to_add?: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'pricing_rule'>>;
-    keys_to_update?: Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule }>;
+    keys_to_add?: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'pricing_rule' | 'models' | 'models_synced_at' | 'models_sync_error'>>;
+    keys_to_update?: Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule; models?: string[]; models_synced_at?: number; models_sync_error?: string }>;
     keys_to_delete?: number[];
 };
 
@@ -161,6 +164,22 @@ export type FetchModelRequest = {
     channel_proxy?: string | null;
     match_regex?: string | null;
     custom_header?: CustomHeader[];
+};
+
+export type FetchModelResult = {
+    key_id?: number;
+    key_index: number;
+    remark: string;
+    masked_key: string;
+    success: boolean;
+    models: string[];
+    error?: string;
+    models_synced_at?: number;
+};
+
+export type FetchModelResponse = {
+    results: FetchModelResult[];
+    models: string[];
 };
 
 /**
@@ -187,6 +206,9 @@ export function useChannelList() {
                 custom_header: item.custom_header ?? [],
                 keys: (item.keys ?? []).map((key) => ({
                     ...key,
+                    models: key.models ?? [],
+                    models_synced_at: key.models_synced_at ?? 0,
+                    models_sync_error: key.models_sync_error ?? '',
                     pricing_rule: normalizePricingRule(key.pricing_rule),
                 })),
                 pricing_rule: normalizePricingRule(item.pricing_rule),
@@ -348,7 +370,7 @@ export function useEnableChannel() {
 export function useFetchModel() {
     return useMutation({
         mutationFn: async (data: FetchModelRequest) => {
-            return apiClient.post<string[]>('/api/v1/channel/fetch-model', data);
+            return apiClient.post<FetchModelResponse>('/api/v1/channel/fetch-model', data);
         },
         onSuccess: (data) => {
             logger.log('模型列表获取成功:', data);
@@ -395,6 +417,9 @@ export function useSyncChannel() {
         onSuccess: () => {
             logger.log('供应商同步成功');
             queryClient.invalidateQueries({ queryKey: ['channels', 'last-sync-time'] });
+            queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['models', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
             logger.warn('供应商同步失败:', error instanceof Error ? error.message : String(error));
@@ -406,7 +431,7 @@ export function useTestChannel() {
     return useMutation({
         mutationFn: async (channel: Channel) => {
             const firstKey = channel.keys.find((key) => key.enabled && key.channel_key);
-            return apiClient.post<string[]>('/api/v1/channel/fetch-model', {
+            return apiClient.post<FetchModelResponse>('/api/v1/channel/fetch-model', {
                 type: channel.type,
                 base_urls: channel.base_urls,
                 keys: firstKey ? [{ enabled: true, channel_key: firstKey.channel_key }] : [],

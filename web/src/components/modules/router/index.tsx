@@ -227,7 +227,7 @@ function AddEndpointForm({
                     >
                         {keys.map((item) => (
                             <option key={item.id} value={item.id}>
-                                {item.remark || '无备注'} ({item.masked_key})
+                                {item.remark || '无备注'} ({item.masked_key}) · {item.models?.length ?? 0} 模型
                             </option>
                         ))}
                     </select>
@@ -394,7 +394,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
                         const label = endpointLabel(endpoint, options);
                         const optionChannel = options.find((item) => item.id === endpoint.channel_id);
                         const optionKey = endpointOptionKey(endpoint, options);
-                        const firstModelName = optionChannel?.models[0];
+                        const firstModelName = optionKey?.models?.[0] ?? optionChannel?.models[0];
                         const baseModel = firstModelName ? modelPriceByName.get(firstModelName) : undefined;
                         const pricing = effectivePricingRule(endpoint, optionChannel);
                         const current = router.preferred_endpoint_id === endpoint.id;
@@ -427,6 +427,10 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                         <div className="mt-1 text-xs text-muted-foreground">
                                             {label.channelName} / {label.keyName}
                                             {invalid ? <span className="ml-2 text-destructive">上游密钥无效</span> : null}
+                                        </div>
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            Key 模型 {optionKey?.models?.length ?? 0}
+                                            {optionKey?.models_sync_error ? <span className="ml-2 text-destructive">{optionKey.models_sync_error}</span> : null}
                                         </div>
                                         <div className="mt-1 text-xs text-muted-foreground">
                                             {optionKey?.pricing_rule?.enabled

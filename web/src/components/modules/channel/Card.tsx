@@ -30,6 +30,7 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     const modelCount = new Set([
         ...splitModels(channel.model),
         ...splitModels(channel.custom_model),
+        ...channel.keys.flatMap((key) => key.models ?? []),
     ]).size;
     const enabledKeyCount = channel.keys.filter((item) => item.enabled).length;
 

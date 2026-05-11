@@ -3,6 +3,7 @@ package op
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/bestruirui/octopus/internal/db"
@@ -33,7 +34,9 @@ func ChannelCreate(channel *model.Channel, ctx context.Context) error {
 		if channel.Keys[i].PricingRule.Enabled {
 			channel.Keys[i].PricingRule = model.NormalizePricingRule(channel.Keys[i].PricingRule)
 		}
+		channel.Keys[i].Models = normalizeModelList(channel.Keys[i].Models)
 	}
+	channel.Model = MergeChannelModels(*channel)
 	if err := db.GetDB().WithContext(ctx).Create(channel).Error; err != nil {
 		return err
 	}
@@ -151,11 +154,11 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 	}
 	if req.Model != nil {
 		selectFields = append(selectFields, "model")
-		updates.Model = *req.Model
+		updates.Model = strings.Join(normalizeModelList(xstrings.SplitTrimCompact(",", *req.Model)), ",")
 	}
 	if req.CustomModel != nil {
 		selectFields = append(selectFields, "custom_model")
-		updates.CustomModel = *req.CustomModel
+		updates.CustomModel = strings.Join(normalizeModelList(xstrings.SplitTrimCompact(",", *req.CustomModel)), ",")
 	}
 	if req.Proxy != nil {
 		selectFields = append(selectFields, "proxy")
@@ -262,6 +265,15 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 				}
 				updatePayload["pricing_rule"] = value
 			}
+			if ku.Models != nil {
+				updatePayload["models"] = normalizeModelList(*ku.Models)
+			}
+			if ku.ModelsSyncedAt != nil {
+				updatePayload["models_synced_at"] = *ku.ModelsSyncedAt
+			}
+			if ku.ModelsSyncError != nil {
+				updatePayload["models_sync_error"] = *ku.ModelsSyncError
+			}
 			if len(updatePayload) == 0 {
 				continue
 			}
@@ -283,11 +295,14 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 				rule = model.NormalizePricingRule(rule)
 			}
 			newKeys = append(newKeys, model.ChannelKey{
-				ChannelID:   req.ID,
-				Enabled:     ka.Enabled,
-				ChannelKey:  ka.ChannelKey,
-				Remark:      ka.Remark,
-				PricingRule: rule,
+				ChannelID:       req.ID,
+				Enabled:         ka.Enabled,
+				ChannelKey:      ka.ChannelKey,
+				Remark:          ka.Remark,
+				PricingRule:     rule,
+				Models:          normalizeModelList(ka.Models),
+				ModelsSyncedAt:  ka.ModelsSyncedAt,
+				ModelsSyncError: ka.ModelsSyncError,
 			})
 		}
 		if err := tx.Create(&newKeys).Error; err != nil {
@@ -309,6 +324,10 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 	}
 
 	channel, _ := channelCache.Get(req.ID)
+	if err := refreshChannelModelUnion(req.ID, ctx); err != nil {
+		return nil, err
+	}
+	channel, _ = channelCache.Get(req.ID)
 	return &channel, nil
 }
 
@@ -389,7 +408,7 @@ func ChannelDel(id int, ctx context.Context) error {
 func ChannelLLMList(ctx context.Context) ([]model.LLMChannel, error) {
 	models := []model.LLMChannel{}
 	for _, channel := range channelCache.GetAll() {
-		modelNames := xstrings.SplitTrimCompact(",", channel.Model, channel.CustomModel)
+		modelNames := ChannelModelNames(channel)
 		for _, modelName := range modelNames {
 			if modelName == "" {
 				continue
@@ -403,6 +422,64 @@ func ChannelLLMList(ctx context.Context) ([]model.LLMChannel, error) {
 		}
 	}
 	return models, nil
+}
+
+func ChannelModelNames(channel model.Channel) []string {
+	return normalizeModelList(xstrings.SplitTrimCompact(",", MergeChannelModels(channel), channel.CustomModel))
+}
+
+func MergeChannelModels(channel model.Channel) string {
+	models := make([]string, 0)
+	for _, key := range channel.Keys {
+		models = append(models, key.Models...)
+	}
+	if len(models) == 0 {
+		models = xstrings.SplitTrimCompact(",", channel.Model)
+	}
+	return strings.Join(normalizeModelList(models), ",")
+}
+
+func ChannelKeyModelNames(channel model.Channel, keyID int) []string {
+	for _, key := range channel.Keys {
+		if key.ID == keyID {
+			return normalizeModelList(key.Models)
+		}
+	}
+	return nil
+}
+
+func refreshChannelModelUnion(channelID int, ctx context.Context) error {
+	channel, ok := channelCache.Get(channelID)
+	if !ok {
+		return fmt.Errorf("channel not found")
+	}
+	modelStr := MergeChannelModels(channel)
+	if err := db.GetDB().WithContext(ctx).
+		Model(&model.Channel{}).
+		Where("id = ?", channelID).
+		Update("model", modelStr).Error; err != nil {
+		return fmt.Errorf("failed to update channel model union: %w", err)
+	}
+	channel.Model = modelStr
+	channelCache.Set(channelID, channel)
+	return nil
+}
+
+func normalizeModelList(models []string) []string {
+	out := make([]string, 0, len(models))
+	seen := make(map[string]struct{}, len(models))
+	for _, m := range models {
+		m = strings.TrimSpace(m)
+		if m == "" {
+			continue
+		}
+		if _, ok := seen[m]; ok {
+			continue
+		}
+		seen[m] = struct{}{}
+		out = append(out, m)
+	}
+	return out
 }
 
 func ChannelGet(id int, ctx context.Context) (*model.Channel, error) {

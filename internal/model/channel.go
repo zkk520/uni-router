@@ -45,6 +45,9 @@ type ChannelKey struct {
 	TotalCost        float64          `json:"total_cost"`
 	Remark           string           `json:"remark"`
 	PricingRule      PricingRule      `json:"pricing_rule" gorm:"serializer:json"`
+	Models           []string         `json:"models" gorm:"serializer:json"`
+	ModelsSyncedAt   int64            `json:"models_synced_at"`
+	ModelsSyncError  string           `json:"models_sync_error" gorm:"type:text"`
 	Stats            *StatsChannelKey `json:"stats,omitempty" gorm:"foreignKey:ChannelKeyID"`
 }
 
@@ -71,18 +74,24 @@ type ChannelUpdateRequest struct {
 }
 
 type ChannelKeyAddRequest struct {
-	Enabled     bool        `json:"enabled"`
-	ChannelKey  string      `json:"channel_key" binding:"required"`
-	Remark      string      `json:"remark"`
-	PricingRule PricingRule `json:"pricing_rule"`
+	Enabled         bool        `json:"enabled"`
+	ChannelKey      string      `json:"channel_key" binding:"required"`
+	Remark          string      `json:"remark"`
+	PricingRule     PricingRule `json:"pricing_rule"`
+	Models          []string    `json:"models,omitempty"`
+	ModelsSyncedAt  int64       `json:"models_synced_at,omitempty"`
+	ModelsSyncError string      `json:"models_sync_error,omitempty"`
 }
 
 type ChannelKeyUpdateRequest struct {
-	ID          int          `json:"id" binding:"required"`
-	Enabled     *bool        `json:"enabled,omitempty"`
-	ChannelKey  *string      `json:"channel_key,omitempty"`
-	Remark      *string      `json:"remark,omitempty"`
-	PricingRule *PricingRule `json:"pricing_rule,omitempty"`
+	ID              int          `json:"id" binding:"required"`
+	Enabled         *bool        `json:"enabled,omitempty"`
+	ChannelKey      *string      `json:"channel_key,omitempty"`
+	Remark          *string      `json:"remark,omitempty"`
+	PricingRule     *PricingRule `json:"pricing_rule,omitempty"`
+	Models          *[]string    `json:"models,omitempty"`
+	ModelsSyncedAt  *int64       `json:"models_synced_at,omitempty"`
+	ModelsSyncError *string      `json:"models_sync_error,omitempty"`
 }
 
 // ChannelFetchModelRequest is used by /channel/fetch-model (not persisted).
@@ -91,6 +100,22 @@ type ChannelFetchModelRequest struct {
 	BaseURL string                `json:"base_url" binding:"required"`
 	Key     string                `json:"key" binding:"required"`
 	Proxy   bool                  `json:"proxy"`
+}
+
+type ChannelFetchModelsResult struct {
+	KeyID          int      `json:"key_id,omitempty"`
+	KeyIndex       int      `json:"key_index"`
+	Remark         string   `json:"remark"`
+	MaskedKey      string   `json:"masked_key"`
+	Success        bool     `json:"success"`
+	Models         []string `json:"models"`
+	Error          string   `json:"error,omitempty"`
+	ModelsSyncedAt int64    `json:"models_synced_at,omitempty"`
+}
+
+type ChannelFetchModelsResponse struct {
+	Results []ChannelFetchModelsResult `json:"results"`
+	Models  []string                   `json:"models"`
 }
 
 func (c *Channel) GetBaseUrl() string {

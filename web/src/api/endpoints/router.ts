@@ -40,6 +40,9 @@ export interface RouteOptionChannelKey {
     enabled: boolean;
     remark: string;
     masked_key: string;
+    models: string[];
+    models_synced_at: number;
+    models_sync_error: string;
     pricing_rule: PricingRule;
 }
 

@@ -20,7 +20,7 @@ export function CreateDialogContent() {
         custom_header: [],
         channel_proxy: '',
         param_override: '',
-        keys: [{ enabled: true, channel_key: '', remark: '', pricing_rule: DEFAULT_PRICING_RULE }],
+        keys: [{ enabled: true, channel_key: '', remark: '', pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }],
         model: '',
         custom_model: '',
         auto_sync: false,
@@ -39,7 +39,15 @@ export function CreateDialogContent() {
         }));
         const normalizedKeys = formData.keys
             .filter((k) => k.channel_key.trim())
-            .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key, remark: k.remark ?? '', pricing_rule: normalizePricingRule(k.pricing_rule) }));
+            .map((k) => ({
+                enabled: k.enabled,
+                channel_key: k.channel_key,
+                remark: k.remark ?? '',
+                pricing_rule: normalizePricingRule(k.pricing_rule),
+                models: k.models ?? [],
+                models_synced_at: k.models_synced_at ?? 0,
+                models_sync_error: k.models_sync_error ?? '',
+            }));
         const normalizedHeaders = (formData.custom_header ?? [])
             .map((h) => ({ header_key: h.header_key.trim(), header_value: h.header_value }))
             .filter((h) => h.header_key && h.header_value !== '');
@@ -72,7 +80,7 @@ export function CreateDialogContent() {
                         custom_header: [],
                         channel_proxy: '',
                         param_override: '',
-                        keys: [{ enabled: true, channel_key: '', remark: '', pricing_rule: DEFAULT_PRICING_RULE }],
+                        keys: [{ enabled: true, channel_key: '', remark: '', pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }],
                         model: '',
                         custom_model: '',
                         auto_sync: false,

@@ -149,12 +149,12 @@ func fetchModel(c *gin.Context) {
 		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
 		return
 	}
-	models, err := helper.FetchModels(c.Request.Context(), request)
-	if err != nil {
-		resp.Error(c, http.StatusInternalServerError, err.Error())
+	result := helper.FetchModelsByKey(c.Request.Context(), request)
+	if len(result.Results) == 0 {
+		resp.Error(c, http.StatusBadRequest, "no enabled api key available")
 		return
 	}
-	resp.Success(c, models)
+	resp.Success(c, result)
 }
 
 func syncChannel(c *gin.Context) {

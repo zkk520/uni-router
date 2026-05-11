@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -74,21 +75,9 @@ func getModelList(c *gin.Context) {
 		resp.Error(c, http.StatusServiceUnavailable, "router not available")
 		return
 	}
-	ep, ok := op.RouteSelectModelListEndpoint(route.RouteProfile)
-	if !ok {
-		resp.Error(c, http.StatusServiceUnavailable, "no available endpoint")
-		return
-	}
-	channel, usedKey, err := op.RouteEndpointValidate(ep, c.Request.Context())
-	if err != nil {
-		resp.Error(c, http.StatusServiceUnavailable, err.Error())
-		return
-	}
-	fetchReq := *channel
-	fetchReq.Keys = []model.ChannelKey{usedKey}
-	models, err := helper.FetchModels(c.Request.Context(), fetchReq)
-	if err != nil {
-		resp.Error(c, http.StatusBadGateway, err.Error())
+	models := collectRouteModelList(c.Request.Context(), route.RouteProfile)
+	if len(models) == 0 {
+		resp.Error(c, http.StatusServiceUnavailable, "no available model")
 		return
 	}
 
@@ -127,6 +116,52 @@ func getModelList(c *gin.Context) {
 			"object":  "list",
 		})
 	}
+}
+
+func collectRouteModelList(ctx context.Context, route model.RouteProfile) []string {
+	candidates := make([]model.RouteEndpoint, 0, len(route.Endpoints))
+	for _, ep := range route.Endpoints {
+		if !ep.Enabled || ep.Status == model.RouteEndpointStatusError {
+			continue
+		}
+		candidates = append(candidates, ep)
+	}
+	if len(candidates) == 0 {
+		for _, ep := range route.Endpoints {
+			if ep.Enabled {
+				candidates = append(candidates, ep)
+			}
+		}
+	}
+	seen := map[string]struct{}{}
+	models := make([]string, 0)
+	for _, ep := range candidates {
+		channel, usedKey, err := op.RouteEndpointValidate(ep, ctx)
+		if err != nil {
+			continue
+		}
+		keyModels := op.ChannelKeyModelNames(*channel, usedKey.ID)
+		if len(keyModels) == 0 {
+			fetchReq := *channel
+			fetchReq.Keys = []model.ChannelKey{usedKey}
+			fetched, err := helper.FetchModels(ctx, fetchReq)
+			if err == nil {
+				keyModels = fetched
+			}
+		}
+		for _, m := range keyModels {
+			m = strings.TrimSpace(m)
+			if m == "" {
+				continue
+			}
+			if _, ok := seen[m]; ok {
+				continue
+			}
+			seen[m] = struct{}{}
+			models = append(models, m)
+		}
+	}
+	return models
 }
 
 func listLLM(c *gin.Context) {

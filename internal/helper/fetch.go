@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/transformer/outbound"
@@ -62,6 +63,77 @@ func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
 		return matchModel, nil
 	}
 	return fetchModel, nil
+}
+
+func FetchModelsByKey(ctx context.Context, request model.Channel) model.ChannelFetchModelsResponse {
+	results := make([]model.ChannelFetchModelsResult, 0, len(request.Keys))
+	allModels := make([]string, 0)
+	seen := make(map[string]struct{})
+
+	for i, key := range request.Keys {
+		if !key.Enabled || strings.TrimSpace(key.ChannelKey) == "" {
+			continue
+		}
+
+		fetchReq := request
+		fetchReq.Keys = []model.ChannelKey{key}
+		models, err := FetchModels(ctx, fetchReq)
+		cleanModels := uniqueTrimModels(models)
+		result := model.ChannelFetchModelsResult{
+			KeyID:          key.ID,
+			KeyIndex:       i,
+			Remark:         key.Remark,
+			MaskedKey:      maskModelFetchKey(key.ChannelKey),
+			Success:        err == nil,
+			Models:         cleanModels,
+			ModelsSyncedAt: timeNowUnix(),
+		}
+		if err != nil {
+			result.Error = err.Error()
+		} else {
+			for _, m := range cleanModels {
+				if _, ok := seen[m]; ok {
+					continue
+				}
+				seen[m] = struct{}{}
+				allModels = append(allModels, m)
+			}
+		}
+		results = append(results, result)
+	}
+
+	return model.ChannelFetchModelsResponse{
+		Results: results,
+		Models:  allModels,
+	}
+}
+
+func uniqueTrimModels(models []string) []string {
+	out := make([]string, 0, len(models))
+	seen := make(map[string]struct{}, len(models))
+	for _, m := range models {
+		m = strings.TrimSpace(m)
+		if m == "" {
+			continue
+		}
+		if _, ok := seen[m]; ok {
+			continue
+		}
+		seen[m] = struct{}{}
+		out = append(out, m)
+	}
+	return out
+}
+
+func maskModelFetchKey(key string) string {
+	if len(key) <= 8 {
+		return "****"
+	}
+	return key[:3] + "***" + key[len(key)-4:]
+}
+
+func timeNowUnix() int64 {
+	return time.Now().Unix()
 }
 
 // refer: https://platform.openai.com/docs/api-reference/models/list

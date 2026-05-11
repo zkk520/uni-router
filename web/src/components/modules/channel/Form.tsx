@@ -24,6 +24,9 @@ export interface ChannelKeyFormItem {
     total_cost?: number;
     remark?: string;
     pricing_rule: PricingRule;
+    models?: string[];
+    models_synced_at?: number;
+    models_sync_error?: string;
 }
 
 export interface ChannelFormData {
@@ -177,7 +180,7 @@ export function ChannelForm({
             return;
         }
         if (!formData.keys || formData.keys.length === 0) {
-            onFormDataChange({ ...formData, keys: [{ enabled: true, channel_key: '', pricing_rule: DEFAULT_PRICING_RULE }] });
+            onFormDataChange({ ...formData, keys: [{ enabled: true, channel_key: '', pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }] });
             return;
         }
         if (!formData.custom_header || formData.custom_header.length === 0) {
@@ -198,12 +201,35 @@ export function ChannelForm({
 
     const effectiveKey =
         formData.keys.find((k) => k.enabled && k.channel_key.trim())?.channel_key.trim() || '';
+    const enabledKeyCount = formData.keys.filter((k) => k.enabled && k.channel_key.trim()).length;
 
     const updateModels = (nextAuto: string[], nextCustom: string[]) => {
         const model = nextAuto.join(',');
         const custom_model = nextCustom.join(',');
         if (formData.model === model && formData.custom_model === custom_model) return;
         onFormDataChange({ ...formData, model, custom_model });
+    };
+
+    const applyFetchedModels = (results: Array<{ key_id?: number; key_index: number; success: boolean; models: string[]; error?: string; models_synced_at?: number }>, unionModels: string[]) => {
+        const nextKeys = formData.keys.map((key, idx) => {
+            const result = results.find((item) =>
+                (key.id && item.key_id === key.id) || (!key.id && item.key_index === idx)
+            );
+            if (!result) return key;
+            return {
+                ...key,
+                models: result.success ? result.models : (key.models ?? []),
+                models_synced_at: result.models_synced_at ?? Math.floor(Date.now() / 1000),
+                models_sync_error: result.success ? '' : result.error ?? t('modelRefreshFailed'),
+            };
+        });
+        const nextAuto = Array.from(new Set([...unionModels, ...nextKeys.flatMap((key) => key.models ?? [])].map((m) => m.trim()).filter(Boolean)));
+        onFormDataChange({
+            ...formData,
+            keys: nextKeys,
+            model: nextAuto.join(','),
+            custom_model: customModels.join(','),
+        });
     };
 
     const handleRefreshModels = async () => {
@@ -213,7 +239,6 @@ export function ChannelForm({
                 type: formData.type,
                 base_urls: formData.base_urls,
                 keys: formData.keys
-                    .filter((k) => k.channel_key.trim())
                     .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key.trim() })),
                 proxy: formData.proxy,
                 channel_proxy: formData.channel_proxy?.trim() || null,
@@ -222,12 +247,58 @@ export function ChannelForm({
             },
             {
                 onSuccess: (data) => {
-                    if (data && data.length > 0) {
-                        const nextAuto = Array.from(new Set([...autoModels, ...data].map((m) => m.trim()).filter(Boolean)));
-                        updateModels(nextAuto, customModels);
-                        toast.success(t('modelRefreshSuccess'));
+                    if (data && data.results.length > 0) {
+                        applyFetchedModels(data.results, data.models);
+                        const successCount = data.results.filter((item) => item.success).length;
+                        const failedCount = data.results.length - successCount;
+                        if (data.models.length > 0) {
+                            const description = failedCount > 0
+                                ? `${successCount}/${data.results.length} 个 Key 成功，${failedCount} 个失败`
+                                : `${successCount} 个 Key 成功`;
+                            toast.success(t('modelRefreshSuccess'), { description });
+                        } else if (failedCount > 0) {
+                            toast.error(t('modelRefreshFailed'), { description: data.results.find((item) => item.error)?.error });
+                        } else {
+                            toast.warning(t('modelRefreshEmpty'));
+                        }
                     } else {
                         toast.warning(t('modelRefreshEmpty'));
+                    }
+                },
+                onError: (error) => {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    toast.error(t('modelRefreshFailed'), { description: errorMessage });
+                },
+            }
+        );
+    };
+
+    const handleRefreshKeyModels = (idx: number) => {
+        const key = formData.keys[idx];
+        if (!formData.base_urls?.[0]?.url || !key?.channel_key.trim()) return;
+        fetchModel.mutate(
+            {
+                type: formData.type,
+                base_urls: formData.base_urls,
+                keys: [{ enabled: key.enabled, channel_key: key.channel_key.trim() }],
+                proxy: formData.proxy,
+                channel_proxy: formData.channel_proxy?.trim() || null,
+                match_regex: formData.match_regex.trim() || null,
+                custom_header: formData.custom_header?.filter((h) => h.header_key.trim()) || [],
+            },
+            {
+                onSuccess: (data) => {
+                    const patched = data.results.map((item) => ({
+                        ...item,
+                        key_id: key.id,
+                        key_index: idx,
+                    }));
+                    applyFetchedModels(patched, data.models);
+                    const result = patched[0];
+                    if (result?.success) {
+                        toast.success(t('modelRefreshSuccess'), { description: `${result.models.length} 个模型` });
+                    } else {
+                        toast.error(t('modelRefreshFailed'), { description: result?.error });
                     }
                 },
                 onError: (error) => {
@@ -247,7 +318,16 @@ export function ChannelForm({
     };
 
     const handleRemoveAutoModel = (model: string) => {
-        updateModels(autoModels.filter(m => m !== model), customModels);
+        const nextKeys = formData.keys.map((key) => ({
+            ...key,
+            models: (key.models ?? []).filter((item) => item !== model),
+        }));
+        onFormDataChange({
+            ...formData,
+            keys: nextKeys,
+            model: autoModels.filter(m => m !== model).join(','),
+            custom_model: customModels.join(','),
+        });
     };
 
     const handleRemoveCustomModel = (model: string) => {
@@ -264,7 +344,7 @@ export function ChannelForm({
     const handleAddKey = () => {
         onFormDataChange({
             ...formData,
-            keys: [...formData.keys, { enabled: true, channel_key: '', pricing_rule: DEFAULT_PRICING_RULE }],
+            keys: [...formData.keys, { enabled: true, channel_key: '', pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }],
         });
     };
 
@@ -546,6 +626,42 @@ export function ChannelForm({
                                     />
                                 </div>
                             ) : null}
+                            <div className="mt-3 rounded-xl border border-border/60 bg-background/70 p-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-medium text-card-foreground">
+                                            Key 模型 {(k.models?.length ?? 0) > 0 ? `(${k.models?.length})` : ''}
+                                        </div>
+                                        <div className="mt-1 truncate text-xs text-muted-foreground">
+                                            {k.models_sync_error
+                                                ? k.models_sync_error
+                                                : k.models_synced_at
+                                                    ? `最近同步 ${new Date((k.models_synced_at ?? 0) * 1000).toLocaleString()}`
+                                                    : '尚未同步'}
+                                        </div>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRefreshKeyModels(idx)}
+                                        disabled={!formData.base_urls?.[0]?.url || !k.channel_key.trim() || fetchModel.isPending}
+                                        className="h-7 px-2 text-xs text-muted-foreground hover:text-muted-foreground hover:bg-muted"
+                                    >
+                                        <RefreshCw className={`h-3 w-3 mr-1 ${fetchModel.isPending ? 'animate-spin' : ''}`} />
+                                        刷新此 Key
+                                    </Button>
+                                </div>
+                                {(k.models?.length ?? 0) > 0 ? (
+                                    <div className="mt-2 flex max-h-20 flex-wrap gap-1.5 overflow-y-auto">
+                                        {(k.models ?? []).map((model) => (
+                                            <Badge key={`${idx}-${model}`} variant="outline" className="max-w-full truncate text-[10px]">
+                                                {model}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                ) : null}
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -563,7 +679,7 @@ export function ChannelForm({
                         className="h-6 px-2 text-xs text-muted-foreground/50 hover:text-muted-foreground hover:bg-transparent"
                     >
                         <RefreshCw className={`h-3 w-3 mr-1 ${fetchModel.isPending ? 'animate-spin' : ''}`} />
-                        {t('modelRefresh')}
+                        {t('modelRefresh')}{enabledKeyCount > 0 ? `(${enabledKeyCount})` : ''}
                     </Button>
                 </div>
                 <input type="hidden" value={formData.model} required />
