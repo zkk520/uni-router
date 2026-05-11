@@ -466,6 +466,7 @@
                 "cancel": "Cancel",
                 "save": "Save",
                 "saving": "Saving...",
+                "saveFailed": "Failed to save channel",
                 "delete": "Delete",
                 "confirmDelete": "Confirm Delete",
                 "deleting": "Deleting..."
@@ -474,7 +475,10 @@
         "create": {
             "dialogTitle": "Create New Channel",
             "submit": "Create Channel",
-            "submitting": "Creating..."
+            "submitting": "Creating...",
+            "toast": {
+                "createFailed": "Failed to create channel"
+            }
         },
         "form": {
             "add": "Add",

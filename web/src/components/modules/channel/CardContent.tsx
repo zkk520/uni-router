@@ -26,6 +26,7 @@ import { ChannelForm, type ChannelFormData } from './Form';
 import { formatCurrencyCosts } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/common/Toast';
 
 export function CardContent({ channel, stats }: { channel: Channel; stats: StatsMetricsFormatted }) {
     const { setIsOpen } = useMorphingDialog();
@@ -158,6 +159,10 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
             onSuccess: () => {
                 setIsEditing(false);
                 setIsOpen(false);
+            },
+            onError: (error) => {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                toast.error(t('actions.saveFailed'), { description: errorMessage });
             }
         });
     };

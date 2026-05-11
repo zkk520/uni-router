@@ -8,6 +8,7 @@ import {
 import { useCreateChannel, ChannelType, DEFAULT_PRICING_RULE, normalizePricingRule } from '@/api/endpoints/channel';
 import { useTranslations } from 'next-intl';
 import { ChannelForm, type ChannelFormData } from './Form';
+import { toast } from '@/components/common/Toast';
 
 export function CreateDialogContent() {
     const { setIsOpen } = useMorphingDialog();
@@ -81,6 +82,10 @@ export function CreateDialogContent() {
                         pricing_rule: DEFAULT_PRICING_RULE,
                     });
                     setIsOpen(false);
+                },
+                onError: (error) => {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    toast.error(t('toast.createFailed'), { description: errorMessage });
                 }
             });
     };

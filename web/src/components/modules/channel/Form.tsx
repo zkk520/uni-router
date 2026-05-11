@@ -115,12 +115,6 @@ function PricingMultiplierInput({
     const [draft, setDraft] = useState(String(value));
     const [focused, setFocused] = useState(false);
 
-    useEffect(() => {
-        if (!focused) {
-            setDraft(String(value));
-        }
-    }, [focused, value]);
-
     return (
         <Input
             id={id}
@@ -144,6 +138,7 @@ function PricingMultiplierInput({
             }}
             onBlur={() => {
                 setFocused(false);
+                setDraft(String(value));
                 if (draft === '' || draft === '.' || draft === '0.') {
                     setDraft(String(value));
                     return;

@@ -237,7 +237,7 @@ export function useCreateChannel() {
             queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
-            logger.error('供应商创建失败:', error);
+            logger.warn('供应商创建失败:', error instanceof Error ? error.message : String(error));
         },
     });
 }
@@ -272,7 +272,7 @@ export function useUpdateChannel() {
             queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
-            logger.error('供应商更新失败:', error);
+            logger.warn('供应商更新失败:', error instanceof Error ? error.message : String(error));
         },
     });
 }
@@ -298,7 +298,7 @@ export function useDeleteChannel() {
             queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
-            logger.error('供应商删除失败:', error);
+            logger.warn('供应商删除失败:', error instanceof Error ? error.message : String(error));
         },
     });
 }
@@ -324,7 +324,7 @@ export function useEnableChannel() {
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
         },
         onError: (error) => {
-            logger.error('供应商状态更新失败:', error);
+            logger.warn('供应商状态更新失败:', error instanceof Error ? error.message : String(error));
         },
     });
 }
@@ -354,7 +354,7 @@ export function useFetchModel() {
             logger.log('模型列表获取成功:', data);
         },
         onError: (error) => {
-            logger.error('模型列表获取失败:', error);
+            logger.warn('模型列表获取失败:', error instanceof Error ? error.message : String(error));
         },
     });
 }
@@ -397,7 +397,7 @@ export function useSyncChannel() {
             queryClient.invalidateQueries({ queryKey: ['channels', 'last-sync-time'] });
         },
         onError: (error) => {
-            logger.error('供应商同步失败:', error);
+            logger.warn('供应商同步失败:', error instanceof Error ? error.message : String(error));
         },
     });
 }
