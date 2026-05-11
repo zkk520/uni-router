@@ -2,28 +2,35 @@ package price
 
 import "testing"
 
-func TestListLLMPricePresetsIncludesKnownProviders(t *testing.T) {
+func TestListLLMPricePresetsIncludesConfirmedProviders(t *testing.T) {
 	presets := ListLLMPricePresets()
 	if len(presets) == 0 {
 		t.Fatal("expected price presets")
 	}
 
-	var hasClaude, hasGemini bool
+	want := map[string]bool{
+		"gpt-5.5":                false,
+		"claude-opus-4-7":        false,
+		"gemini-3-flash-preview": false,
+		"deepseek-v4-flash":      false,
+		"grok-4.3":               false,
+		"qwen3.6-plus":           false,
+		"glm-5.1":                false,
+		"minimax-m2.7":           false,
+		"kimi-k2.6":              false,
+		"v0-1.5-md":              false,
+	}
 	for i, preset := range presets {
 		if i > 0 && presets[i-1].Name > preset.Name {
 			t.Fatalf("expected presets sorted by name, got %q before %q", presets[i-1].Name, preset.Name)
 		}
-		switch preset.Name {
-		case "claude-3-5-sonnet-20241022":
-			hasClaude = true
-		case "gemini-2.5-pro":
-			hasGemini = true
+		if _, ok := want[preset.Name]; ok {
+			want[preset.Name] = true
 		}
 	}
-	if !hasClaude {
-		t.Fatal("expected claude preset")
-	}
-	if !hasGemini {
-		t.Fatal("expected gemini preset")
+	for name, found := range want {
+		if !found {
+			t.Fatalf("expected preset %q", name)
+		}
 	}
 }
