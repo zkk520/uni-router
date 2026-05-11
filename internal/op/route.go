@@ -18,7 +18,8 @@ var routeCache = cache.New[int, model.RouteProfile](16)
 
 type RouteProfileDetail struct {
 	model.RouteProfile
-	BoundAPIKeyCount int `json:"bound_api_key_count"`
+	BoundAPIKeyCount int           `json:"bound_api_key_count"`
+	BoundAPIKey      *model.APIKey `json:"bound_api_key,omitempty"`
 }
 
 type RouteOptionChannel struct {
@@ -41,9 +42,11 @@ type RouteOptionChannelKey struct {
 func RouteProfileList(ctx context.Context) ([]RouteProfileDetail, error) {
 	routes := make([]RouteProfileDetail, 0, routeCache.Len())
 	for _, route := range routeCache.GetAll() {
+		boundKey, boundCount := APIKeyByRouter(route.ID, ctx)
 		routes = append(routes, RouteProfileDetail{
 			RouteProfile:     route,
-			BoundAPIKeyCount: APIKeyCountByRouter(route.ID, ctx),
+			BoundAPIKeyCount: boundCount,
+			BoundAPIKey:      boundKey,
 		})
 	}
 	sort.Slice(routes, func(i, j int) bool { return routes[i].ID < routes[j].ID })
@@ -55,9 +58,11 @@ func RouteProfileGet(id int, ctx context.Context) (*RouteProfileDetail, error) {
 	if !ok {
 		return nil, fmt.Errorf("router not found")
 	}
+	boundKey, boundCount := APIKeyByRouter(id, ctx)
 	return &RouteProfileDetail{
 		RouteProfile:     route,
-		BoundAPIKeyCount: APIKeyCountByRouter(id, ctx),
+		BoundAPIKeyCount: boundCount,
+		BoundAPIKey:      boundKey,
 	}, nil
 }
 

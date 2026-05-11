@@ -3,6 +3,7 @@ package op
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/bestruirui/octopus/internal/db"
 	"github.com/bestruirui/octopus/internal/model"
@@ -18,6 +19,9 @@ func APIKeyCreate(key *model.APIKey, ctx context.Context) error {
 	}
 	if _, ok := routeCache.Get(key.RouterID); !ok {
 		return fmt.Errorf("router not found")
+	}
+	if err := ensureUniqueAPIKeyRouter(key.RouterID, 0, ctx); err != nil {
+		return err
 	}
 	if err := db.GetDB().WithContext(ctx).Create(key).Error; err != nil {
 		return fmt.Errorf("failed to create API key: %w", err)
@@ -37,6 +41,9 @@ func APIKeyUpdate(key *model.APIKey, ctx context.Context) error {
 	}
 	if _, ok := routeCache.Get(key.RouterID); !ok {
 		return fmt.Errorf("router not found")
+	}
+	if err := ensureUniqueAPIKeyRouter(key.RouterID, key.ID, ctx); err != nil {
+		return err
 	}
 	if err := db.GetDB().WithContext(ctx).Omit("api_key").Save(key).Error; err != nil {
 		return fmt.Errorf("failed to update API key: %w", err)
@@ -102,6 +109,40 @@ func APIKeyCountByRouter(routerID int, ctx context.Context) int {
 		return 0
 	}
 	return int(count)
+}
+
+func APIKeyByRouter(routerID int, ctx context.Context) (*model.APIKey, int) {
+	if routerID <= 0 {
+		return nil, 0
+	}
+	keys := make([]model.APIKey, 0)
+	for _, apiKey := range apiKeyCache.GetAll() {
+		if apiKey.RouterID == routerID {
+			keys = append(keys, apiKey)
+		}
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i].ID < keys[j].ID })
+	if len(keys) == 0 {
+		return nil, APIKeyCountByRouter(routerID, ctx)
+	}
+	return &keys[0], APIKeyCountByRouter(routerID, ctx)
+}
+
+func ensureUniqueAPIKeyRouter(routerID, currentID int, ctx context.Context) error {
+	count := int64(0)
+	query := db.GetDB().WithContext(ctx).
+		Model(&model.APIKey{}).
+		Where("router_id = ?", routerID)
+	if currentID > 0 {
+		query = query.Where("id <> ?", currentID)
+	}
+	if err := query.Count(&count).Error; err != nil {
+		return fmt.Errorf("failed to check router API key binding: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("router already has an API key")
+	}
+	return nil
 }
 
 func apiKeyRefreshCache(ctx context.Context) error {
