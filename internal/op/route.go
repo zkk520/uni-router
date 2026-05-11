@@ -164,11 +164,12 @@ func RouteProfileUpdate(req *model.RouteProfileUpdateRequest, ctx context.Contex
 			up["use_pricing_override"] = *item.UsePricingOverride
 		}
 		if item.PricingRuleOverride != nil {
-			rule := *item.PricingRuleOverride
-			if rule.Enabled {
-				rule = model.NormalizePricingRule(rule)
+			value, err := pricingRuleDBValue(*item.PricingRuleOverride)
+			if err != nil {
+				tx.Rollback()
+				return nil, fmt.Errorf("failed to serialize endpoint pricing rule override: %w", err)
 			}
-			up["pricing_rule_override"] = rule
+			up["pricing_rule_override"] = value
 		}
 		if err := tx.Model(&model.RouteEndpoint{}).
 			Where("id = ? AND router_id = ?", item.ID, req.ID).

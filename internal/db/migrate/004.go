@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -67,7 +68,11 @@ func migrateChannelPricingRulesToCNY(tx *gorm.DB) error {
 		}
 		channels[i].PricingRule = model.DefaultPricingRule()
 		channels[i].PricingRule.Enabled = false
-		if err := tx.Model(&model.Channel{}).Where("id = ?", channels[i].ID).Update("pricing_rule", channels[i].PricingRule).Error; err != nil {
+		pricingRuleJSON, err := json.Marshal(channels[i].PricingRule)
+		if err != nil {
+			return fmt.Errorf("marshal channel pricing_rule %d: %w", channels[i].ID, err)
+		}
+		if err := tx.Model(&model.Channel{}).Where("id = ?", channels[i].ID).Update("pricing_rule", pricingRuleJSON).Error; err != nil {
 			return fmt.Errorf("update channel pricing_rule %d: %w", channels[i].ID, err)
 		}
 	}
@@ -82,7 +87,11 @@ func migrateChannelPricingRulesToCNY(tx *gorm.DB) error {
 		}
 		keys[i].PricingRule = model.DefaultPricingRule()
 		keys[i].PricingRule.Enabled = false
-		if err := tx.Model(&model.ChannelKey{}).Where("id = ?", keys[i].ID).Update("pricing_rule", keys[i].PricingRule).Error; err != nil {
+		pricingRuleJSON, err := json.Marshal(keys[i].PricingRule)
+		if err != nil {
+			return fmt.Errorf("marshal channel_key pricing_rule %d: %w", keys[i].ID, err)
+		}
+		if err := tx.Model(&model.ChannelKey{}).Where("id = ?", keys[i].ID).Update("pricing_rule", pricingRuleJSON).Error; err != nil {
 			return fmt.Errorf("update channel_key pricing_rule %d: %w", keys[i].ID, err)
 		}
 	}

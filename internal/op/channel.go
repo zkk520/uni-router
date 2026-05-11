@@ -183,16 +183,47 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 	}
 	if req.PricingRule != nil {
 		selectFields = append(selectFields, "pricing_rule")
-		rule := *req.PricingRule
-		if rule.Enabled {
-			rule = model.NormalizePricingRule(rule)
-		}
-		updates.PricingRule = rule
 	}
 
 	// 只有当有字段需要更新时才执行 UPDATE
 	if len(selectFields) > 0 {
-		if err := tx.Model(&model.Channel{}).Where("id = ?", req.ID).Select(selectFields).Updates(&updates).Error; err != nil {
+		updatePayload := map[string]any{}
+		for _, field := range selectFields {
+			switch field {
+			case "name":
+				updatePayload[field] = updates.Name
+			case "type":
+				updatePayload[field] = updates.Type
+			case "enabled":
+				updatePayload[field] = updates.Enabled
+			case "base_urls":
+				updatePayload[field] = updates.BaseUrls
+			case "model":
+				updatePayload[field] = updates.Model
+			case "custom_model":
+				updatePayload[field] = updates.CustomModel
+			case "proxy":
+				updatePayload[field] = updates.Proxy
+			case "auto_sync":
+				updatePayload[field] = updates.AutoSync
+			case "custom_header":
+				updatePayload[field] = updates.CustomHeader
+			case "channel_proxy":
+				updatePayload[field] = updates.ChannelProxy
+			case "param_override":
+				updatePayload[field] = updates.ParamOverride
+			case "match_regex":
+				updatePayload[field] = updates.MatchRegex
+			case "pricing_rule":
+				value, err := pricingRuleDBValue(*req.PricingRule)
+				if err != nil {
+					tx.Rollback()
+					return nil, fmt.Errorf("failed to serialize channel pricing rule: %w", err)
+				}
+				updatePayload[field] = value
+			}
+		}
+		if err := tx.Model(&model.Channel{}).Where("id = ?", req.ID).Updates(updatePayload).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update channel: %w", err)
 		}
@@ -213,35 +244,30 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 	// 更新 keys（逐条，只更新提供的字段）
 	if len(req.KeysToUpdate) > 0 {
 		for _, ku := range req.KeysToUpdate {
-			selectFields := make([]string, 0, 4)
-			keyUpdate := model.ChannelKey{ID: ku.ID, ChannelID: req.ID}
+			updatePayload := map[string]any{}
 			if ku.Enabled != nil {
-				selectFields = append(selectFields, "enabled")
-				keyUpdate.Enabled = *ku.Enabled
+				updatePayload["enabled"] = *ku.Enabled
 			}
 			if ku.ChannelKey != nil {
-				selectFields = append(selectFields, "channel_key")
-				keyUpdate.ChannelKey = *ku.ChannelKey
+				updatePayload["channel_key"] = *ku.ChannelKey
 			}
 			if ku.Remark != nil {
-				selectFields = append(selectFields, "remark")
-				keyUpdate.Remark = *ku.Remark
+				updatePayload["remark"] = *ku.Remark
 			}
 			if ku.PricingRule != nil {
-				rule := *ku.PricingRule
-				if rule.Enabled {
-					rule = model.NormalizePricingRule(rule)
+				value, err := pricingRuleDBValue(*ku.PricingRule)
+				if err != nil {
+					tx.Rollback()
+					return nil, fmt.Errorf("failed to serialize channel key %d pricing rule: %w", ku.ID, err)
 				}
-				selectFields = append(selectFields, "pricing_rule")
-				keyUpdate.PricingRule = rule
+				updatePayload["pricing_rule"] = value
 			}
-			if len(selectFields) == 0 {
+			if len(updatePayload) == 0 {
 				continue
 			}
 			if err := tx.Model(&model.ChannelKey{}).
 				Where("id = ? AND channel_id = ?", ku.ID, req.ID).
-				Select(selectFields).
-				Updates(&keyUpdate).Error; err != nil {
+				Updates(updatePayload).Error; err != nil {
 				tx.Rollback()
 				return nil, fmt.Errorf("failed to update channel key %d: %w", ku.ID, err)
 			}
