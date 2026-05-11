@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/bestruirui/octopus/internal/helper"
 	"github.com/bestruirui/octopus/internal/model"
@@ -44,6 +45,10 @@ func init() {
 		AddRoute(
 			router.NewRoute("/last-update-time", http.MethodGet).
 				Handle(getLastUpdateTime),
+		).
+		AddRoute(
+			router.NewRoute("/presets", http.MethodGet).
+				Handle(listLLMPresets),
 		)
 	router.NewGroupRouter("/v1").
 		Use(middleware.APIKeyAuth()).
@@ -131,6 +136,27 @@ func listLLM(c *gin.Context) {
 		return
 	}
 	resp.Success(c, models)
+}
+
+func listLLMPresets(c *gin.Context) {
+	models, err := op.LLMList(c.Request.Context())
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	existing := make(map[string]struct{}, len(models))
+	for _, model := range models {
+		existing[strings.ToLower(model.Name)] = struct{}{}
+	}
+	presets := price.ListLLMPricePresets()
+	filtered := make([]model.LLMInfo, 0, len(presets))
+	for _, preset := range presets {
+		if _, ok := existing[strings.ToLower(preset.Name)]; ok {
+			continue
+		}
+		filtered = append(filtered, preset)
+	}
+	resp.Success(c, filtered)
 }
 
 func listLLMByChannel(c *gin.Context) {

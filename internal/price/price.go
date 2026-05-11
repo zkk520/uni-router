@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -82,6 +83,23 @@ func UpdateLLMPrice(ctx context.Context) error {
 
 func GetLastUpdateTime() time.Time {
 	return lastUpdateTime
+}
+
+func ListLLMPricePresets() []model.LLMInfo {
+	llmPriceLock.RLock()
+	defer llmPriceLock.RUnlock()
+
+	presets := make([]model.LLMInfo, 0, len(llmPrice))
+	for name, price := range llmPrice {
+		presets = append(presets, model.LLMInfo{
+			Name:     name,
+			LLMPrice: price,
+		})
+	}
+	sort.Slice(presets, func(i, j int) bool {
+		return presets[i].Name < presets[j].Name
+	})
+	return presets
 }
 
 func GetLLMPrice(modelName string) *model.LLMPrice {
