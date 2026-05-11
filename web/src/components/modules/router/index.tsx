@@ -1,7 +1,7 @@
 'use client';
 
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Cable, Check, Loader2, Plus, Trash2, X, TestTube2 } from 'lucide-react';
+import { Cable, Check, KeyRound, Loader2, Plus, Trash2, X, TestTube2 } from 'lucide-react';
 import {
     useCreateRouter,
     useDeleteRouter,
@@ -17,6 +17,7 @@ import {
     type RouteOptionChannel,
     type RouteProfile,
 } from '@/api/endpoints/router';
+import { useCreateAPIKey } from '@/api/endpoints/apikey';
 import { useModelList } from '@/api/endpoints/model';
 import { DEFAULT_PRICING_RULE, normalizePricingRule, type PricingRule } from '@/api/endpoints/channel';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,9 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/components/common/Toast';
+import { CopyIconButton } from '@/components/common/CopyButton';
 import { cn } from '@/lib/utils';
+import type { ApiError } from '@/api/types';
 
 function statusClass(status: string) {
     if (status === 'normal') return 'bg-emerald-500';
@@ -57,6 +60,12 @@ function endpointLabel(endpoint: RouteEndpoint, options: RouteOptionChannel[]) {
         keyName: key?.remark || key?.masked_key || `密钥 #${endpoint.channel_key_id}`,
         keyEnabled: key?.enabled ?? false,
     };
+}
+
+function maskAPIKey(apiKey: string) {
+    if (!apiKey) return '未生成';
+    if (apiKey.length <= 8) return '****';
+    return `${apiKey.slice(0, 6)}***${apiKey.slice(-4)}`;
 }
 
 function endpointOptionKey(endpoint: RouteEndpoint, options: RouteOptionChannel[]) {
@@ -536,6 +545,7 @@ export function Router() {
     const { data: routers = [], error, isLoading } = useRouterList();
     const createRouter = useCreateRouter();
     const deleteRouter = useDeleteRouter();
+    const createAPIKey = useCreateAPIKey();
     const [selectedId, setSelectedId] = useState<number | null>(null);
 
     const selected = selectedId ?? routers[0]?.id ?? null;
@@ -551,6 +561,20 @@ export function Router() {
                 setSelectedId(router.id);
             },
             onError: (error) => toast.error('创建路由失败', { description: String(error) }),
+        });
+    };
+
+    const createBoundAPIKey = (router: RouteProfile) => {
+        createAPIKey.mutate({
+            name: `${router.name} 令牌`,
+            enabled: true,
+            router_id: router.id,
+        }, {
+            onSuccess: () => toast.success('令牌已创建'),
+            onError: (error) => {
+                const msg = (error as unknown as ApiError)?.message;
+                toast.error('令牌创建失败', { description: msg || String(error) });
+            },
         });
     };
 
@@ -575,64 +599,116 @@ export function Router() {
                         </div>
                     ) : routers.length === 0 ? (
                         <div className="p-6 text-center text-sm text-muted-foreground">暂无路由。</div>
-                    ) : routers.map((router) => (
-                        <div
-                            key={router.id}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => setSelectedId(router.id)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    setSelectedId(router.id);
-                                }
-                            }}
-                            className={cn(
-                                'w-full cursor-pointer rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                selected === router.id ? 'border-primary bg-primary/5' : 'border-border bg-muted/20 hover:bg-muted/40'
-                            )}
-                        >
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="truncate text-sm font-semibold">{router.name}</span>
-                                <Badge variant="outline">{routeModeLabel(router.mode)}</Badge>
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                                {router.endpoints?.length ?? 0} 个端点 / {router.bound_api_key_count ?? 0} 个密钥
-                            </div>
-                            <div className="mt-2 flex justify-end">
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                        >
-                                            <X className="size-4" />
-                                        </button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>删除路由？</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                将删除“{router.name}”及其所有端点。已绑定 API Key 的路由无法删除，系统会阻止该操作。
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>取消</AlertDialogCancel>
-                                            <AlertDialogAction
-                                                className="bg-destructive text-white hover:bg-destructive/90"
-                                                onClick={() => deleteRouter.mutate(router.id, {
-                                                    onError: (error) => toast.error('删除失败', { description: String(error) }),
-                                                })}
+                    ) : routers.map((router) => {
+                        const boundKey = router.bound_api_key;
+                        const boundKeyCount = router.bound_api_key_count ?? 0;
+                        return (
+                            <div
+                                key={router.id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setSelectedId(router.id)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        setSelectedId(router.id);
+                                    }
+                                }}
+                                className={cn(
+                                    'w-full cursor-pointer rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                    selected === router.id ? 'border-primary bg-primary/5' : 'border-border bg-muted/20 hover:bg-muted/40'
+                                )}
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="truncate text-sm font-semibold">{router.name}</span>
+                                    <Badge variant="outline">{routeModeLabel(router.mode)}</Badge>
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                    {router.endpoints?.length ?? 0} 个端点 / {boundKeyCount} 个密钥
+                                </div>
+                                {boundKey ? (
+                                    <div className="mt-3 rounded-lg border border-border/70 bg-background/80 p-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                <KeyRound className="size-4 shrink-0 text-muted-foreground" />
+                                                <div className="min-w-0">
+                                                    <div className="truncate text-xs font-medium">{boundKey.name}</div>
+                                                    <code className="block truncate text-xs text-muted-foreground">{maskAPIKey(boundKey.api_key)}</code>
+                                                </div>
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-1.5">
+                                                <Badge variant={boundKey.enabled ? 'outline' : 'secondary'} className="text-[10px]">
+                                                    {boundKey.enabled ? '启用' : '停用'}
+                                                </Badge>
+                                                <div onClick={(e) => e.stopPropagation()}>
+                                                    <CopyIconButton
+                                                        text={boundKey.api_key}
+                                                        className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary transition-all hover:bg-primary hover:text-primary-foreground active:scale-95"
+                                                        copyIconClassName="size-4"
+                                                        checkIconClassName="size-4"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {boundKeyCount > 1 ? (
+                                            <div className="mt-2 text-xs text-amber-700">该路由存在多个历史令牌，请在令牌管理中清理。</div>
+                                        ) : null}
+                                    </div>
+                                ) : boundKeyCount > 0 ? (
+                                    <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700">
+                                        已绑定令牌，但当前接口未返回密钥详情；后端更新后可在此处直接复制。
+                                    </div>
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        className="mt-3 w-full rounded-lg"
+                                        disabled={createAPIKey.isPending}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            createBoundAPIKey(router);
+                                        }}
+                                    >
+                                        {createAPIKey.isPending ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+                                        一键创建令牌
+                                    </Button>
+                                )}
+                                <div className="mt-2 flex justify-end">
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                             >
-                                                删除路由
-                                            </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
+                                                <X className="size-4" />
+                                            </button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>删除路由？</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    将删除“{router.name}”及其所有端点。已绑定 API Key 的路由无法删除，系统会阻止该操作。
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>取消</AlertDialogCancel>
+                                                <AlertDialogAction
+                                                    className="bg-destructive text-white hover:bg-destructive/90"
+                                                    onClick={() => deleteRouter.mutate(router.id, {
+                                                        onError: (error) => toast.error('删除失败', { description: String(error) }),
+                                                    })}
+                                                >
+                                                    删除路由
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
             <div className="min-h-0 rounded-2xl border border-border bg-background p-4">

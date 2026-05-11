@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import type { Channel, PricingRule } from './channel';
+import type { APIKey } from './apikey';
 
 export type RouteMode = 'manual' | 'weighted';
 export type RouteEndpointStatus = 'unknown' | 'normal' | 'error';
@@ -29,6 +30,7 @@ export interface RouteProfile {
     failover_enabled: boolean;
     endpoints?: RouteEndpoint[];
     bound_api_key_count?: number;
+    bound_api_key?: APIKey;
     created_at?: number;
     updated_at?: number;
 }

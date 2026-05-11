@@ -132,6 +132,7 @@ export function useCreateAPIKey() {
         onSuccess: (data) => {
             logger.log('API Key 创建成功:', data);
             queryClient.invalidateQueries({ queryKey: ['apikeys', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['routers'] });
         },
         onError: (error) => {
             logger.error('API Key 创建失败:', error);
