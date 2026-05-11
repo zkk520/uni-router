@@ -76,3 +76,44 @@ func TestExtractErrorMessage(t *testing.T) {
 		})
 	}
 }
+
+func TestDecodeModelListJSON(t *testing.T) {
+	type result struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+
+	t.Run("html body returns friendly error", func(t *testing.T) {
+		var got result
+		err := decodeModelListJSON([]byte("<html><body>ok</body></html>"), &got)
+		if err == nil {
+			t.Fatal("decodeModelListJSON() error = nil, want error")
+		}
+		if err.Error() != modelListHTMLMessage {
+			t.Fatalf("decodeModelListJSON() = %q, want %q", err.Error(), modelListHTMLMessage)
+		}
+	})
+
+	t.Run("plain invalid json returns friendly error", func(t *testing.T) {
+		var got result
+		err := decodeModelListJSON([]byte("not json"), &got)
+		if err == nil {
+			t.Fatal("decodeModelListJSON() error = nil, want error")
+		}
+		if err.Error() != modelListInvalidJSONMessage {
+			t.Fatalf("decodeModelListJSON() = %q, want %q", err.Error(), modelListInvalidJSONMessage)
+		}
+	})
+
+	t.Run("valid json succeeds", func(t *testing.T) {
+		var got result
+		err := decodeModelListJSON([]byte(`{"data":[{"id":"gpt-4o"}]}`), &got)
+		if err != nil {
+			t.Fatalf("decodeModelListJSON() error = %v, want nil", err)
+		}
+		if len(got.Data) != 1 || got.Data[0].ID != "gpt-4o" {
+			t.Fatalf("decodeModelListJSON() = %#v, want parsed data", got)
+		}
+	})
+}

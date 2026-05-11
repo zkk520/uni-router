@@ -15,6 +15,11 @@ import (
 	"github.com/dlclark/regexp2"
 )
 
+const (
+	modelListInvalidJSONMessage = "上游模型列表响应不是有效 JSON，请检查 Base URL/供应商类型/API Key"
+	modelListHTMLMessage        = "上游返回了 HTML 页面，请检查 Base URL/供应商类型/API Key"
+)
+
 func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
 	if request.GetBaseUrl() == "" {
 		return nil, fmt.Errorf("base url is required")
@@ -93,7 +98,7 @@ func fetchOpenAIModels(client *http.Client, ctx context.Context, request model.C
 
 	var result model.OpenAIModelList
 
-	if err := json.Unmarshal(body, &result); err != nil {
+	if err := decodeModelListJSON(body, &result); err != nil {
 		return nil, err
 	}
 
@@ -153,7 +158,7 @@ func fetchGeminiModels(client *http.Client, ctx context.Context, request model.C
 
 		var result model.GeminiModelList
 
-		if err := json.Unmarshal(body, &result); err != nil {
+		if err := decodeModelListJSON(body, &result); err != nil {
 			if fallbackModels, fallbackErr := fetchOpenAIModels(client, ctx, request); fallbackErr == nil {
 				return fallbackModels, nil
 			}
@@ -229,7 +234,7 @@ func fetchAnthropicModels(client *http.Client, ctx context.Context, request mode
 
 		var result model.AnthropicModelList
 
-		if err := json.Unmarshal(body, &result); err != nil {
+		if err := decodeModelListJSON(body, &result); err != nil {
 			if fallbackModels, fallbackErr := fetchOpenAIModels(client, ctx, request); fallbackErr == nil {
 				return fallbackModels, nil
 			}
@@ -282,6 +287,10 @@ func readSuccessBody(resp *http.Response) ([]byte, error) {
 		return body, nil
 	}
 
+	if looksLikeHTML(body) {
+		return nil, fmt.Errorf("upstream returned HTTP %d: %s", resp.StatusCode, modelListHTMLMessage)
+	}
+
 	message := extractErrorMessage(body)
 	if message == "" {
 		message = strings.TrimSpace(string(body))
@@ -290,6 +299,28 @@ func readSuccessBody(resp *http.Response) ([]byte, error) {
 		message = resp.Status
 	}
 	return nil, fmt.Errorf("upstream returned HTTP %d: %s", resp.StatusCode, message)
+}
+
+func decodeModelListJSON(body []byte, target any) error {
+	if err := json.Unmarshal(body, target); err != nil {
+		if looksLikeHTML(body) {
+			return fmt.Errorf(modelListHTMLMessage)
+		}
+		return fmt.Errorf(modelListInvalidJSONMessage)
+	}
+	return nil
+}
+
+func looksLikeHTML(body []byte) bool {
+	body = bytes.TrimSpace(body)
+	if len(body) == 0 {
+		return false
+	}
+	lower := bytes.ToLower(body)
+	return bytes.HasPrefix(lower, []byte("<!doctype html")) ||
+		bytes.HasPrefix(lower, []byte("<html")) ||
+		bytes.HasPrefix(lower, []byte("<head")) ||
+		bytes.HasPrefix(lower, []byte("<body"))
 }
 
 func extractErrorMessage(body []byte) string {
