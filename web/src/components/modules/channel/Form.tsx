@@ -1,4 +1,4 @@
-import { ChannelType, type Channel, useFetchModel } from '@/api/endpoints/channel';
+import { ChannelType, DEFAULT_PRICING_RULE, PRICING_CURRENCY_OPTIONS, normalizePricingRule, type Channel, type PricingRule, useFetchModel } from '@/api/endpoints/channel';
 import {
     Select,
     SelectContent,
@@ -23,6 +23,7 @@ export interface ChannelKeyFormItem {
     last_use_time_stamp?: number;
     total_cost?: number;
     remark?: string;
+    pricing_rule: PricingRule;
 }
 
 export interface ChannelFormData {
@@ -39,6 +40,7 @@ export interface ChannelFormData {
     proxy: boolean;
     auto_sync: boolean;
     match_regex: string;
+    pricing_rule: PricingRule;
 }
 
 export interface ChannelFormProps {
@@ -59,6 +61,105 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion";
+
+function PricingCurrencySelect({
+    id,
+    rule,
+    onChange,
+}: {
+    id: string;
+    rule: PricingRule;
+    onChange: (patch: Pick<PricingRule, 'currency' | 'currency_symbol'>) => void;
+}) {
+    const normalized = normalizePricingRule(rule);
+    const currentOption = PRICING_CURRENCY_OPTIONS.find((item) => item.currency === normalized.currency);
+    const currentValue = currentOption?.currency ?? normalized.currency;
+
+    return (
+        <Select
+            value={currentValue}
+            onValueChange={(currency) => {
+                const next = PRICING_CURRENCY_OPTIONS.find((item) => item.currency === currency);
+                if (!next) return;
+                onChange({ currency: next.currency, currency_symbol: next.currency_symbol });
+            }}
+        >
+            <SelectTrigger id={id} className="rounded-xl w-full border border-border px-4 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+                {!currentOption ? (
+                    <SelectItem className="rounded-xl" value={normalized.currency} disabled>
+                        {normalized.currency} {normalized.currency_symbol}
+                    </SelectItem>
+                ) : null}
+                {PRICING_CURRENCY_OPTIONS.map((item) => (
+                    <SelectItem className="rounded-xl" key={item.currency} value={item.currency}>
+                        {item.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+function PricingMultiplierInput({
+    id,
+    value,
+    onValueChange,
+}: {
+    id?: string;
+    value: number;
+    onValueChange: (value: number) => void;
+}) {
+    const [draft, setDraft] = useState(String(value));
+    const [focused, setFocused] = useState(false);
+
+    useEffect(() => {
+        if (!focused) {
+            setDraft(String(value));
+        }
+    }, [focused, value]);
+
+    return (
+        <Input
+            id={id}
+            type="number"
+            inputMode="decimal"
+            step="any"
+            min="0"
+            value={focused ? draft : String(value)}
+            onFocus={() => {
+                setFocused(true);
+                setDraft(String(value));
+            }}
+            onChange={(e) => {
+                const next = e.target.value;
+                setDraft(next);
+                if (next === '' || next === '.' || next === '0.') return;
+                const parsed = Number(next);
+                if (Number.isFinite(parsed) && parsed >= 0) {
+                    onValueChange(parsed);
+                }
+            }}
+            onBlur={() => {
+                setFocused(false);
+                if (draft === '' || draft === '.' || draft === '0.') {
+                    setDraft(String(value));
+                    return;
+                }
+                const parsed = Number(draft);
+                if (Number.isFinite(parsed) && parsed >= 0) {
+                    onValueChange(parsed);
+                    setDraft(String(parsed));
+                } else {
+                    setDraft(String(value));
+                }
+            }}
+            className="rounded-xl"
+        />
+    );
+}
 
 export function ChannelForm({
     formData,
@@ -81,7 +182,7 @@ export function ChannelForm({
             return;
         }
         if (!formData.keys || formData.keys.length === 0) {
-            onFormDataChange({ ...formData, keys: [{ enabled: true, channel_key: '' }] });
+            onFormDataChange({ ...formData, keys: [{ enabled: true, channel_key: '', pricing_rule: DEFAULT_PRICING_RULE }] });
             return;
         }
         if (!formData.custom_header || formData.custom_header.length === 0) {
@@ -168,8 +269,13 @@ export function ChannelForm({
     const handleAddKey = () => {
         onFormDataChange({
             ...formData,
-            keys: [...formData.keys, { enabled: true, channel_key: '' }],
+            keys: [...formData.keys, { enabled: true, channel_key: '', pricing_rule: DEFAULT_PRICING_RULE }],
         });
+    };
+
+    const handleUpdateKeyPricingRule = (idx: number, patch: Partial<PricingRule>) => {
+        const current = formData.keys[idx]?.pricing_rule ?? DEFAULT_PRICING_RULE;
+        handleUpdateKey(idx, { pricing_rule: { ...current, ...patch } });
     };
 
     const handleUpdateKey = (idx: number, patch: Partial<ChannelKeyFormItem>) => {
@@ -220,6 +326,15 @@ export function ChannelForm({
         onFormDataChange({ ...formData, custom_header: curr.filter((_, i) => i !== idx) });
     };
 
+    const updatePricingRule = (patch: Partial<PricingRule>) => {
+        onFormDataChange({
+            ...formData,
+            pricing_rule: normalizePricingRule({ ...(formData.pricing_rule ?? DEFAULT_PRICING_RULE), ...patch }),
+        });
+    };
+
+    const pricingRule = normalizePricingRule(formData.pricing_rule);
+
     return (
         <form onSubmit={onSubmit} className="space-y-4 px-1">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -257,6 +372,52 @@ export function ChannelForm({
                             <SelectItem className='rounded-xl' value={String(ChannelType.OpenAIEmbedding)}>{t('typeOpenAIEmbedding')}</SelectItem>
                         </SelectContent>
                     </Select>
+                </div>
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <div className="text-sm font-medium text-card-foreground">{t('pricingRule')}</div>
+                        <div className="text-xs text-muted-foreground">{t('pricingRuleHint')}</div>
+                    </div>
+                    <Switch
+                        checked={pricingRule.enabled}
+                        onCheckedChange={(checked) => updatePricingRule({ enabled: checked })}
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <div className="space-y-1 md:col-span-2">
+                        <label htmlFor={`${idPrefix}-pricing-currency`} className="text-xs text-muted-foreground">{t('pricingCurrency')}</label>
+                        <PricingCurrencySelect
+                            id={`${idPrefix}-pricing-currency`}
+                            rule={pricingRule}
+                            onChange={updatePricingRule}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label htmlFor={`${idPrefix}-pricing-multiplier`} className="text-xs text-muted-foreground">{t('pricingMultiplier')}</label>
+                        <PricingMultiplierInput
+                            id={`${idPrefix}-pricing-multiplier`}
+                            value={pricingRule.multiplier}
+                            onValueChange={(value) => updatePricingRule({ multiplier: value })}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label htmlFor={`${idPrefix}-pricing-unit`} className="text-xs text-muted-foreground">{t('pricingUnit')}</label>
+                        <Input
+                            id={`${idPrefix}-pricing-unit`}
+                            value={pricingRule.unit}
+                            onChange={(e) => updatePricingRule({ unit: e.target.value })}
+                            placeholder="1M Tokens"
+                            className="rounded-xl"
+                        />
+                    </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                    {pricingRule.enabled
+                        ? `${pricingRule.currency_symbol || pricingRule.currency} · ${pricingRule.multiplier || 1}x / ${pricingRule.unit || '1M Tokens'}`
+                        : t('pricingRuleDisabled')}
                 </div>
             </div>
 
@@ -322,37 +483,74 @@ export function ChannelForm({
                 </div>
                 <div className="space-y-2">
                     {(formData.keys ?? []).map((k, idx) => (
-                        <div key={k.id ?? `new-${idx}`} className="flex items-center gap-2">
-                            <Input
-                                type="text"
-                                value={k.channel_key}
-                                onChange={(e) => handleUpdateKey(idx, { channel_key: e.target.value })}
-                                placeholder={t('apiKey')}
-                                required={idx === 0}
-                                className="rounded-xl flex-1"
-                            />
-                            <Input
-                                type="text"
-                                value={k.remark ?? ''}
-                                onChange={(e) => handleUpdateKey(idx, { remark: e.target.value })}
-                                placeholder={t('remark')}
-                                className="rounded-xl w-32"
-                            />
-                            <Switch
-                                checked={k.enabled}
-                                onCheckedChange={(checked) => handleUpdateKey(idx, { enabled: checked })}
-                            />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveKey(idx)}
-                                disabled={(formData.keys ?? []).length <= 1}
-                                className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-destructive hover:bg-transparent disabled:opacity-40"
-                                title="Remove"
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
+                        <div key={k.id ?? `new-${idx}`} className="rounded-xl border border-border/60 bg-muted/10 p-3">
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    type="text"
+                                    value={k.channel_key}
+                                    onChange={(e) => handleUpdateKey(idx, { channel_key: e.target.value })}
+                                    placeholder={t('apiKey')}
+                                    required={idx === 0}
+                                    className="rounded-xl flex-1"
+                                />
+                                <Input
+                                    type="text"
+                                    value={k.remark ?? ''}
+                                    onChange={(e) => handleUpdateKey(idx, { remark: e.target.value })}
+                                    placeholder={t('remark')}
+                                    className="rounded-xl w-32"
+                                />
+                                <Switch
+                                    checked={k.enabled}
+                                    onCheckedChange={(checked) => handleUpdateKey(idx, { enabled: checked })}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveKey(idx)}
+                                    disabled={(formData.keys ?? []).length <= 1}
+                                    className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-destructive hover:bg-transparent disabled:opacity-40"
+                                    title="Remove"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <div className="mt-3 flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-xs font-medium text-card-foreground">{t('keyPricingRule')}</div>
+                                    <div className="mt-1 truncate text-xs text-muted-foreground">
+                                        {(k.pricing_rule ?? DEFAULT_PRICING_RULE).enabled
+                                            ? `${(k.pricing_rule ?? DEFAULT_PRICING_RULE).currency_symbol || (k.pricing_rule ?? DEFAULT_PRICING_RULE).currency} · ${(k.pricing_rule ?? DEFAULT_PRICING_RULE).multiplier || 1}x / ${(k.pricing_rule ?? DEFAULT_PRICING_RULE).unit || '1M Tokens'}`
+                                            : t('keyPricingInherit')}
+                                    </div>
+                                </div>
+                                <Switch
+                                    checked={(k.pricing_rule ?? DEFAULT_PRICING_RULE).enabled}
+                                    onCheckedChange={(checked) => handleUpdateKeyPricingRule(idx, { enabled: checked })}
+                                />
+                            </div>
+                            {(k.pricing_rule ?? DEFAULT_PRICING_RULE).enabled ? (
+                                <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                                    <div className="md:col-span-2">
+                                        <PricingCurrencySelect
+                                            id={`${idPrefix}-key-${idx}-pricing-currency`}
+                                            rule={normalizePricingRule(k.pricing_rule)}
+                                            onChange={(patch) => handleUpdateKeyPricingRule(idx, patch)}
+                                        />
+                                    </div>
+                                    <PricingMultiplierInput
+                                        value={(k.pricing_rule ?? DEFAULT_PRICING_RULE).multiplier}
+                                        onValueChange={(value) => handleUpdateKeyPricingRule(idx, { multiplier: value })}
+                                    />
+                                    <Input
+                                        value={(k.pricing_rule ?? DEFAULT_PRICING_RULE).unit}
+                                        onChange={(e) => handleUpdateKeyPricingRule(idx, { unit: e.target.value })}
+                                        placeholder={t('pricingUnit')}
+                                        className="rounded-xl"
+                                    />
+                                </div>
+                            ) : null}
                         </div>
                     ))}
                 </div>

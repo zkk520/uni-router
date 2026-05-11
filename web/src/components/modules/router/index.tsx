@@ -17,6 +17,8 @@ import {
     type RouteOptionChannel,
     type RouteProfile,
 } from '@/api/endpoints/router';
+import { useModelList } from '@/api/endpoints/model';
+import { DEFAULT_PRICING_RULE, normalizePricingRule, type PricingRule } from '@/api/endpoints/channel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -57,8 +59,34 @@ function endpointLabel(endpoint: RouteEndpoint, options: RouteOptionChannel[]) {
     };
 }
 
+function endpointOptionKey(endpoint: RouteEndpoint, options: RouteOptionChannel[]) {
+    const channel = options.find((item) => item.id === endpoint.channel_id);
+    return channel?.keys.find((item) => item.id === endpoint.channel_key_id);
+}
+
 function endpointKey(endpoint: Pick<RouteEndpoint, 'channel_id' | 'channel_key_id'>) {
     return `${endpoint.channel_id}:${endpoint.channel_key_id}`;
+}
+
+function effectivePricingRule(endpoint: RouteEndpoint, channel?: RouteOptionChannel): { rule: PricingRule; source: string } {
+    const key = channel?.keys.find((item) => item.id === endpoint.channel_key_id);
+    const keyRule = normalizePricingRule(key?.pricing_rule);
+    if (keyRule.enabled) {
+        return { rule: keyRule, source: '密钥规则' };
+    }
+    const channelRule = normalizePricingRule(channel?.pricing_rule);
+    if (channelRule.enabled) {
+        return { rule: channelRule, source: '供应商默认' };
+    }
+    return { rule: { ...DEFAULT_PRICING_RULE, enabled: true }, source: '系统默认' };
+}
+
+function pricingPreviewText(rule: PricingRule, baseModel?: { input: number; output: number; cache_read: number; cache_write: number }) {
+    if (!baseModel) return `${rule.currency_symbol || rule.currency} · ${rule.multiplier || 1}x / ${rule.unit || '1M Tokens'}`;
+    const symbol = rule.currency_symbol || rule.currency;
+    const multiplier = rule.multiplier || 1;
+    const fmt = (value: number) => `${symbol}${(value * multiplier).toFixed(4)}`;
+    return `输入 ${fmt(baseModel.input)} / 输出 ${fmt(baseModel.output)} / 缓存读 ${fmt(baseModel.cache_read)} / ${rule.unit || '1M Tokens'}`;
 }
 
 function SectionTitle({ title, description }: { title: string; description: string }) {
@@ -155,6 +183,8 @@ function AddEndpointForm({
             priority: 1,
             weight: 1,
             enabled: true,
+            use_pricing_override: false,
+            pricing_rule_override: DEFAULT_PRICING_RULE,
         });
     };
 
@@ -205,14 +235,38 @@ function AddEndpointForm({
     );
 }
 
+function PricingRulePreview({
+    source,
+    preview,
+}: {
+    source: string;
+    preview: string;
+}) {
+    return (
+        <div className="mt-3 rounded-xl border border-border/70 bg-muted/20 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <div className="text-xs font-medium text-card-foreground">计费规则</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                        {source} · {preview}
+                    </div>
+                </div>
+                <Badge variant="outline" className="shrink-0">按实际上游密钥计费</Badge>
+            </div>
+        </div>
+    );
+}
+
 function RouterDetail({ routerId }: { routerId: number }) {
     const { data: router } = useRouterDetail(routerId);
     const { data: options = [] } = useRouterOptions();
+    const { data: models = [] } = useModelList();
     const updateRouter = useUpdateRouter();
     const switchEndpoint = useSwitchRouterEndpoint();
     const testEndpoint = useTestRouterEndpoint();
 
     const endpoints = useMemo(() => [...(router?.endpoints ?? [])].sort((a, b) => a.priority - b.priority), [router]);
+    const modelPriceByName = useMemo(() => new Map(models.map((item) => [item.name, item])), [models]);
     const duplicateEndpointIds = useMemo(() => {
         const firstByKey = new Map<string, number>();
         const duplicates = new Set<number>();
@@ -329,6 +383,11 @@ function RouterDetail({ routerId }: { routerId: number }) {
                         </div>
                     ) : endpoints.map((endpoint) => {
                         const label = endpointLabel(endpoint, options);
+                        const optionChannel = options.find((item) => item.id === endpoint.channel_id);
+                        const optionKey = endpointOptionKey(endpoint, options);
+                        const firstModelName = optionChannel?.models[0];
+                        const baseModel = firstModelName ? modelPriceByName.get(firstModelName) : undefined;
+                        const pricing = effectivePricingRule(endpoint, optionChannel);
                         const current = router.preferred_endpoint_id === endpoint.id;
                         const invalid = !label.keyEnabled;
                         const duplicate = duplicateEndpointIds.has(endpoint.id);
@@ -359,6 +418,11 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                         <div className="mt-1 text-xs text-muted-foreground">
                                             {label.channelName} / {label.keyName}
                                             {invalid ? <span className="ml-2 text-destructive">上游密钥无效</span> : null}
+                                        </div>
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            {optionKey?.pricing_rule?.enabled
+                                                ? `密钥倍率 ${optionKey.pricing_rule.multiplier || 1}x`
+                                                : '密钥未单独定价，将继承供应商默认或系统默认'}
                                         </div>
                                         {duplicate ? (
                                             <div className="mt-2 text-xs text-amber-700">同一供应商和密钥已被重复添加，请删除多余端点。</div>
@@ -455,6 +519,10 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                         启用
                                     </label>
                                 </div>
+                                <PricingRulePreview
+                                    source={pricing.source}
+                                    preview={pricingPreviewText(pricing.rule, baseModel)}
+                                />
                             </div>
                         );
                     })}

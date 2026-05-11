@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { logger } from '@/lib/logger';
-import { formatCount, formatMoney, formatTime } from '@/lib/utils';
-import { StatsChannel, type StatsMetricsFormatted } from './stats';
+import { formatCount, formatCurrencyCosts, formatTime } from '@/lib/utils';
+import { StatsChannel, StatsChannelKey, type StatsMetricsFormatted } from './stats';
 /**
  * 供应商类型枚举
  */
@@ -25,6 +25,48 @@ export type CustomHeader = {
     header_value: string;
 };
 
+export type PricingRule = {
+    enabled: boolean;
+    currency: string;
+    currency_symbol: string;
+    unit: string;
+    multiplier: number;
+    base_source: string;
+};
+
+export const DEFAULT_PRICING_RULE: PricingRule = {
+    enabled: false,
+    currency: 'CNY',
+    currency_symbol: '¥',
+    unit: '1M Tokens',
+    multiplier: 7.2,
+    base_source: 'model_price',
+};
+
+export const PRICING_CURRENCY_OPTIONS = [
+    { currency: 'CNY', currency_symbol: '¥', label: 'CNY ¥' },
+    { currency: 'USD', currency_symbol: '$', label: 'USD $' },
+    { currency: 'EUR', currency_symbol: '€', label: 'EUR €' },
+    { currency: 'GBP', currency_symbol: '£', label: 'GBP £' },
+    { currency: 'JPY', currency_symbol: '¥', label: 'JPY ¥' },
+    { currency: 'HKD', currency_symbol: 'HK$', label: 'HKD HK$' },
+    { currency: 'TWD', currency_symbol: 'NT$', label: 'TWD NT$' },
+    { currency: 'SGD', currency_symbol: 'S$', label: 'SGD S$' },
+    { currency: 'KRW', currency_symbol: '₩', label: 'KRW ₩' },
+] as const;
+
+export function normalizePricingRule(rule?: PricingRule): PricingRule {
+    const base = rule ?? DEFAULT_PRICING_RULE;
+    return {
+        enabled: base.enabled ?? DEFAULT_PRICING_RULE.enabled,
+        currency: base.currency || DEFAULT_PRICING_RULE.currency,
+        currency_symbol: base.currency_symbol || DEFAULT_PRICING_RULE.currency_symbol,
+        unit: base.unit || DEFAULT_PRICING_RULE.unit,
+        multiplier: base.multiplier || DEFAULT_PRICING_RULE.multiplier,
+        base_source: base.base_source || DEFAULT_PRICING_RULE.base_source,
+    };
+}
+
 export type ChannelKey = {
     id: number;
     channel_id: number;
@@ -34,6 +76,8 @@ export type ChannelKey = {
     last_use_time_stamp: number;
     total_cost: number;
     remark: string;
+    pricing_rule: PricingRule;
+    stats?: StatsChannelKey;
 };
 
 /**
@@ -54,6 +98,7 @@ export type Channel = {
     param_override?: string | null;
     channel_proxy?: string | null;
     match_regex?: string | null;
+    pricing_rule: PricingRule;
     stats: StatsChannel;
 };
 
@@ -72,7 +117,7 @@ export type CreateChannelRequest = {
     type: ChannelType;
     enabled?: boolean;
     base_urls: BaseUrl[];
-    keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark'>>;
+    keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'pricing_rule'>>;
     model: string;
     custom_model?: string;
     proxy?: boolean;
@@ -81,6 +126,7 @@ export type CreateChannelRequest = {
     channel_proxy?: string | null;
     param_override?: string | null;
     match_regex?: string | null;
+    pricing_rule?: PricingRule;
 };
 
 /**
@@ -100,9 +146,10 @@ export type UpdateChannelRequest = {
     channel_proxy?: string | null;
     param_override?: string | null;
     match_regex?: string | null;
+    pricing_rule?: PricingRule;
     // keys diff
-    keys_to_add?: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark'>>;
-    keys_to_update?: Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string }>;
+    keys_to_add?: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'pricing_rule'>>;
+    keys_to_update?: Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule }>;
     keys_to_delete?: number[];
 };
 
@@ -138,15 +185,19 @@ export function useChannelList() {
                 ...item,
                 base_urls: item.base_urls ?? [],
                 custom_header: item.custom_header ?? [],
-                keys: item.keys ?? [],
+                keys: (item.keys ?? []).map((key) => ({
+                    ...key,
+                    pricing_rule: normalizePricingRule(key.pricing_rule),
+                })),
+                pricing_rule: normalizePricingRule(item.pricing_rule),
             }) satisfies Channel,
             formatted: {
                 input_token: formatCount(item.stats.input_token),
                 output_token: formatCount(item.stats.output_token),
                 total_token: formatCount(item.stats.input_token + item.stats.output_token),
-                input_cost: formatMoney(item.stats.input_cost),
-                output_cost: formatMoney(item.stats.output_cost),
-                total_cost: formatMoney(item.stats.input_cost + item.stats.output_cost),
+                input_cost: formatCurrencyCosts(item.stats.input_cost_by_currency, item.stats.input_cost),
+                output_cost: formatCurrencyCosts(item.stats.output_cost_by_currency, item.stats.output_cost),
+                total_cost: formatCurrencyCosts(item.stats.total_cost_by_currency, item.stats.input_cost + item.stats.output_cost),
                 request_success: formatCount(item.stats.request_success),
                 request_failed: formatCount(item.stats.request_failed),
                 request_count: formatCount(item.stats.request_success + item.stats.request_failed),

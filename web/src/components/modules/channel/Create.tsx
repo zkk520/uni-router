@@ -5,7 +5,7 @@ import {
     MorphingDialogDescription,
     useMorphingDialog,
 } from '@/components/ui/morphing-dialog';
-import { useCreateChannel, ChannelType } from '@/api/endpoints/channel';
+import { useCreateChannel, ChannelType, DEFAULT_PRICING_RULE, normalizePricingRule } from '@/api/endpoints/channel';
 import { useTranslations } from 'next-intl';
 import { ChannelForm, type ChannelFormData } from './Form';
 
@@ -19,13 +19,14 @@ export function CreateDialogContent() {
         custom_header: [],
         channel_proxy: '',
         param_override: '',
-        keys: [{ enabled: true, channel_key: '', remark: '' }],
+        keys: [{ enabled: true, channel_key: '', remark: '', pricing_rule: DEFAULT_PRICING_RULE }],
         model: '',
         custom_model: '',
         auto_sync: false,
         enabled: true,
         proxy: false,
         match_regex: '',
+        pricing_rule: DEFAULT_PRICING_RULE,
     });
     const t = useTranslations('channel.create');
 
@@ -37,7 +38,7 @@ export function CreateDialogContent() {
         }));
         const normalizedKeys = formData.keys
             .filter((k) => k.channel_key.trim())
-            .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key, remark: k.remark ?? '' }));
+            .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key, remark: k.remark ?? '', pricing_rule: normalizePricingRule(k.pricing_rule) }));
         const normalizedHeaders = (formData.custom_header ?? [])
             .map((h) => ({ header_key: h.header_key.trim(), header_value: h.header_value }))
             .filter((h) => h.header_key && h.header_value !== '');
@@ -59,6 +60,7 @@ export function CreateDialogContent() {
                 channel_proxy: channelProxy,
                 param_override: paramOverride,
                 match_regex: formData.match_regex.trim(),
+                pricing_rule: formData.pricing_rule,
             },
             {
                 onSuccess: () => {
@@ -69,13 +71,14 @@ export function CreateDialogContent() {
                         custom_header: [],
                         channel_proxy: '',
                         param_override: '',
-                        keys: [{ enabled: true, channel_key: '', remark: '' }],
+                        keys: [{ enabled: true, channel_key: '', remark: '', pricing_rule: DEFAULT_PRICING_RULE }],
                         model: '',
                         custom_model: '',
                         auto_sync: false,
                         enabled: true,
                         proxy: false,
                         match_regex: '',
+                        pricing_rule: DEFAULT_PRICING_RULE,
                     });
                     setIsOpen(false);
                 }

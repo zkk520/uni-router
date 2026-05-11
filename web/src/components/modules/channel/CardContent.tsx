@@ -11,7 +11,7 @@ import {
     Globe,
     Key
 } from 'lucide-react';
-import { useUpdateChannel, useDeleteChannel, type Channel, type UpdateChannelRequest } from '@/api/endpoints/channel';
+import { DEFAULT_PRICING_RULE, normalizePricingRule, useUpdateChannel, useDeleteChannel, type Channel, type PricingRule, type UpdateChannelRequest } from '@/api/endpoints/channel';
 import {
     MorphingDialogTitle,
     MorphingDialogDescription,
@@ -23,7 +23,7 @@ import { type StatsMetricsFormatted } from '@/api/endpoints/stats';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { ChannelForm, type ChannelFormData } from './Form';
-import { formatMoney } from '@/lib/utils';
+import { formatCurrencyCosts } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -50,13 +50,15 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                 last_use_time_stamp: k.last_use_time_stamp,
                 total_cost: k.total_cost,
                 remark: k.remark,
+                pricing_rule: normalizePricingRule(k.pricing_rule),
             }))
-            : [{ enabled: true, channel_key: '', remark: '' }],
+            : [{ enabled: true, channel_key: '', remark: '', pricing_rule: DEFAULT_PRICING_RULE }],
         model: channel.model,
         custom_model: channel.custom_model,
         proxy: channel.proxy,
         auto_sync: channel.auto_sync,
         match_regex: channel.match_regex ?? '',
+        pricing_rule: normalizePricingRule(channel.pricing_rule),
     });
     const t = useTranslations('channel.detail');
 
@@ -66,6 +68,8 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
     const headersEqual = (a: Channel['custom_header'] | undefined, b: Channel['custom_header'] | undefined) =>
         JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+    const pricingRuleEqual = (a: PricingRule | undefined, b: PricingRule | undefined) =>
+        JSON.stringify(a ?? DEFAULT_PRICING_RULE) === JSON.stringify(b ?? DEFAULT_PRICING_RULE);
 
     const handleUpdate = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -113,6 +117,10 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
             req.match_regex = nextMatchRegex;
         }
 
+        if (!pricingRuleEqual(formData.pricing_rule, channel.pricing_rule)) {
+            req.pricing_rule = formData.pricing_rule;
+        }
+
         const originalKeys = channel.keys;
         const originalByID = new Map(originalKeys.map((k) => [k.id, k]));
         const nextKeys = formData.keys ?? [];
@@ -122,19 +130,25 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
 
         const keys_to_add = nextKeys
             .filter((k) => !k.id && k.channel_key.trim())
-            .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key, remark: k.remark ?? '' }));
+            .map((k) => ({
+                enabled: k.enabled,
+                channel_key: k.channel_key,
+                remark: k.remark ?? '',
+                pricing_rule: normalizePricingRule(k.pricing_rule),
+            }));
 
         const keys_to_update = nextKeys
             .filter((k) => typeof k.id === 'number' && originalByID.has(k.id as number))
             .map((k) => {
                 const orig = originalByID.get(k.id as number)!;
-                const u: { id: number; enabled?: boolean; channel_key?: string; remark?: string } = { id: k.id as number };
+                const u: { id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule } = { id: k.id as number };
                 if (k.enabled !== orig.enabled) u.enabled = k.enabled;
                 if (k.channel_key !== orig.channel_key) u.channel_key = k.channel_key;
                 if ((k.remark ?? '') !== orig.remark) u.remark = k.remark ?? '';
+                if (!pricingRuleEqual(k.pricing_rule, orig.pricing_rule)) u.pricing_rule = normalizePricingRule(k.pricing_rule);
                 return Object.keys(u).length > 1 ? u : null;
             })
-            .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string }>;
+            .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule }>;
 
         if (keys_to_add.length > 0) req.keys_to_add = keys_to_add;
         if (keys_to_update.length > 0) req.keys_to_update = keys_to_update;
@@ -351,7 +365,10 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                         {t('sections.keys')}
                                     </h4>
                                     <div className="rounded-2xl border bg-card overflow-hidden">
-                                        {channel.keys?.map((key) => (
+                                        {channel.keys?.map((key) => {
+                                            const keyTotalCost = formatCurrencyCosts(key.stats?.total_cost_by_currency, key.stats ? key.stats.input_cost + key.stats.output_cost : key.total_cost);
+                                            const keyRule = normalizePricingRule(key.pricing_rule);
+                                            return (
                                             <div key={key.id} className="flex items-center gap-3 p-3 sm:p-4 border-b last:border-0 hover:bg-accent/5 transition-colors">
                                                 <div className={cn("size-2 shrink-0 rounded-full", key.enabled ? "bg-emerald-500" : "bg-destructive")} />
 
@@ -394,12 +411,17 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                                     )}
 
                                                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                                                        {formatMoney(key.total_cost).formatted.value}
-                                                        {formatMoney(key.total_cost).formatted.unit}
+                                                        {keyTotalCost.formatted.value}
+                                                        {keyTotalCost.formatted.unit}
+                                                    </Badge>
+
+                                                    <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                                                        {keyRule.enabled ? `${keyRule.multiplier || 1}x` : '继承'}
                                                     </Badge>
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                         {(!channel.keys || channel.keys.length === 0) && (
                                             <div className="p-4 text-sm text-muted-foreground text-center">{t('noKeys')}</div>
                                         )}

@@ -11,7 +11,7 @@ import { useTheme } from 'next-themes';
 import { type RelayLog, type ChannelAttempt } from '@/api/endpoints/log';
 import { getModelIcon } from '@/lib/model-icons';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrencyCosts } from '@/lib/utils';
 import { CopyIconButton } from '@/components/common/CopyButton';
 import {
     MorphingDialog,
@@ -108,6 +108,18 @@ function LogStatusBadge({ log }: { log: RelayLog }) {
             {t(status)}
         </Badge>
     );
+}
+
+function formatLogCost(log: RelayLog): string {
+    const formatted = formatCurrencyCosts(log.total_cost_by_currency, log.cost);
+    if (formatted.formatted.unit) {
+        return `${formatted.formatted.value}${formatted.formatted.unit}`;
+    }
+    if (formatted.formatted.value) {
+        return formatted.formatted.value;
+    }
+    const symbol = log.cost_currency_symbol || (log.cost_currency === 'CNY' ? '¥' : log.cost_currency || '¥');
+    return `${symbol}${Number(log.cost || 0).toFixed(6)}`;
 }
 
 interface RetryBadgeWithTooltipProps {
@@ -262,6 +274,7 @@ export function LogCard({ log }: { log: RelayLog }) {
     const hasMultipleAttempts = log.attempts && log.attempts.length > 1;
     const hasAttempts = log.attempts && log.attempts.length > 0;
     const [isDiagnosticExpanded, setIsDiagnosticExpanded] = useState(false);
+    const costText = formatLogCost(log);
 
     return (
         <TooltipProvider>
@@ -350,7 +363,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                 <div className="flex items-center gap-1.5">
                                     <DollarSign className="size-3.5 shrink-0 text-emerald-500" />
                                     <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                                        {t('cost')} {Number(log.cost).toFixed(6)}
+                                        {t('cost')} {costText}
                                     </span>
                                 </div>
                             </div>
@@ -609,7 +622,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                             <div className="flex items-center gap-1.5">
                                 <DollarSign className="size-3.5 text-emerald-500" />
                                 <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                                    {t('cost')}: {Number(log.cost).toFixed(6)}
+                                    {t('cost')}: {costText}
                                 </span>
                             </div>
                         </div>

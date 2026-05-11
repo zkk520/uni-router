@@ -1,15 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import { formatCount, formatMoney, formatTime } from '@/lib/utils';
+import { formatCount, formatCurrencyCosts, formatTime, type CostCurrencyMetrics } from '@/lib/utils';
 
 /**
  * 统计数据
  */
-interface StatsMetrics {
+export interface StatsMetrics {
     input_token: number;
     output_token: number;
     input_cost: number;
     output_cost: number;
+    input_cost_by_currency?: Record<string, CostCurrencyMetrics>;
+    output_cost_by_currency?: Record<string, CostCurrencyMetrics>;
+    total_cost_by_currency?: Record<string, CostCurrencyMetrics>;
     wait_time: number;
     request_success: number;
     request_failed: number;
@@ -18,19 +21,23 @@ interface StatsMetrics {
 export interface StatsMetricsFormatted {
     input_token: ReturnType<typeof formatCount>;
     output_token: ReturnType<typeof formatCount>;
-    input_cost: ReturnType<typeof formatMoney>;
-    output_cost: ReturnType<typeof formatMoney>;
+    input_cost: ReturnType<typeof formatCurrencyCosts>;
+    output_cost: ReturnType<typeof formatCurrencyCosts>;
     wait_time: ReturnType<typeof formatTime>;
     request_success: ReturnType<typeof formatCount>;
     request_failed: ReturnType<typeof formatCount>;
 
     request_count: ReturnType<typeof formatCount>;
     total_token: ReturnType<typeof formatCount>;
-    total_cost: ReturnType<typeof formatMoney>;
+    total_cost: ReturnType<typeof formatCurrencyCosts>;
 }
 
 export interface StatsChannel extends StatsMetrics {
     channel_id: number;
+}
+
+export interface StatsChannelKey extends StatsMetrics {
+    channel_key_id: number;
 }
 
 export interface StatsDaily extends StatsMetrics {
@@ -90,9 +97,9 @@ export function useStatsDaily() {
             input_token: formatCount(item.input_token),
             output_token: formatCount(item.output_token),
             total_token: formatCount(item.input_token + item.output_token),
-            input_cost: formatMoney(item.input_cost),
-            output_cost: formatMoney(item.output_cost),
-            total_cost: formatMoney(item.input_cost + item.output_cost),
+            input_cost: formatCurrencyCosts(item.input_cost_by_currency, item.input_cost),
+            output_cost: formatCurrencyCosts(item.output_cost_by_currency, item.output_cost),
+            total_cost: formatCurrencyCosts(item.total_cost_by_currency, item.input_cost + item.output_cost),
             wait_time: formatTime(item.wait_time),
             request_success: formatCount(item.request_success),
             request_failed: formatCount(item.request_failed),
@@ -118,9 +125,9 @@ export function useStatsHourly() {
             input_token: formatCount(item.input_token),
             output_token: formatCount(item.output_token),
             total_token: formatCount(item.input_token + item.output_token),
-            input_cost: formatMoney(item.input_cost),
-            output_cost: formatMoney(item.output_cost),
-            total_cost: formatMoney(item.input_cost + item.output_cost),
+            input_cost: formatCurrencyCosts(item.input_cost_by_currency, item.input_cost),
+            output_cost: formatCurrencyCosts(item.output_cost_by_currency, item.output_cost),
+            total_cost: formatCurrencyCosts(item.total_cost_by_currency, item.input_cost + item.output_cost),
             wait_time: formatTime(item.wait_time),
             request_success: formatCount(item.request_success),
             request_failed: formatCount(item.request_failed),
@@ -141,9 +148,9 @@ export function useStatsTotal() {
             input_token: formatCount(data.input_token),
             output_token: formatCount(data.output_token),
             total_token: formatCount(data.input_token + data.output_token),
-            input_cost: formatMoney(data.input_cost),
-            output_cost: formatMoney(data.output_cost),
-            total_cost: formatMoney(data.input_cost + data.output_cost),
+            input_cost: formatCurrencyCosts(data.input_cost_by_currency, data.input_cost),
+            output_cost: formatCurrencyCosts(data.output_cost_by_currency, data.output_cost),
+            total_cost: formatCurrencyCosts(data.total_cost_by_currency, data.input_cost + data.output_cost),
             wait_time: formatTime(data.wait_time),
             request_success: formatCount(data.request_success),
             request_failed: formatCount(data.request_failed),
@@ -170,9 +177,9 @@ export function useStatsAPIKey() {
             input_token: formatCount(item.input_token),
             output_token: formatCount(item.output_token),
             total_token: formatCount(item.input_token + item.output_token),
-            input_cost: formatMoney(item.input_cost),
-            output_cost: formatMoney(item.output_cost),
-            total_cost: formatMoney(item.input_cost + item.output_cost),
+            input_cost: formatCurrencyCosts(item.input_cost_by_currency, item.input_cost),
+            output_cost: formatCurrencyCosts(item.output_cost_by_currency, item.output_cost),
+            total_cost: formatCurrencyCosts(item.total_cost_by_currency, item.input_cost + item.output_cost),
             wait_time: formatTime(item.wait_time),
             request_success: formatCount(item.request_success),
             request_failed: formatCount(item.request_failed),

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import type { Channel } from './channel';
+import type { Channel, PricingRule } from './channel';
 
 export type RouteMode = 'manual' | 'weighted';
 export type RouteEndpointStatus = 'unknown' | 'normal' | 'error';
@@ -17,6 +17,8 @@ export interface RouteEndpoint {
     status: RouteEndpointStatus;
     last_checked_at?: number;
     last_error?: string;
+    use_pricing_override: boolean;
+    pricing_rule_override: PricingRule;
 }
 
 export interface RouteProfile {
@@ -36,6 +38,7 @@ export interface RouteOptionChannelKey {
     enabled: boolean;
     remark: string;
     masked_key: string;
+    pricing_rule: PricingRule;
 }
 
 export interface RouteOptionChannel {
@@ -44,6 +47,7 @@ export interface RouteOptionChannel {
     enabled: boolean;
     models: string[];
     keys: RouteOptionChannelKey[];
+    pricing_rule: PricingRule;
 }
 
 export type RouteEndpointAddRequest = Omit<RouteEndpoint, 'id' | 'router_id' | 'status' | 'last_checked_at' | 'last_error'>;

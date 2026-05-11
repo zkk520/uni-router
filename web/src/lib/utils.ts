@@ -24,7 +24,43 @@ export function formatCount(num: number | undefined): { raw: number, formatted: 
 export function formatMoney(num: number | undefined): { raw: number, formatted: { value: string, unit: string } } {
   return {
     raw: num ?? 0,
-    formatted: formatNumber(num, [1000000000, 1000000, 1000, 1], ['$', 'B$', 'M$', 'K$', '$', '$']),
+    formatted: formatNumber(num, [1000000000, 1000000, 1000, 1], ['¥', 'B¥', 'M¥', 'K¥', '¥', '¥']),
+  };
+}
+
+export function formatMoneyWithSymbol(num: number | undefined, symbol = '$'): { raw: number, formatted: { value: string, unit: string } } {
+  return {
+    raw: num ?? 0,
+    formatted: formatNumber(num, [1000000000, 1000000, 1000, 1], [symbol, `B${symbol}`, `M${symbol}`, `K${symbol}`, symbol, symbol]),
+  };
+}
+
+export type CostCurrencyMetrics = {
+  currency: string;
+  currency_symbol: string;
+  input_cost: number;
+  output_cost: number;
+  total_cost: number;
+};
+
+export function formatCurrencyCosts(
+  costs: Record<string, CostCurrencyMetrics> | undefined,
+  fallback?: number,
+): ReturnType<typeof formatMoney> {
+  const values = Object.values(costs ?? {}).filter((item) => Math.abs(item.total_cost) > 0);
+  if (values.length === 0) {
+    return formatMoney(fallback ?? 0);
+  }
+  const display = values
+    .sort((a, b) => a.currency.localeCompare(b.currency))
+    .map((item) => {
+      const formatted = formatMoneyWithSymbol(item.total_cost, item.currency_symbol || item.currency);
+      return `${formatted.formatted.value}${formatted.formatted.unit}`;
+    })
+    .join(' / ');
+  return {
+    raw: fallback ?? values.reduce((sum, item) => sum + item.total_cost, 0),
+    formatted: { value: display, unit: '' },
   };
 }
 

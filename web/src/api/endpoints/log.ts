@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import { apiClient, API_BASE_URL } from '../client';
 import { logger } from '@/lib/logger';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CostCurrencyMetrics } from '@/lib/utils';
 
 /**
  * 尝试状态
@@ -46,6 +47,14 @@ export interface RelayLog {
     ftut: number;                // 首字时间(毫秒)
     use_time: number;            // 总用时(毫秒)
     cost: number;                // 消耗费用
+    cost_currency?: string;
+    cost_currency_symbol?: string;
+    pricing_multiplier?: number;
+    pricing_unit?: string;
+    pricing_rule_source?: string;
+    input_cost_by_currency?: Record<string, CostCurrencyMetrics>;
+    output_cost_by_currency?: Record<string, CostCurrencyMetrics>;
+    total_cost_by_currency?: Record<string, CostCurrencyMetrics>;
     request_content: string;     // 请求内容
     response_content: string;    // 响应内容
     error: string;               // 错误信息

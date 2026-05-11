@@ -14,8 +14,8 @@ export function SettingInfo() {
     const nowVersionQuery = useNowVersion();
     const updateCore = useUpdateCore();
 
-    const backendNowVersion = nowVersionQuery.data || '';
-    const latestVersion = latestInfoQuery.data?.tag_name || '';
+    const backendNowVersion = nowVersionQuery.data || APP_VERSION;
+    const latestVersion = latestInfoQuery.data?.tag_name || APP_VERSION;
 
     // 前端版本与后端当前版本不一致 → 浏览器缓存问题
     const isCacheMismatch = !!backendNowVersion && backendNowVersion !== APP_VERSION;
