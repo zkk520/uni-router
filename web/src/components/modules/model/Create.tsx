@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useCreateModel } from '@/api/endpoints/model';
+import { useEffect, useMemo, useState } from 'react';
+import { Search } from 'lucide-react';
+import { useCreateModel, useModelPresetList, type LLMInfo } from '@/api/endpoints/model';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel, FieldGroup } from '@/components/ui/field';
@@ -13,18 +14,61 @@ import {
 } from '@/components/ui/morphing-dialog';
 import { useTranslations } from 'next-intl';
 
-export function CreateDialogContent() {
-    const { setIsOpen } = useMorphingDialog();
+type ModelFormValues = {
+    name: string;
+    input: string;
+    output: string;
+    cache_read: string;
+    cache_write: string;
+};
+
+function createEmptyFormValues(initialValues?: Partial<ModelFormValues>): ModelFormValues {
+    return {
+        name: initialValues?.name ?? '',
+        input: initialValues?.input ?? '',
+        output: initialValues?.output ?? '',
+        cache_read: initialValues?.cache_read ?? '',
+        cache_write: initialValues?.cache_write ?? '',
+    };
+}
+
+export type CreateDialogContentProps = {
+    initialValues?: Partial<ModelFormValues>;
+};
+
+export function CreateDialogContent({ initialValues }: CreateDialogContentProps) {
+    const { isOpen, setIsOpen } = useMorphingDialog();
     const t = useTranslations('model.create');
     const createModel = useCreateModel();
 
-    const [formData, setFormData] = useState({
-        name: '',
-        input: '',
-        output: '',
-        cache_read: '',
-        cache_write: '',
-    });
+    const [formData, setFormData] = useState<ModelFormValues>(() => createEmptyFormValues(initialValues));
+    const [presetSearch, setPresetSearch] = useState('');
+    const isCopyMode = initialValues !== undefined;
+    const presetList = useModelPresetList(isOpen && !isCopyMode);
+
+    useEffect(() => {
+        setFormData(createEmptyFormValues(initialValues));
+    }, [initialValues]);
+
+    const filteredPresets = useMemo(() => {
+        const presets = presetList.data ?? [];
+        const keyword = presetSearch.trim().toLowerCase();
+        if (!keyword) return presets.slice(0, 8);
+        return presets
+            .filter((preset) => preset.name.toLowerCase().includes(keyword))
+            .slice(0, 8);
+    }, [presetList.data, presetSearch]);
+
+    const handleSelectPreset = (preset: LLMInfo) => {
+        setFormData({
+            name: preset.name,
+            input: preset.input.toString(),
+            output: preset.output.toString(),
+            cache_read: preset.cache_read.toString(),
+            cache_write: preset.cache_write.toString(),
+        });
+        setPresetSearch(preset.name);
+    };
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -38,7 +82,8 @@ export function CreateDialogContent() {
             cache_write: parseFloat(formData.cache_write) || 0,
         }, {
             onSuccess: () => {
-                setFormData({ name: '', input: '', output: '', cache_read: '', cache_write: '' });
+                setFormData(createEmptyFormValues());
+                setPresetSearch('');
                 setIsOpen(false);
             }
         });
@@ -48,7 +93,14 @@ export function CreateDialogContent() {
         <div className="w-screen max-w-full md:max-w-xl">
             <MorphingDialogTitle>
                 <header className="mb-5 flex items-center justify-between">
-                    <h2 className="text-2xl font-bold text-card-foreground">{t('title')}</h2>
+                    <div>
+                        <h2 className="text-2xl font-bold text-card-foreground">
+                            {isCopyMode ? t('copyTitle') : t('title')}
+                        </h2>
+                        {isCopyMode ? (
+                            <p className="mt-1 text-sm text-muted-foreground">{t('copyDescription')}</p>
+                        ) : null}
+                    </div>
                     <MorphingDialogClose
                         className="relative right-0 top-0"
                         variants={{
@@ -62,6 +114,51 @@ export function CreateDialogContent() {
             <MorphingDialogDescription>
                 <form onSubmit={handleSubmit}>
                     <FieldGroup className="gap-4">
+                        {!isCopyMode ? (
+                            <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                                <label htmlFor="model-preset-search" className="text-xs font-medium text-muted-foreground">
+                                    {t('presetLabel')}
+                                </label>
+                                <div className="mt-2 flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3">
+                                    <Search className="size-4 shrink-0 text-muted-foreground" />
+                                    <input
+                                        id="model-preset-search"
+                                        value={presetSearch}
+                                        onChange={(e) => setPresetSearch(e.target.value)}
+                                        placeholder={t('presetPlaceholder')}
+                                        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                                    />
+                                </div>
+                                <div className="mt-2 max-h-48 overflow-y-auto pr-1">
+                                    {presetList.isLoading ? (
+                                        <div className="px-2 py-3 text-xs text-muted-foreground">{t('presetLoading')}</div>
+                                    ) : presetList.isError ? (
+                                        <div className="px-2 py-3 text-xs text-destructive">{t('presetLoadFailed')}</div>
+                                    ) : filteredPresets.length > 0 ? (
+                                        <div className="grid gap-1.5">
+                                            {filteredPresets.map((preset) => (
+                                                <button
+                                                    key={preset.name}
+                                                    type="button"
+                                                    onClick={() => handleSelectPreset(preset)}
+                                                    className="rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted"
+                                                >
+                                                    <div className="truncate text-sm font-medium text-card-foreground">{preset.name}</div>
+                                                    <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                                        <span>{t('input')}: {preset.input}</span>
+                                                        <span>{t('output')}: {preset.output}</span>
+                                                        <span>{t('cacheRead')}: {preset.cache_read}</span>
+                                                        <span>{t('cacheWrite')}: {preset.cache_write}</span>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="px-2 py-3 text-xs text-muted-foreground">{t('presetEmpty')}</div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
                         <Field>
                             <FieldLabel htmlFor="model-name">{t('name')}</FieldLabel>
                             <Input

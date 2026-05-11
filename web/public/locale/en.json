@@ -334,6 +334,13 @@
     "model": {
         "create": {
             "title": "Create Model",
+            "copyTitle": "Copy Model",
+            "copyDescription": "Base prices have been filled from the original model. Rename it before creating.",
+            "presetLabel": "Choose from presets",
+            "presetPlaceholder": "Search unadded preset models",
+            "presetLoading": "Loading presets...",
+            "presetLoadFailed": "Failed to load presets. Please make sure the backend is updated.",
+            "presetEmpty": "No unadded presets available",
             "name": "Model Name",
             "input": "Input Price",
             "output": "Output Price",
@@ -351,6 +358,7 @@
         "card": {
             "inputCache": "Input/Cache",
             "outputCache": "Output/Cache",
+            "copy": "Copy",
             "edit": "Edit",
             "delete": "Delete"
         },
@@ -367,7 +375,18 @@
             "endpointDescription": "The channel rule is only a fallback for keys that do not enable their own pricing rule.",
             "priority": "Priority: upstream key rule > channel default rule > system default CNY pricing.",
             "listTitle": "Model Base Prices",
-            "listUnit": "USD / 1M Tokens"
+            "listUnit": "USD / 1M Tokens",
+            "helpAriaLabel": "View pricing explanation",
+            "groupSummary": "{total} total, {priced} priced",
+            "providers": {
+                "openai": "OpenAI",
+                "anthropic": "Anthropic",
+                "google": "Google",
+                "deepseek": "DeepSeek",
+                "xai": "xAI",
+                "alibaba": "Alibaba",
+                "other": "Other"
+            }
         },
         "overlay": {
             "cancel": "Cancel",

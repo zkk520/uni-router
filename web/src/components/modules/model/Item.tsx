@@ -1,16 +1,23 @@
 'use client';
 
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Pencil, Trash2, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { ArrowDownToLine, ArrowUpFromLine, Copy, Pencil, Trash2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useTranslations } from 'next-intl';
-import { useUpdateModel, useDeleteModel, type LLMInfo } from '@/api/endpoints/model';
-import { getModelIcon } from '@/lib/model-icons';
+import { useDeleteModel, useUpdateModel, type LLMInfo } from '@/api/endpoints/model';
 import { toast } from '@/components/common/Toast';
+import {
+    MorphingDialog,
+    MorphingDialogContainer,
+    MorphingDialogContent,
+    MorphingDialogTrigger,
+} from '@/components/ui/morphing-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/animate-ui/components/animate/tooltip';
-import { ModelDeleteOverlay, ModelEditOverlay } from './ItemOverlays';
+import { getModelIcon } from '@/lib/model-icons';
 import { cn } from '@/lib/utils';
 import { createPortal } from 'react-dom';
+import { CreateDialogContent } from './Create';
+import { ModelDeleteOverlay, ModelEditOverlay } from './ItemOverlays';
 
 interface ModelItemProps {
     model: LLMInfo;
@@ -36,9 +43,16 @@ export const ModelItem = memo(function ModelItem({ model, layout = 'grid' }: Mod
         cache_write: model.cache_write.toString(),
     }));
 
+    const copyInitialValues = useMemo(() => ({
+        name: `${model.name}-copy`,
+        input: model.input.toString(),
+        output: model.output.toString(),
+        cache_read: model.cache_read.toString(),
+        cache_write: model.cache_write.toString(),
+    }), [model]);
+
     const updateModel = useUpdateModel();
     const deleteModel = useDeleteModel();
-
     const { Avatar: ModelAvatar, color: brandColor } = useMemo(() => getModelIcon(model.name), [model.name]);
 
     const updateOverlayRect = useCallback(() => {
@@ -65,13 +79,8 @@ export const ModelItem = memo(function ModelItem({ model, layout = 'grid' }: Mod
             cache_read: model.cache_read.toString(),
             cache_write: model.cache_write.toString(),
         });
-        // Ensure first open already has anchor geometry so layout animation can run.
         updateOverlayRect();
         setIsEditOpen(true);
-    };
-
-    const handleCancelEdit = () => {
-        closeEdit();
     };
 
     const handleSaveEdit = () => {
@@ -88,7 +97,7 @@ export const ModelItem = memo(function ModelItem({ model, layout = 'grid' }: Mod
             },
             onError: (error) => {
                 toast.error(t('toast.updateFailed'), { description: error.message });
-            }
+            },
         });
     };
 
@@ -96,7 +105,7 @@ export const ModelItem = memo(function ModelItem({ model, layout = 'grid' }: Mod
         closeEdit();
         setConfirmDelete(true);
     };
-    const handleCancelDelete = () => setConfirmDelete(false);
+
     const handleConfirmDelete = () => {
         deleteModel.mutate(model.name, {
             onSuccess: () => {
@@ -106,7 +115,7 @@ export const ModelItem = memo(function ModelItem({ model, layout = 'grid' }: Mod
             onError: (error) => {
                 setConfirmDelete(false);
                 toast.error(t('toast.deleteFailed'), { description: error.message });
-            }
+            },
         });
     };
 
@@ -145,68 +154,160 @@ export const ModelItem = memo(function ModelItem({ model, layout = 'grid' }: Mod
         <article
             ref={cardRef}
             className={cn(
-                'group relative rounded-3xl border border-border bg-card transition-all duration-300 flex items-center gap-3 p-4',
+                'group relative rounded-3xl border border-border bg-card p-4 transition-all duration-300',
                 (isEditOpen || confirmDelete) && 'z-50'
             )}
         >
-            <ModelAvatar size={52} />
-
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
-                <Tooltip side="top" sideOffset={10} align="start">
-                    <TooltipTrigger className='text-base font-semibold text-card-foreground leading-tight truncate'>
-                        {model.name}
-                    </TooltipTrigger>
-                    <TooltipContent key={model.name}>
-                        {model.name}
-                    </TooltipContent>
-                </Tooltip>
-
-                {isListLayout ? (
-                    <p className="flex items-center gap-2 overflow-hidden text-sm text-muted-foreground whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1">
-                            <ArrowDownToLine className="size-3.5 shrink-0" style={{ color: brandColor }} />
-                            {t('card.inputCache')}
-                            <span className="tabular-nums">{model.input.toFixed(2)}/{model.cache_read.toFixed(2)}$</span>
-                        </span>
-                        <span className="text-muted-foreground/60">|</span>
-                        <span className="inline-flex items-center gap-1 overflow-hidden">
-                            <ArrowUpFromLine className="size-3.5 shrink-0" style={{ color: brandColor }} />
-                            {t('card.outputCache')}
-                            <span className="tabular-nums truncate">{model.output.toFixed(2)}/{model.cache_write.toFixed(2)}$</span>
-                        </span>
-                    </p>
-                ) : (
-                    <>
-                        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <ArrowDownToLine className="size-3.5" style={{ color: brandColor }} />
-                            {t('card.inputCache')}
-                            <span className="tabular-nums">{model.input.toFixed(2)}/{model.cache_read.toFixed(2)}$</span>
+            {isListLayout ? (
+                <div className="flex items-center gap-3">
+                    <ModelAvatar size={52} />
+                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+                        <Tooltip side="top" sideOffset={10} align="start">
+                            <TooltipTrigger className="truncate text-base font-semibold leading-tight text-card-foreground">
+                                {model.name}
+                            </TooltipTrigger>
+                            <TooltipContent key={model.name}>{model.name}</TooltipContent>
+                        </Tooltip>
+                        <p className="flex items-center gap-2 overflow-hidden whitespace-nowrap text-sm text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                                <ArrowDownToLine className="size-3.5 shrink-0" style={{ color: brandColor }} />
+                                {t('card.inputCache')}
+                                <span className="tabular-nums">{model.input.toFixed(2)}/{model.cache_read.toFixed(2)}$</span>
+                            </span>
+                            <span className="text-muted-foreground/60">|</span>
+                            <span className="inline-flex items-center gap-1 overflow-hidden">
+                                <ArrowUpFromLine className="size-3.5 shrink-0" style={{ color: brandColor }} />
+                                {t('card.outputCache')}
+                                <span className="truncate tabular-nums">{model.output.toFixed(2)}/{model.cache_write.toFixed(2)}$</span>
+                            </span>
                         </p>
+                    </div>
+                    <div
+                        className={cn(
+                            'flex shrink-0 items-center gap-2 self-center',
+                            (isEditOpen || confirmDelete) && 'invisible pointer-events-none'
+                        )}
+                    >
+                        <MorphingDialog>
+                            <MorphingDialogTrigger
+                                className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground transition-colors hover:bg-muted"
+                                style={{ display: 'flex' }}
+                            >
+                                <Copy className="size-4" />
+                                <span className="sr-only">{t('card.copy')}</span>
+                            </MorphingDialogTrigger>
+                            <MorphingDialogContainer>
+                                <MorphingDialogContent className="w-fit max-w-full rounded-3xl bg-card px-6 py-4 text-card-foreground custom-shadow">
+                                    <CreateDialogContent initialValues={copyInitialValues} />
+                                </MorphingDialogContent>
+                            </MorphingDialogContainer>
+                        </MorphingDialog>
 
-                        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <ArrowUpFromLine className="size-3.5" style={{ color: brandColor }} />
-                            {t('card.outputCache')}
-                            <span className="tabular-nums">{model.output.toFixed(2)}/{model.cache_write.toFixed(2)}$</span>
-                        </p>
-                    </>
-                )}
-            </div>
+                        <motion.button
+                            ref={editButtonRef}
+                            layoutId={editLayoutId}
+                            type="button"
+                            onClick={handleEditClick}
+                            disabled={isEditOpen || confirmDelete}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+                            title={t('card.edit')}
+                        >
+                            <Pencil className="size-4" />
+                        </motion.button>
 
-            <div
-                className={cn(
-                    isListLayout
-                        ? 'shrink-0 flex items-center gap-2 self-center'
-                        : 'shrink-0 flex flex-col justify-between self-stretch',
-                    (isEditOpen || confirmDelete) && 'invisible pointer-events-none'
-                )}
-            >
+                        <motion.button
+                            layoutId={deleteLayoutId}
+                            type="button"
+                            onClick={handleDeleteClick}
+                            disabled={isEditOpen || confirmDelete}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg bg-destructive/10 text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+                            title={t('card.delete')}
+                        >
+                            <Trash2 className="size-4" />
+                        </motion.button>
+                    </div>
+                </div>
+            ) : (
+                <div className="flex items-center gap-3">
+                    <ModelAvatar size={52} />
+                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+                        <Tooltip side="top" sideOffset={10} align="start">
+                            <TooltipTrigger className="truncate text-base font-semibold leading-tight text-card-foreground">
+                                {model.name}
+                            </TooltipTrigger>
+                            <TooltipContent key={model.name}>{model.name}</TooltipContent>
+                        </Tooltip>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2">
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <ArrowDownToLine className="size-3.5" style={{ color: brandColor }} />
+                                    {t('overlay.input')}
+                                </div>
+                                <div className="mt-1 text-sm font-medium text-card-foreground tabular-nums">
+                                    {model.input.toFixed(2)}$
+                                </div>
+                            </div>
+                            <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2">
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <ArrowUpFromLine className="size-3.5" style={{ color: brandColor }} />
+                                    {t('overlay.output')}
+                                </div>
+                                <div className="mt-1 text-sm font-medium text-card-foreground tabular-nums">
+                                    {model.output.toFixed(2)}$
+                                </div>
+                            </div>
+                            <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2">
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <ArrowDownToLine className="size-3.5" style={{ color: brandColor }} />
+                                    {t('overlay.cacheRead')}
+                                </div>
+                                <div className="mt-1 text-sm font-medium text-card-foreground tabular-nums">
+                                    {model.cache_read.toFixed(2)}$
+                                </div>
+                            </div>
+                            <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2">
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <ArrowUpFromLine className="size-3.5" style={{ color: brandColor }} />
+                                    {t('overlay.cacheWrite')}
+                                </div>
+                                <div className="mt-1 text-sm font-medium text-card-foreground tabular-nums">
+                                    {model.cache_write.toFixed(2)}$
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {!isListLayout ? (
+                <div
+                    className={cn(
+                        'mt-3 flex shrink-0 justify-between gap-2',
+                        (isEditOpen || confirmDelete) && 'invisible pointer-events-none'
+                    )}
+                >
+                <MorphingDialog>
+                    <MorphingDialogTrigger
+                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground transition-colors hover:bg-muted"
+                        style={{ display: 'flex' }}
+                    >
+                        <Copy className="size-4" />
+                        <span className="sr-only">{t('card.copy')}</span>
+                    </MorphingDialogTrigger>
+                    <MorphingDialogContainer>
+                        <MorphingDialogContent className="w-fit max-w-full rounded-3xl bg-card px-6 py-4 text-card-foreground custom-shadow">
+                            <CreateDialogContent initialValues={copyInitialValues} />
+                        </MorphingDialogContent>
+                    </MorphingDialogContainer>
+                </MorphingDialog>
                 <motion.button
                     ref={editButtonRef}
                     layoutId={editLayoutId}
                     type="button"
                     onClick={handleEditClick}
                     disabled={isEditOpen || confirmDelete}
-                    className="h-9 w-9 flex items-center justify-center rounded-lg bg-muted/60 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
                     title={t('card.edit')}
                 >
                     <Pencil className="size-4" />
@@ -217,19 +318,20 @@ export const ModelItem = memo(function ModelItem({ model, layout = 'grid' }: Mod
                     type="button"
                     onClick={handleDeleteClick}
                     disabled={isEditOpen || confirmDelete}
-                    className="h-9 w-9 flex items-center justify-center rounded-lg bg-destructive/10 text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg bg-destructive/10 text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
                     title={t('card.delete')}
                 >
                     <Trash2 className="size-4" />
                 </motion.button>
-            </div>
+                </div>
+            ) : null}
 
             <AnimatePresence>
                 {confirmDelete && (
                     <ModelDeleteOverlay
                         layoutId={deleteLayoutId}
                         isPending={deleteModel.isPending}
-                        onCancel={handleCancelDelete}
+                        onCancel={() => setConfirmDelete(false)}
                         onConfirm={handleConfirmDelete}
                     />
                 )}
@@ -256,7 +358,7 @@ export const ModelItem = memo(function ModelItem({ model, layout = 'grid' }: Mod
                                         editValues={editValues}
                                         isPending={updateModel.isPending}
                                         onChange={setEditValues}
-                                        onCancel={handleCancelEdit}
+                                        onCancel={closeEdit}
                                         onSave={handleSaveEdit}
                                     />
                                 </div>

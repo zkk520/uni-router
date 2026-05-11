@@ -334,6 +334,13 @@
     "model": {
         "create": {
             "title": "创建模型",
+            "copyTitle": "复制模型",
+            "copyDescription": "已带入原模型的基准价，请修改模型名称后创建。",
+            "presetLabel": "从预设中选择",
+            "presetPlaceholder": "搜索未添加的预设模型",
+            "presetLoading": "预设加载中...",
+            "presetLoadFailed": "预设加载失败，请确认后端已更新",
+            "presetEmpty": "没有可用的未添加预设",
             "name": "模型名称",
             "input": "输入价格",
             "output": "输出价格",
@@ -351,6 +358,7 @@
         "card": {
             "inputCache": "输入/缓存",
             "outputCache": "输出/缓存",
+            "copy": "复制",
             "edit": "编辑",
             "delete": "删除"
         },
@@ -367,7 +375,18 @@
             "endpointDescription": "供应商规则只作为默认值：当某个密钥没有单独启用计费规则时，才继承供应商规则。",
             "priority": "优先级：上游密钥规则 > 供应商默认规则 > 系统默认人民币计费。",
             "listTitle": "模型基准价",
-            "listUnit": "USD / 1M Tokens"
+            "listUnit": "USD / 1M Tokens",
+            "helpAriaLabel": "查看价格说明",
+            "groupSummary": "共 {total} 个，已收费 {priced} 个",
+            "providers": {
+                "openai": "OpenAI",
+                "anthropic": "Anthropic",
+                "google": "Google",
+                "deepseek": "DeepSeek",
+                "xai": "xAI",
+                "alibaba": "Alibaba",
+                "other": "其他"
+            }
         },
         "overlay": {
             "cancel": "取消",

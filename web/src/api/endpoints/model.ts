@@ -51,6 +51,17 @@ export function useModelList() {
     });
 }
 
+export function useModelPresetList(enabled = true) {
+    return useQuery({
+        queryKey: ['models', 'presets'],
+        queryFn: async () => {
+            return apiClient.get<LLMInfo[]>('/api/v1/model/presets');
+        },
+        enabled,
+        staleTime: 30000,
+    });
+}
+
 /**
  * 获取 LLM 模型与供应商关联列表 Hook
  * 
@@ -127,6 +138,7 @@ export function useCreateModel() {
         onSuccess: (data) => {
             logger.log('模型创建成功:', data);
             queryClient.invalidateQueries({ queryKey: ['models', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['models', 'presets'] });
         },
         onError: (error) => {
             logger.error('模型创建失败:', error);
@@ -152,6 +164,7 @@ export function useDeleteModel() {
         onSuccess: () => {
             logger.log('模型删除成功');
             queryClient.invalidateQueries({ queryKey: ['models', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['models', 'presets'] });
         },
         onError: (error) => {
             logger.error('模型删除失败:', error);

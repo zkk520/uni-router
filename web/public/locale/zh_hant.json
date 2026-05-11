@@ -334,6 +334,13 @@
     "model": {
         "create": {
             "title": "建立模型",
+            "copyTitle": "複製模型",
+            "copyDescription": "已帶入原模型的基準價，請修改模型名稱後建立。",
+            "presetLabel": "從預設中選擇",
+            "presetPlaceholder": "搜尋未添加的預設模型",
+            "presetLoading": "預設載入中...",
+            "presetLoadFailed": "預設載入失敗，請確認後端已更新",
+            "presetEmpty": "沒有可用的未添加預設",
             "name": "模型名稱",
             "input": "輸入價格",
             "output": "輸出價格",
@@ -351,6 +358,7 @@
         "card": {
             "inputCache": "輸入/快取",
             "outputCache": "輸出/快取",
+            "copy": "複製",
             "edit": "編輯",
             "delete": "刪除"
         },
@@ -367,7 +375,18 @@
             "endpointDescription": "供應源規則只作為預設值：當某個密鑰沒有單獨啟用計費規則時，才繼承供應源規則。",
             "priority": "優先級：上游密鑰規則 > 供應源預設規則 > 系統預設人民幣計費。",
             "listTitle": "模型基準價",
-            "listUnit": "USD / 1M Tokens"
+            "listUnit": "USD / 1M Tokens",
+            "helpAriaLabel": "查看價格說明",
+            "groupSummary": "共 {total} 個，已收費 {priced} 個",
+            "providers": {
+                "openai": "OpenAI",
+                "anthropic": "Anthropic",
+                "google": "Google",
+                "deepseek": "DeepSeek",
+                "xai": "xAI",
+                "alibaba": "Alibaba",
+                "other": "其他"
+            }
         },
         "overlay": {
             "cancel": "取消",
