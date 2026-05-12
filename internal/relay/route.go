@@ -61,21 +61,19 @@ func handleRoute(internalRequest *model.InternalLLMRequest, inAdapter model.Inbo
 			continue
 		}
 
-		outAdapter := outbound.Get(channel.Type)
+		keyType := dbmodel.EffectiveChannelKeyType(*channel, usedKey)
+		outAdapter := outbound.Get(keyType)
 		if outAdapter == nil {
-			msg := fmt.Sprintf("unsupported channel type: %d", channel.Type)
+			msg := fmt.Sprintf("unsupported channel key type: %d", keyType)
 			req.addRouteAttempt(ep, channel, dbmodel.AttemptSkipped, 0, msg)
 			lastErr = fmt.Errorf("%s", msg)
 			continue
 		}
-		if internalRequest.IsEmbeddingRequest() && !outbound.IsEmbeddingChannelType(channel.Type) {
-			msg := "channel type not compatible with embedding request"
-			req.addRouteAttempt(ep, channel, dbmodel.AttemptSkipped, 0, msg)
-			lastErr = fmt.Errorf("%s", msg)
-			continue
-		}
-		if internalRequest.IsChatRequest() && !outbound.IsChatChannelType(channel.Type) {
-			msg := "channel type not compatible with chat request"
+		if !isRouteRequestCompatibleWithKeyType(internalRequest, keyType) {
+			msg := "channel key type not compatible with embedding request"
+			if internalRequest.IsChatRequest() {
+				msg = "channel key type not compatible with chat request"
+			}
 			req.addRouteAttempt(ep, channel, dbmodel.AttemptSkipped, 0, msg)
 			lastErr = fmt.Errorf("%s", msg)
 			continue
@@ -130,6 +128,16 @@ func handleRoute(internalRequest *model.InternalLLMRequest, inAdapter model.Inbo
 
 	metrics.Save(c.Request.Context(), false, lastErr, req.routeAttempts)
 	resp.Error(c, http.StatusBadGateway, "all endpoints failed")
+}
+
+func isRouteRequestCompatibleWithKeyType(internalRequest *model.InternalLLMRequest, keyType outbound.OutboundType) bool {
+	if internalRequest.IsEmbeddingRequest() && !outbound.IsEmbeddingChannelType(keyType) {
+		return false
+	}
+	if internalRequest.IsChatRequest() && !outbound.IsChatChannelType(keyType) {
+		return false
+	}
+	return true
 }
 
 func (r *relayRequest) addRouteAttempt(ep dbmodel.RouteEndpoint, channel *dbmodel.Channel, status dbmodel.AttemptStatus, statusCode int, msg string) {

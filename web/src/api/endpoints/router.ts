@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
-import type { Channel, PricingRule } from './channel';
+import type { Channel, ChannelType, PricingRule } from './channel';
 import type { APIKey } from './apikey';
 
 export type RouteMode = 'manual' | 'weighted';
@@ -40,6 +40,8 @@ export interface RouteOptionChannelKey {
     enabled: boolean;
     remark: string;
     masked_key: string;
+    type?: ChannelType | null;
+    effective_type: ChannelType;
     models: string[];
     models_synced_at: number;
     models_sync_error: string;

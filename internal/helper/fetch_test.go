@@ -193,6 +193,47 @@ func TestFetchModelsByKeySupportsNewAPIChat(t *testing.T) {
 	}
 }
 
+func TestFetchModelsByKeyUsesPerKeyTypeOverride(t *testing.T) {
+	anthropicType := outbound.OutboundTypeAnthropic
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("path = %q, want /v1/models", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Header.Get("Authorization") == "Bearer openai-key":
+			_, _ = w.Write([]byte(`{"data":[{"id":"gpt-4o"}]}`))
+		case r.Header.Get("X-Api-Key") == "anthropic-key":
+			_, _ = w.Write([]byte(`{"data":[{"id":"claude-3-5-sonnet"}],"has_more":false}`))
+		default:
+			t.Fatalf("unexpected headers: authorization=%q x-api-key=%q", r.Header.Get("Authorization"), r.Header.Get("X-Api-Key"))
+		}
+	}))
+	defer server.Close()
+
+	got := FetchModelsByKey(context.Background(), model.Channel{
+		Type:     outbound.OutboundTypeOpenAIChat,
+		BaseUrls: []model.BaseUrl{{URL: server.URL + "/v1"}},
+		Keys: []model.ChannelKey{
+			{ID: 1, Enabled: true, ChannelKey: "openai-key"},
+			{ID: 2, Enabled: true, ChannelKey: "anthropic-key", Type: &anthropicType},
+		},
+	})
+
+	if len(got.Results) != 2 {
+		t.Fatalf("results = %d, want 2", len(got.Results))
+	}
+	if !got.Results[0].Success || len(got.Results[0].Models) != 1 || got.Results[0].Models[0] != "gpt-4o" {
+		t.Fatalf("openai result = %#v, want gpt-4o", got.Results[0])
+	}
+	if !got.Results[1].Success || len(got.Results[1].Models) != 1 || got.Results[1].Models[0] != "claude-3-5-sonnet" {
+		t.Fatalf("anthropic result = %#v, want claude-3-5-sonnet", got.Results[1])
+	}
+	if len(got.Models) != 2 || got.Models[0] != "gpt-4o" || got.Models[1] != "claude-3-5-sonnet" {
+		t.Fatalf("models = %#v, want mixed protocol union", got.Models)
+	}
+}
+
 func TestFetchModelsByKeyReturnsEmptySlicesWhenAllFail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":{"message":"invalid api key"}}`, http.StatusUnauthorized)

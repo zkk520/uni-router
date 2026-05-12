@@ -146,9 +146,10 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 			continue
 		}
 
-		// channel.Type 限制：仅 OpenAI Chat/Responses
-		if channel.Type != outbound.OutboundTypeOpenAIChat && channel.Type != outbound.OutboundTypeOpenAIResponse {
-			msg := fmt.Sprintf("unsupported channel type: %d", channel.Type)
+		keyType := model.EffectiveChannelKeyType(*channel, usedKey)
+		// keyType 限制：仅 OpenAI 兼容图片接口类型。
+		if !isImagesKeyTypeSupported(keyType) {
+			msg := fmt.Sprintf("unsupported channel key type: %d", keyType)
 			attemptNum++
 			attempts = append(attempts, model.ChannelAttempt{
 				ChannelID:    channel.ID,
@@ -235,6 +236,12 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 	// 所有通道都失败
 	metrics.Save(ctx, false, lastErr, attempts)
 	resp.Error(c, http.StatusBadGateway, "all channels failed")
+}
+
+func isImagesKeyTypeSupported(keyType outbound.OutboundType) bool {
+	return keyType == outbound.OutboundTypeOpenAIChat ||
+		keyType == outbound.OutboundTypeOpenAIResponse ||
+		keyType == outbound.OutboundTypeNewAPIChat
 }
 
 type imagesUsage struct {

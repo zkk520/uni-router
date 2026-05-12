@@ -19,7 +19,7 @@ import {
 } from '@/api/endpoints/router';
 import { useCreateAPIKey } from '@/api/endpoints/apikey';
 import { useModelList } from '@/api/endpoints/model';
-import { DEFAULT_PRICING_RULE, normalizePricingRule, type PricingRule } from '@/api/endpoints/channel';
+import { ChannelType, DEFAULT_PRICING_RULE, normalizePricingRule, type PricingRule } from '@/api/endpoints/channel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -50,6 +50,27 @@ function routeModeLabel(mode: RouteMode) {
     if (mode === 'manual') return '手动';
     if (mode === 'weighted') return '加权';
     return mode;
+}
+
+function channelTypeLabel(type?: ChannelType) {
+    switch (type) {
+        case ChannelType.OpenAIChat:
+            return 'OpenAI Chat';
+        case ChannelType.NewAPIChat:
+            return 'New API Chat';
+        case ChannelType.OpenAIResponse:
+            return 'OpenAI Response';
+        case ChannelType.Anthropic:
+            return 'Anthropic';
+        case ChannelType.Gemini:
+            return 'Gemini';
+        case ChannelType.Volcengine:
+            return '火山引擎';
+        case ChannelType.OpenAIEmbedding:
+            return 'OpenAI Embedding';
+        default:
+            return type == null ? '-' : String(type);
+    }
 }
 
 function endpointLabel(endpoint: RouteEndpoint, options: RouteOptionChannel[]) {
@@ -227,7 +248,7 @@ function AddEndpointForm({
                     >
                         {keys.map((item) => (
                             <option key={item.id} value={item.id}>
-                                {item.remark || '无备注'} ({item.masked_key}) · {item.models?.length ?? 0} 模型
+                                {item.remark || '无备注'} ({item.masked_key}) · {channelTypeLabel(item.effective_type)} · {item.models?.length ?? 0} 模型
                             </option>
                         ))}
                     </select>
@@ -429,7 +450,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                             {invalid ? <span className="ml-2 text-destructive">上游密钥无效</span> : null}
                                         </div>
                                         <div className="mt-1 text-xs text-muted-foreground">
-                                            Key 模型 {optionKey?.models?.length ?? 0}
+                                            {channelTypeLabel(optionKey?.effective_type)} · Key 模型 {optionKey?.models?.length ?? 0}
                                             {optionKey?.models_sync_error ? <span className="ml-2 text-destructive">{optionKey.models_sync_error}</span> : null}
                                         </div>
                                         <div className="mt-1 text-xs text-muted-foreground">

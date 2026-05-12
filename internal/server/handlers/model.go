@@ -144,6 +144,7 @@ func collectRouteModelList(ctx context.Context, route model.RouteProfile) []stri
 		if len(keyModels) == 0 {
 			fetchReq := *channel
 			fetchReq.Keys = []model.ChannelKey{usedKey}
+			fetchReq.Type = model.EffectiveChannelKeyType(*channel, usedKey)
 			fetched, err := helper.FetchModels(ctx, fetchReq)
 			if err == nil {
 				keyModels = fetched

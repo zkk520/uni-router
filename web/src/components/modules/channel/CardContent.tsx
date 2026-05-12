@@ -11,7 +11,7 @@ import {
     Globe,
     Key
 } from 'lucide-react';
-import { DEFAULT_PRICING_RULE, normalizePricingRule, useUpdateChannel, useDeleteChannel, type Channel, type PricingRule, type UpdateChannelRequest } from '@/api/endpoints/channel';
+import { ChannelType, DEFAULT_PRICING_RULE, normalizePricingRule, useUpdateChannel, useDeleteChannel, type Channel, type PricingRule, type UpdateChannelRequest } from '@/api/endpoints/channel';
 import {
     MorphingDialogTitle,
     MorphingDialogDescription,
@@ -27,6 +27,27 @@ import { formatCurrencyCosts } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/common/Toast';
+
+function channelTypeLabel(type: ChannelType) {
+    switch (type) {
+        case ChannelType.OpenAIChat:
+            return 'OpenAI Chat';
+        case ChannelType.NewAPIChat:
+            return 'New API Chat';
+        case ChannelType.OpenAIResponse:
+            return 'OpenAI Response';
+        case ChannelType.Anthropic:
+            return 'Anthropic';
+        case ChannelType.Gemini:
+            return 'Gemini';
+        case ChannelType.Volcengine:
+            return '火山引擎';
+        case ChannelType.OpenAIEmbedding:
+            return 'OpenAI Embedding';
+        default:
+            return String(type);
+    }
+}
 
 export function CardContent({ channel, stats }: { channel: Channel; stats: StatsMetricsFormatted }) {
     const { setIsOpen } = useMorphingDialog();
@@ -51,12 +72,13 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                 last_use_time_stamp: k.last_use_time_stamp,
                 total_cost: k.total_cost,
                 remark: k.remark,
+                type: k.type ?? null,
                 pricing_rule: normalizePricingRule(k.pricing_rule),
                 models: k.models ?? [],
                 models_synced_at: k.models_synced_at ?? 0,
                 models_sync_error: k.models_sync_error ?? '',
             }))
-            : [{ enabled: true, channel_key: '', remark: '', pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }],
+            : [{ enabled: true, channel_key: '', remark: '', type: null, pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }],
         model: channel.model,
         custom_model: channel.custom_model,
         proxy: channel.proxy,
@@ -138,6 +160,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                 enabled: k.enabled,
                 channel_key: k.channel_key,
                 remark: k.remark ?? '',
+                type: k.type ?? null,
                 pricing_rule: normalizePricingRule(k.pricing_rule),
                 models: k.models ?? [],
                 models_synced_at: k.models_synced_at ?? 0,
@@ -148,17 +171,18 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
             .filter((k) => typeof k.id === 'number' && originalByID.has(k.id as number))
             .map((k) => {
                 const orig = originalByID.get(k.id as number)!;
-                const u: { id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule; models?: string[]; models_synced_at?: number; models_sync_error?: string } = { id: k.id as number };
+                const u: { id: number; enabled?: boolean; channel_key?: string; remark?: string; type?: ChannelType | null; pricing_rule?: PricingRule; models?: string[]; models_synced_at?: number; models_sync_error?: string } = { id: k.id as number };
                 if (k.enabled !== orig.enabled) u.enabled = k.enabled;
                 if (k.channel_key !== orig.channel_key) u.channel_key = k.channel_key;
                 if ((k.remark ?? '') !== orig.remark) u.remark = k.remark ?? '';
+                if ((k.type ?? null) !== (orig.type ?? null)) u.type = k.type ?? null;
                 if (!pricingRuleEqual(k.pricing_rule, orig.pricing_rule)) u.pricing_rule = normalizePricingRule(k.pricing_rule);
                 if (JSON.stringify(k.models ?? []) !== JSON.stringify(orig.models ?? [])) u.models = k.models ?? [];
                 if ((k.models_synced_at ?? 0) !== (orig.models_synced_at ?? 0)) u.models_synced_at = k.models_synced_at ?? 0;
                 if ((k.models_sync_error ?? '') !== (orig.models_sync_error ?? '')) u.models_sync_error = k.models_sync_error ?? '';
                 return Object.keys(u).length > 1 ? u : null;
             })
-            .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule; models?: string[]; models_synced_at?: number; models_sync_error?: string }>;
+            .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; type?: ChannelType | null; pricing_rule?: PricingRule; models?: string[]; models_synced_at?: number; models_sync_error?: string }>;
 
         if (keys_to_add.length > 0) req.keys_to_add = keys_to_add;
         if (keys_to_update.length > 0) req.keys_to_update = keys_to_update;
@@ -432,6 +456,10 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
 
                                                     <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
                                                         {keyRule.enabled ? `${keyRule.multiplier || 1}x` : '继承'}
+                                                    </Badge>
+
+                                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                                                        {channelTypeLabel(key.type ?? channel.type)}
                                                     </Badge>
                                                     </div>
                                                 </div>

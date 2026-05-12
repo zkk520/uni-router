@@ -77,6 +77,7 @@ export type ChannelKey = {
     last_use_time_stamp: number;
     total_cost: number;
     remark: string;
+    type?: ChannelType | null;
     pricing_rule: PricingRule;
     models: string[];
     models_synced_at: number;
@@ -121,7 +122,7 @@ export type CreateChannelRequest = {
     type: ChannelType;
     enabled?: boolean;
     base_urls: BaseUrl[];
-    keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'pricing_rule' | 'models' | 'models_synced_at' | 'models_sync_error'>>;
+    keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'type' | 'pricing_rule' | 'models' | 'models_synced_at' | 'models_sync_error'>>;
     model: string;
     custom_model?: string;
     proxy?: boolean;
@@ -152,15 +153,15 @@ export type UpdateChannelRequest = {
     match_regex?: string | null;
     pricing_rule?: PricingRule;
     // keys diff
-    keys_to_add?: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'pricing_rule' | 'models' | 'models_synced_at' | 'models_sync_error'>>;
-    keys_to_update?: Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; pricing_rule?: PricingRule; models?: string[]; models_synced_at?: number; models_sync_error?: string }>;
+    keys_to_add?: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'type' | 'pricing_rule' | 'models' | 'models_synced_at' | 'models_sync_error'>>;
+    keys_to_update?: Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; type?: ChannelType | null; pricing_rule?: PricingRule; models?: string[]; models_synced_at?: number; models_sync_error?: string }>;
     keys_to_delete?: number[];
 };
 
 export type FetchModelRequest = {
     type: ChannelType;
     base_urls: BaseUrl[];
-    keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key'>>;
+    keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'type'>>;
     proxy?: boolean;
     channel_proxy?: string | null;
     match_regex?: string | null;

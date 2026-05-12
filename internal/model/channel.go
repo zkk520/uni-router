@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/bestruirui/octopus/internal/transformer/outbound"
@@ -36,19 +37,20 @@ type CustomHeader struct {
 }
 
 type ChannelKey struct {
-	ID               int              `json:"id" gorm:"primaryKey"`
-	ChannelID        int              `json:"channel_id"`
-	Enabled          bool             `json:"enabled" gorm:"default:true"`
-	ChannelKey       string           `json:"channel_key"`
-	StatusCode       int              `json:"status_code"`
-	LastUseTimeStamp int64            `json:"last_use_time_stamp"`
-	TotalCost        float64          `json:"total_cost"`
-	Remark           string           `json:"remark"`
-	PricingRule      PricingRule      `json:"pricing_rule" gorm:"serializer:json"`
-	Models           []string         `json:"models" gorm:"serializer:json"`
-	ModelsSyncedAt   int64            `json:"models_synced_at"`
-	ModelsSyncError  string           `json:"models_sync_error" gorm:"type:text"`
-	Stats            *StatsChannelKey `json:"stats,omitempty" gorm:"foreignKey:ChannelKeyID"`
+	ID               int                    `json:"id" gorm:"primaryKey"`
+	ChannelID        int                    `json:"channel_id"`
+	Enabled          bool                   `json:"enabled" gorm:"default:true"`
+	ChannelKey       string                 `json:"channel_key"`
+	StatusCode       int                    `json:"status_code"`
+	LastUseTimeStamp int64                  `json:"last_use_time_stamp"`
+	TotalCost        float64                `json:"total_cost"`
+	Remark           string                 `json:"remark"`
+	Type             *outbound.OutboundType `json:"type,omitempty"`
+	PricingRule      PricingRule            `json:"pricing_rule" gorm:"serializer:json"`
+	Models           []string               `json:"models" gorm:"serializer:json"`
+	ModelsSyncedAt   int64                  `json:"models_synced_at"`
+	ModelsSyncError  string                 `json:"models_sync_error" gorm:"type:text"`
+	Stats            *StatsChannelKey       `json:"stats,omitempty" gorm:"foreignKey:ChannelKeyID"`
 }
 
 // ChannelUpdateRequest 渠道更新请求 - 仅包含变更的数据
@@ -74,24 +76,26 @@ type ChannelUpdateRequest struct {
 }
 
 type ChannelKeyAddRequest struct {
-	Enabled         bool        `json:"enabled"`
-	ChannelKey      string      `json:"channel_key" binding:"required"`
-	Remark          string      `json:"remark"`
-	PricingRule     PricingRule `json:"pricing_rule"`
-	Models          []string    `json:"models,omitempty"`
-	ModelsSyncedAt  int64       `json:"models_synced_at,omitempty"`
-	ModelsSyncError string      `json:"models_sync_error,omitempty"`
+	Enabled         bool                   `json:"enabled"`
+	ChannelKey      string                 `json:"channel_key" binding:"required"`
+	Remark          string                 `json:"remark"`
+	Type            *outbound.OutboundType `json:"type,omitempty"`
+	PricingRule     PricingRule            `json:"pricing_rule"`
+	Models          []string               `json:"models,omitempty"`
+	ModelsSyncedAt  int64                  `json:"models_synced_at,omitempty"`
+	ModelsSyncError string                 `json:"models_sync_error,omitempty"`
 }
 
 type ChannelKeyUpdateRequest struct {
-	ID              int          `json:"id" binding:"required"`
-	Enabled         *bool        `json:"enabled,omitempty"`
-	ChannelKey      *string      `json:"channel_key,omitempty"`
-	Remark          *string      `json:"remark,omitempty"`
-	PricingRule     *PricingRule `json:"pricing_rule,omitempty"`
-	Models          *[]string    `json:"models,omitempty"`
-	ModelsSyncedAt  *int64       `json:"models_synced_at,omitempty"`
-	ModelsSyncError *string      `json:"models_sync_error,omitempty"`
+	ID              int                  `json:"id" binding:"required"`
+	Enabled         *bool                `json:"enabled,omitempty"`
+	ChannelKey      *string              `json:"channel_key,omitempty"`
+	Remark          *string              `json:"remark,omitempty"`
+	Type            OptionalOutboundType `json:"type,omitempty"`
+	PricingRule     *PricingRule         `json:"pricing_rule,omitempty"`
+	Models          *[]string            `json:"models,omitempty"`
+	ModelsSyncedAt  *int64               `json:"models_synced_at,omitempty"`
+	ModelsSyncError *string              `json:"models_sync_error,omitempty"`
 }
 
 // ChannelFetchModelRequest is used by /channel/fetch-model (not persisted).
@@ -116,6 +120,32 @@ type ChannelFetchModelsResult struct {
 type ChannelFetchModelsResponse struct {
 	Results []ChannelFetchModelsResult `json:"results"`
 	Models  []string                   `json:"models"`
+}
+
+type OptionalOutboundType struct {
+	Set   bool
+	Value *outbound.OutboundType
+}
+
+func (o *OptionalOutboundType) UnmarshalJSON(data []byte) error {
+	o.Set = true
+	if string(data) == "null" {
+		o.Value = nil
+		return nil
+	}
+	var value outbound.OutboundType
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	o.Value = &value
+	return nil
+}
+
+func EffectiveChannelKeyType(channel Channel, key ChannelKey) outbound.OutboundType {
+	if key.Type != nil {
+		return *key.Type
+	}
+	return channel.Type
 }
 
 func (c *Channel) GetBaseUrl() string {

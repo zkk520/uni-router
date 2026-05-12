@@ -29,6 +29,7 @@ export interface ChannelKeyFormItem {
     last_use_time_stamp?: number;
     total_cost?: number;
     remark?: string;
+    type?: ChannelType | null;
     pricing_rule: PricingRule;
     models?: string[];
     models_synced_at?: number;
@@ -203,6 +204,29 @@ function PricingMultiplierInput({
     );
 }
 
+const INHERIT_KEY_TYPE_VALUE = '__inherit';
+
+function channelTypeLabel(t: ReturnType<typeof useTranslations>, type: ChannelType) {
+    switch (type) {
+        case ChannelType.OpenAIChat:
+            return t('typeOpenAIChat');
+        case ChannelType.NewAPIChat:
+            return t('typeNewAPIChat');
+        case ChannelType.OpenAIResponse:
+            return t('typeOpenAIResponse');
+        case ChannelType.Anthropic:
+            return t('typeAnthropic');
+        case ChannelType.Gemini:
+            return t('typeGemini');
+        case ChannelType.Volcengine:
+            return t('typeVolcengine');
+        case ChannelType.OpenAIEmbedding:
+            return t('typeOpenAIEmbedding');
+        default:
+            return String(type);
+    }
+}
+
 export function ChannelForm({
     formData,
     onFormDataChange,
@@ -224,7 +248,7 @@ export function ChannelForm({
             return;
         }
         if (!formData.keys || formData.keys.length === 0) {
-            onFormDataChange({ ...formData, keys: [{ enabled: true, channel_key: '', pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }] });
+            onFormDataChange({ ...formData, keys: [{ enabled: true, channel_key: '', type: null, pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }] });
             return;
         }
         if (!formData.custom_header || formData.custom_header.length === 0) {
@@ -283,7 +307,7 @@ export function ChannelForm({
                 type: formData.type,
                 base_urls: formData.base_urls,
                 keys: formData.keys
-                    .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key.trim() })),
+                    .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key.trim(), type: k.type ?? null })),
                 proxy: formData.proxy,
                 channel_proxy: formData.channel_proxy?.trim() || null,
                 match_regex: formData.match_regex.trim() || null,
@@ -332,7 +356,7 @@ export function ChannelForm({
             {
                 type: formData.type,
                 base_urls: formData.base_urls,
-                keys: [{ enabled: key.enabled, channel_key: key.channel_key.trim() }],
+                keys: [{ enabled: key.enabled, channel_key: key.channel_key.trim(), type: key.type ?? null }],
                 proxy: formData.proxy,
                 channel_proxy: formData.channel_proxy?.trim() || null,
                 match_regex: formData.match_regex.trim() || null,
@@ -408,7 +432,7 @@ export function ChannelForm({
     const handleAddKey = () => {
         onFormDataChange({
             ...formData,
-            keys: [...formData.keys, { enabled: true, channel_key: '', pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }],
+            keys: [...formData.keys, { enabled: true, channel_key: '', type: null, pricing_rule: DEFAULT_PRICING_RULE, models: [], models_synced_at: 0, models_sync_error: '' }],
         });
     };
 
@@ -655,6 +679,38 @@ export function ChannelForm({
                                 >
                                     <X className="h-4 w-4" />
                                 </Button>
+                            </div>
+                            <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-card-foreground">
+                                        {t('keyType')}
+                                    </label>
+                                    <Select
+                                        value={k.type == null ? INHERIT_KEY_TYPE_VALUE : String(k.type)}
+                                        onValueChange={(value) => handleUpdateKey(idx, {
+                                            type: value === INHERIT_KEY_TYPE_VALUE ? null : Number(value) as ChannelType,
+                                        })}
+                                    >
+                                        <SelectTrigger className="rounded-xl w-full border border-border px-4 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-xl">
+                                            <SelectItem className="rounded-xl" value={INHERIT_KEY_TYPE_VALUE}>
+                                                {t('keyTypeInherit', { type: channelTypeLabel(t, formData.type) })}
+                                            </SelectItem>
+                                            <SelectItem className="rounded-xl" value={String(ChannelType.OpenAIChat)}>{t('typeOpenAIChat')}</SelectItem>
+                                            <SelectItem className="rounded-xl" value={String(ChannelType.NewAPIChat)}>{t('typeNewAPIChat')}</SelectItem>
+                                            <SelectItem className="rounded-xl" value={String(ChannelType.OpenAIResponse)}>{t('typeOpenAIResponse')}</SelectItem>
+                                            <SelectItem className="rounded-xl" value={String(ChannelType.Anthropic)}>{t('typeAnthropic')}</SelectItem>
+                                            <SelectItem className="rounded-xl" value={String(ChannelType.Gemini)}>{t('typeGemini')}</SelectItem>
+                                            <SelectItem className="rounded-xl" value={String(ChannelType.Volcengine)}>{t('typeVolcengine')}</SelectItem>
+                                            <SelectItem className="rounded-xl" value={String(ChannelType.OpenAIEmbedding)}>{t('typeOpenAIEmbedding')}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="text-xs text-muted-foreground md:max-w-52">
+                                    {t('keyTypeHint')}
+                                </div>
                             </div>
                             <div className="mt-3 flex items-center justify-between gap-3">
                                 <div className="min-w-0">

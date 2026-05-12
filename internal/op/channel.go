@@ -257,6 +257,13 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 			if ku.Remark != nil {
 				updatePayload["remark"] = *ku.Remark
 			}
+			if ku.Type.Set {
+				if ku.Type.Value == nil {
+					updatePayload["type"] = nil
+				} else {
+					updatePayload["type"] = *ku.Type.Value
+				}
+			}
 			if ku.PricingRule != nil {
 				value, err := pricingRuleDBValue(*ku.PricingRule)
 				if err != nil {
@@ -299,6 +306,7 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 				Enabled:         ka.Enabled,
 				ChannelKey:      ka.ChannelKey,
 				Remark:          ka.Remark,
+				Type:            ka.Type,
 				PricingRule:     rule,
 				Models:          normalizeModelList(ka.Models),
 				ModelsSyncedAt:  ka.ModelsSyncedAt,

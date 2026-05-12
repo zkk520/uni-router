@@ -10,6 +10,7 @@ import (
 
 	"github.com/bestruirui/octopus/internal/db"
 	"github.com/bestruirui/octopus/internal/model"
+	"github.com/bestruirui/octopus/internal/transformer/outbound"
 	"github.com/bestruirui/octopus/internal/utils/cache"
 	"gorm.io/gorm"
 )
@@ -32,14 +33,16 @@ type RouteOptionChannel struct {
 }
 
 type RouteOptionChannelKey struct {
-	ID              int               `json:"id"`
-	Enabled         bool              `json:"enabled"`
-	Remark          string            `json:"remark"`
-	MaskedKey       string            `json:"masked_key"`
-	Models          []string          `json:"models"`
-	ModelsSyncedAt  int64             `json:"models_synced_at"`
-	ModelsSyncError string            `json:"models_sync_error"`
-	PricingRule     model.PricingRule `json:"pricing_rule"`
+	ID              int                    `json:"id"`
+	Enabled         bool                   `json:"enabled"`
+	Remark          string                 `json:"remark"`
+	MaskedKey       string                 `json:"masked_key"`
+	Type            *outbound.OutboundType `json:"type,omitempty"`
+	EffectiveType   outbound.OutboundType  `json:"effective_type"`
+	Models          []string               `json:"models"`
+	ModelsSyncedAt  int64                  `json:"models_synced_at"`
+	ModelsSyncError string                 `json:"models_sync_error"`
+	PricingRule     model.PricingRule      `json:"pricing_rule"`
 }
 
 func RouteProfileList(ctx context.Context) ([]RouteProfileDetail, error) {
@@ -289,6 +292,8 @@ func RouteOptions(ctx context.Context) ([]RouteOptionChannel, error) {
 				Enabled:         k.Enabled,
 				Remark:          k.Remark,
 				MaskedKey:       maskKey(k.ChannelKey),
+				Type:            k.Type,
+				EffectiveType:   model.EffectiveChannelKeyType(ch, k),
 				Models:          append([]string(nil), k.Models...),
 				ModelsSyncedAt:  k.ModelsSyncedAt,
 				ModelsSyncError: k.ModelsSyncError,

@@ -77,6 +77,7 @@ func FetchModelsByKey(ctx context.Context, request model.Channel) model.ChannelF
 
 		fetchReq := request
 		fetchReq.Keys = []model.ChannelKey{key}
+		fetchReq.Type = model.EffectiveChannelKeyType(request, key)
 		models, err := FetchModels(ctx, fetchReq)
 		cleanModels := uniqueTrimModels(models)
 		if cleanModels == nil {
