@@ -1,8 +1,10 @@
 package conf
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/bestruirui/octopus/internal/utils/log"
@@ -12,6 +14,113 @@ import (
 type Server struct {
 	Host string `mapstructure:"host"`
 	Port int    `mapstructure:"port"`
+}
+
+func SaveServerPort(port int) error {
+	settings, _, err := readConfigSettings()
+	if err != nil {
+		return err
+	}
+
+	server, ok := settings["server"].(map[string]any)
+	if !ok {
+		server = map[string]any{}
+		settings["server"] = server
+	}
+	server["port"] = port
+
+	if _, ok := server["host"]; !ok {
+		server["host"] = AppConfig.Server.Host
+	}
+	if _, ok := settings["database"]; !ok {
+		settings["database"] = map[string]any{
+			"type": AppConfig.Database.Type,
+			"path": AppConfig.Database.Path,
+		}
+	}
+	if _, ok := settings["log"]; !ok {
+		settings["log"] = map[string]any{
+			"level": AppConfig.Log.Level,
+		}
+	}
+
+	if err := writeConfigSettings(settings); err != nil {
+		return err
+	}
+
+	viper.Set("server.port", port)
+	AppConfig.Server.Port = port
+	return nil
+}
+
+func SaveDevFrontendPort(port int) error {
+	settings, _, err := readConfigSettings()
+	if err != nil {
+		return err
+	}
+
+	dev, ok := settings["dev"].(map[string]any)
+	if !ok {
+		dev = map[string]any{}
+		settings["dev"] = dev
+	}
+	dev["frontend_port"] = port
+
+	return writeConfigSettings(settings)
+}
+
+func readConfigSettings() (map[string]any, string, error) {
+	configFile := viper.ConfigFileUsed()
+	if configFile == "" {
+		configFile = filepath.Join("data", "config.json")
+	}
+
+	settings := map[string]any{}
+	if data, err := os.ReadFile(configFile); err == nil && len(data) > 0 {
+		if err := json.Unmarshal(data, &settings); err != nil {
+			return nil, "", fmt.Errorf("failed to parse config file: %w", err)
+		}
+	}
+	return settings, configFile, nil
+}
+
+func writeConfigSettings(settings map[string]any) error {
+	configFile := viper.ConfigFileUsed()
+	if configFile == "" {
+		configFile = filepath.Join("data", "config.json")
+	}
+
+	if _, ok := settings["server"]; !ok {
+		settings["server"] = map[string]any{
+			"host": AppConfig.Server.Host,
+			"port": AppConfig.Server.Port,
+		}
+	}
+	if _, ok := settings["database"]; !ok {
+		settings["database"] = map[string]any{
+			"type": AppConfig.Database.Type,
+			"path": AppConfig.Database.Path,
+		}
+	}
+	if _, ok := settings["log"]; !ok {
+		settings["log"] = map[string]any{
+			"level": AppConfig.Log.Level,
+		}
+	}
+
+	data, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to encode config file: %w", err)
+	}
+	data = append(data, '\n')
+
+	if err := os.MkdirAll(filepath.Dir(configFile), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	if err := os.WriteFile(configFile, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+	return nil
 }
 
 type Log struct {

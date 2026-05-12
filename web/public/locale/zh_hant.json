@@ -163,6 +163,32 @@
             "hint": "為空禁止跨網域，* 允許所有",
             "example": "只允許指定域名: https://example.com,https://example2.com"
         },
+        "ports": {
+            "backend": {
+                "label": "後端連接埠",
+                "placeholder": "請輸入後端連接埠"
+            },
+            "frontend": {
+                "label": "前端連接埠",
+                "placeholder": "請輸入前端連接埠"
+            },
+            "devHint": "開發模式下前端連接埠用於 Next 開發服務。",
+            "productionHint": "正式版前端隨後端靜態託管，只需配置後端連接埠。",
+            "saveAndRestart": "儲存並重啟",
+            "confirmTitle": "確認修改連接埠",
+            "confirmDescription": "儲存後系統會重啟相關服務，目前頁面會在新連接埠重新開啟。",
+            "confirm": "確認重啟",
+            "cancel": "取消",
+            "restarting": "重啟中...",
+            "restartSuccess": "連接埠已儲存，正在重啟服務",
+            "saveFailed": "連接埠儲存失敗",
+            "conflict": "連接埠已被佔用",
+            "recommended": "推薦使用連接埠 {port}",
+            "conflictWithPort": "連接埠 {port} 已被佔用，推薦使用 {recommended}",
+            "useRecommended": "使用推薦連接埠",
+            "invalidBackend": "後端連接埠必須在 1 到 65535 之間",
+            "invalidFrontend": "前端連接埠必須在 1 到 65535 之間"
+        },
         "circuitBreaker": {
             "title": "熔斷器配置",
             "threshold": {

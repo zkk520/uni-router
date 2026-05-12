@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/bestruirui/octopus/internal/conf"
 	"github.com/bestruirui/octopus/internal/db"
+	"github.com/bestruirui/octopus/internal/devfrontend"
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/server"
 	"github.com/bestruirui/octopus/internal/task"
@@ -46,6 +47,11 @@ var startCmd = &cobra.Command{
 			return
 		}
 		shutdown.Register(server.Close)
+
+		if err := devfrontend.StartFromSettings(); err != nil {
+			log.Warnf("dev frontend start error: %v", err)
+		}
+		shutdown.Register(devfrontend.Stop)
 
 		task.Init()
 		go task.RUN()

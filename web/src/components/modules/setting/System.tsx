@@ -2,26 +2,60 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Monitor, Globe, Clock, Shield, HelpCircle, X } from 'lucide-react';
+import { Monitor, Globe, Clock, Shield, HelpCircle, X, Server, Laptop, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useSettingList, useSetSetting, SettingKey } from '@/api/endpoints/setting';
+import { usePortsInfo, useSetPorts, useSettingList, useSetSetting, SettingKey, type PortConflictData } from '@/api/endpoints/setting';
 import { toast } from '@/components/common/Toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/animate-ui/components/animate/tooltip';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import type { ApiError } from '@/api/types';
+
+function isPortConflictData(value: unknown): value is PortConflictData {
+    return typeof value === 'object'
+        && value !== null
+        && 'field' in value
+        && 'recommended_port' in value
+        && typeof (value as PortConflictData).recommended_port === 'number';
+}
+
+function parsePort(value: string) {
+    const port = Number(value);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+    return port;
+}
 
 export function SettingSystem() {
     const t = useTranslations('setting');
     const { data: settings } = useSettingList();
+    const { data: portsInfo } = usePortsInfo();
     const setSetting = useSetSetting();
+    const setPorts = useSetPorts();
 
     const [proxyUrl, setProxyUrl] = useState('');
     const [statsSaveInterval, setStatsSaveInterval] = useState('');
     const [corsAllowOrigins, setCorsAllowOrigins] = useState('');
     const [corsInputValue, setCorsInputValue] = useState('');
+    const [backendPort, setBackendPort] = useState('');
+    const [frontendPort, setFrontendPort] = useState('');
+    const [confirmPortsOpen, setConfirmPortsOpen] = useState(false);
+    const [portConflict, setPortConflict] = useState<PortConflictData | null>(null);
 
     const initialProxyUrl = useRef('');
     const initialStatsSaveInterval = useRef('');
     const initialCorsAllowOrigins = useRef('');
+    const initialBackendPort = useRef('');
+    const initialFrontendPort = useRef('');
 
     useEffect(() => {
         if (settings) {
@@ -42,6 +76,18 @@ export function SettingSystem() {
             }
         }
     }, [settings]);
+
+    useEffect(() => {
+        if (!portsInfo) return;
+        const backend = String(portsInfo.backend_port);
+        const frontend = String(portsInfo.frontend_port);
+        queueMicrotask(() => {
+            setBackendPort(backend);
+            setFrontendPort(frontend);
+        });
+        initialBackendPort.current = backend;
+        initialFrontendPort.current = frontend;
+    }, [portsInfo]);
 
     const handleSave = (key: string, value: string, initialValue: string) => {
         if (value === initialValue) return;
@@ -114,12 +160,143 @@ export function SettingSystem() {
         saveCorsAllowOrigins(nextOrigins);
     };
 
+    const portsChanged = backendPort !== initialBackendPort.current
+        || (portsInfo?.frontend_port_configurable && frontendPort !== initialFrontendPort.current);
+
+    const buildPortsPayload = () => {
+        const parsedBackendPort = parsePort(backendPort);
+        const parsedFrontendPort = parsePort(frontendPort);
+        if (!parsedBackendPort) {
+            toast.error(t('ports.invalidBackend'));
+            return null;
+        }
+        if (portsInfo?.frontend_port_configurable && !parsedFrontendPort) {
+            toast.error(t('ports.invalidFrontend'));
+            return null;
+        }
+        return {
+            backend_port: parsedBackendPort,
+            frontend_port: parsedFrontendPort ?? portsInfo?.frontend_port ?? 3000,
+            restart: true,
+        };
+    };
+
+    const handlePreparePortSave = () => {
+        if (!portsChanged) return;
+        if (!buildPortsPayload()) return;
+        setConfirmPortsOpen(true);
+    };
+
+    const handleConfirmPortSave = () => {
+        const payload = buildPortsPayload();
+        if (!payload) return;
+
+        setPortConflict(null);
+        setPorts.mutate(payload, {
+            onSuccess: (data) => {
+                setConfirmPortsOpen(false);
+                initialBackendPort.current = String(data.backend_port);
+                initialFrontendPort.current = String(data.frontend_port);
+                toast.success(t('ports.restartSuccess'));
+                const targetURL = data.debug && data.frontend_port_configurable ? data.frontend_url : data.backend_url;
+                window.setTimeout(() => {
+                    window.location.href = targetURL;
+                }, data.backend_restarting ? 1800 : 800);
+            },
+            onError: (error) => {
+                const apiError = error as unknown as ApiError;
+                if (apiError.code === 409 && isPortConflictData(apiError.data)) {
+                    setPortConflict(apiError.data);
+                    toast.warning(t('ports.conflict'), {
+                        description: t('ports.recommended', { port: apiError.data.recommended_port }),
+                    });
+                    return;
+                }
+                toast.error(apiError.message || t('ports.saveFailed'));
+            }
+        });
+    };
+
+    const handleUseRecommendedPort = () => {
+        if (!portConflict) return;
+        const value = String(portConflict.recommended_port);
+        if (portConflict.field === 'backend_port') {
+            setBackendPort(value);
+        } else {
+            setFrontendPort(value);
+        }
+        setPortConflict(null);
+    };
+
     return (
         <div className="rounded-3xl border border-border bg-card p-6 space-y-5">
             <h2 className="text-lg font-bold text-card-foreground flex items-center gap-2">
                 <Monitor className="h-5 w-5" />
                 {t('system')}
             </h2>
+
+            {/* 运行端口 */}
+            <div className="space-y-3 rounded-2xl border border-border/60 p-4">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <Server className="h-5 w-5 text-muted-foreground" />
+                        <span className="text-sm font-medium">{t('ports.backend.label')}</span>
+                    </div>
+                    <Input
+                        type="number"
+                        min={1}
+                        max={65535}
+                        value={backendPort}
+                        onChange={(e) => setBackendPort(e.target.value)}
+                        placeholder={t('ports.backend.placeholder')}
+                        className="w-48 rounded-xl"
+                    />
+                </div>
+
+                {portsInfo?.frontend_port_configurable && (
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <Laptop className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-sm font-medium">{t('ports.frontend.label')}</span>
+                        </div>
+                        <Input
+                            type="number"
+                            min={1}
+                            max={65535}
+                            value={frontendPort}
+                            onChange={(e) => setFrontendPort(e.target.value)}
+                            placeholder={t('ports.frontend.placeholder')}
+                            className="w-48 rounded-xl"
+                        />
+                    </div>
+                )}
+
+                {portConflict && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+                        <span className="text-destructive">
+                            {t('ports.conflictWithPort', { port: portConflict.port, recommended: portConflict.recommended_port })}
+                        </span>
+                        <Button type="button" size="sm" variant="outline" onClick={handleUseRecommendedPort}>
+                            {t('ports.useRecommended')}
+                        </Button>
+                    </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">
+                        {portsInfo?.frontend_port_configurable ? t('ports.devHint') : t('ports.productionHint')}
+                    </span>
+                    <Button
+                        type="button"
+                        size="sm"
+                        onClick={handlePreparePortSave}
+                        disabled={!portsChanged || setPorts.isPending}
+                    >
+                        {setPorts.isPending && <Loader2 className="size-4 animate-spin" />}
+                        {t('ports.saveAndRestart')}
+                    </Button>
+                </div>
+            </div>
 
             {/* 代理地址 */}
             <div className="flex items-center justify-between gap-4">
@@ -216,6 +393,23 @@ export function SettingSystem() {
                     </PopoverContent>
                 </Popover>
             </div>
+
+            <AlertDialog open={confirmPortsOpen} onOpenChange={setConfirmPortsOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{t('ports.confirmTitle')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {t('ports.confirmDescription')}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={setPorts.isPending}>{t('ports.cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmPortSave} disabled={setPorts.isPending}>
+                            {setPorts.isPending ? t('ports.restarting') : t('ports.confirm')}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

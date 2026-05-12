@@ -47,6 +47,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
             message: (data && typeof data === 'object' && 'message' in data && typeof data.message === 'string')
                 ? data.message
                 : (typeof data === 'string' ? data : response.statusText),
+            data: (data && typeof data === 'object' && 'data' in data) ? data.data : undefined,
         };
 
         handleError(error);

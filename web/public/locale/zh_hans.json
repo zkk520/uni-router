@@ -163,6 +163,32 @@
             "hint": "为空禁止跨域，* 允许所有",
             "example": "只允许指定域名: https://example.com,https://example2.com"
         },
+        "ports": {
+            "backend": {
+                "label": "后端端口",
+                "placeholder": "请输入后端端口"
+            },
+            "frontend": {
+                "label": "前端端口",
+                "placeholder": "请输入前端端口"
+            },
+            "devHint": "开发模式下前端端口用于 Next 开发服务。",
+            "productionHint": "正式版前端随后端静态托管，只需配置后端端口。",
+            "saveAndRestart": "保存并重启",
+            "confirmTitle": "确认修改端口",
+            "confirmDescription": "保存后系统会重启相关服务，当前页面会在新端口重新打开。",
+            "confirm": "确认重启",
+            "cancel": "取消",
+            "restarting": "重启中...",
+            "restartSuccess": "端口已保存，正在重启服务",
+            "saveFailed": "端口保存失败",
+            "conflict": "端口已被占用",
+            "recommended": "推荐使用端口 {port}",
+            "conflictWithPort": "端口 {port} 已被占用，推荐使用 {recommended}",
+            "useRecommended": "使用推荐端口",
+            "invalidBackend": "后端端口必须在 1 到 65535 之间",
+            "invalidFrontend": "前端端口必须在 1 到 65535 之间"
+        },
         "circuitBreaker": {
             "title": "熔断器配置",
             "threshold": {

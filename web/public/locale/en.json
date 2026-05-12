@@ -163,6 +163,32 @@
             "hint": "Empty = deny all, * = allow all",
             "example": "Only allow specific domains: https://example.com,https://example2.com"
         },
+        "ports": {
+            "backend": {
+                "label": "Backend Port",
+                "placeholder": "Enter backend port"
+            },
+            "frontend": {
+                "label": "Frontend Port",
+                "placeholder": "Enter frontend port"
+            },
+            "devHint": "In development mode, the frontend port is used by the Next dev server.",
+            "productionHint": "In production, the frontend is served by the backend, so only the backend port is configurable.",
+            "saveAndRestart": "Save and Restart",
+            "confirmTitle": "Confirm Port Change",
+            "confirmDescription": "After saving, related services will restart and this page will reopen on the new port.",
+            "confirm": "Restart",
+            "cancel": "Cancel",
+            "restarting": "Restarting...",
+            "restartSuccess": "Ports saved, restarting services",
+            "saveFailed": "Failed to save ports",
+            "conflict": "Port is already in use",
+            "recommended": "Recommended port: {port}",
+            "conflictWithPort": "Port {port} is already in use. Recommended: {recommended}",
+            "useRecommended": "Use Recommended",
+            "invalidBackend": "Backend port must be between 1 and 65535",
+            "invalidFrontend": "Frontend port must be between 1 and 65535"
+        },
         "circuitBreaker": {
             "title": "Circuit Breaker",
             "threshold": {

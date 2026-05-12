@@ -19,6 +19,7 @@ const (
 	SettingKeyCircuitBreakerThreshold   SettingKey = "circuit_breaker_threshold"    // 熔断触发阈值（连续失败次数）
 	SettingKeyCircuitBreakerCooldown    SettingKey = "circuit_breaker_cooldown"     // 熔断基础冷却时间（秒）
 	SettingKeyCircuitBreakerMaxCooldown SettingKey = "circuit_breaker_max_cooldown" // 熔断最大冷却时间（秒），指数退避上限
+	SettingKeyDevFrontendPort           SettingKey = "dev_frontend_port"            // 开发模式前端端口
 )
 
 type Setting struct {
@@ -38,16 +39,21 @@ func DefaultSettings() []Setting {
 		{Key: SettingKeyCircuitBreakerThreshold, Value: "5"},     // 默认连续失败5次触发熔断
 		{Key: SettingKeyCircuitBreakerCooldown, Value: "60"},     // 默认基础冷却60秒
 		{Key: SettingKeyCircuitBreakerMaxCooldown, Value: "600"}, // 默认最大冷却600秒（10分钟）
+		{Key: SettingKeyDevFrontendPort, Value: "3000"},          // 默认开发前端端口
 	}
 }
 
 func (s *Setting) Validate() error {
 	switch s.Key {
 	case SettingKeyModelInfoUpdateInterval, SettingKeySyncLLMInterval, SettingKeyRelayLogKeepPeriod,
-		SettingKeyCircuitBreakerThreshold, SettingKeyCircuitBreakerCooldown, SettingKeyCircuitBreakerMaxCooldown:
-		_, err := strconv.Atoi(s.Value)
+		SettingKeyCircuitBreakerThreshold, SettingKeyCircuitBreakerCooldown, SettingKeyCircuitBreakerMaxCooldown,
+		SettingKeyDevFrontendPort:
+		value, err := strconv.Atoi(s.Value)
 		if err != nil {
-			return fmt.Errorf("model info update interval must be an integer")
+			return fmt.Errorf("setting value must be an integer")
+		}
+		if s.Key == SettingKeyDevFrontendPort && (value < 1 || value > 65535) {
+			return fmt.Errorf("dev frontend port must be between 1 and 65535")
 		}
 		return nil
 	case SettingKeyRelayLogKeepEnabled:

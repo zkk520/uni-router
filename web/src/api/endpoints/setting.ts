@@ -22,7 +22,35 @@ export const SettingKey = {
     CircuitBreakerThreshold: 'circuit_breaker_threshold',
     CircuitBreakerCooldown: 'circuit_breaker_cooldown',
     CircuitBreakerMaxCooldown: 'circuit_breaker_max_cooldown',
+    DevFrontendPort: 'dev_frontend_port',
 } as const;
+
+export interface PortsInfo {
+    backend_port: number;
+    frontend_port: number;
+    debug: boolean;
+    frontend_managed: boolean;
+    backend_url: string;
+    frontend_url: string;
+    frontend_port_configurable: boolean;
+}
+
+export interface SetPortsRequest {
+    backend_port: number;
+    frontend_port: number;
+    restart: boolean;
+}
+
+export interface SetPortsResponse extends PortsInfo {
+    backend_restarting: boolean;
+    frontend_restarting: boolean;
+}
+
+export interface PortConflictData {
+    field: 'backend_port' | 'frontend_port';
+    port: number;
+    recommended_port: number;
+}
 
 /**
  * 获取 Setting 列表 Hook
@@ -43,6 +71,34 @@ export function useSettingList() {
         },
         refetchInterval: 30000,
         refetchOnMount: 'always',
+    });
+}
+
+export function usePortsInfo() {
+    return useQuery({
+        queryKey: ['settings', 'ports'],
+        queryFn: async () => {
+            return apiClient.get<PortsInfo>('/api/v1/setting/ports');
+        },
+        refetchInterval: 30000,
+        refetchOnMount: 'always',
+    });
+}
+
+export function useSetPorts() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (data: SetPortsRequest) => {
+            return apiClient.post<SetPortsResponse>('/api/v1/setting/ports', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['settings', 'ports'] });
+            queryClient.invalidateQueries({ queryKey: ['settings', 'list'] });
+        },
+        onError: (error) => {
+            logger.error('端口设置失败:', error);
+        },
     });
 }
 

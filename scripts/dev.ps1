@@ -2,8 +2,8 @@
 param(
     [ValidateSet("All", "Backend", "Frontend")]
     [string]$Start = "All",
-    [string]$BackendUrl = "http://127.0.0.1:8080",
-    [int]$FrontendPort = 3000,
+    [string]$BackendUrl = "",
+    [int]$FrontendPort = 0,
     [switch]$Install,
     [switch]$Check,
     [switch]$Status,
@@ -16,6 +16,46 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
 $WebRoot = Join-Path $RepoRoot "web"
+$ConfigPath = Join-Path $RepoRoot "data\config.json"
+
+function Get-ConfigValue {
+    param(
+        [string]$Path,
+        [object]$Default
+    )
+
+    if (-not (Test-Path $ConfigPath)) {
+        return $Default
+    }
+
+    try {
+        $Config = Get-Content -Raw $ConfigPath | ConvertFrom-Json
+        $Current = $Config
+        foreach ($Part in $Path.Split(".")) {
+            if ($null -eq $Current -or -not ($Current.PSObject.Properties.Name -contains $Part)) {
+                return $Default
+            }
+            $Current = $Current.$Part
+        }
+        if ($null -eq $Current) {
+            return $Default
+        }
+        return $Current
+    }
+    catch {
+        return $Default
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($BackendUrl)) {
+    $SavedBackendPort = [int](Get-ConfigValue -Path "server.port" -Default 8080)
+    $BackendUrl = "http://127.0.0.1:$SavedBackendPort"
+}
+
+if ($FrontendPort -le 0) {
+    $FrontendPort = [int](Get-ConfigValue -Path "dev.frontend_port" -Default 3000)
+}
+
 $FrontendUrl = "http://127.0.0.1:$FrontendPort"
 $BackendUri = [uri]$BackendUrl
 $BackendPort = $BackendUri.Port
@@ -176,6 +216,9 @@ function Start-BackendForeground {
 
     $env:OCTOPUS_DEBUG = "true"
     $env:OCTOPUS_SERVER_PORT = [string]$BackendPort
+    if ($Start -eq "All") {
+        $env:OCTOPUS_MANAGE_FRONTEND = "true"
+    }
     Set-Location $RepoRoot
     Write-Step "Starting backend at $BackendUrl"
     & $Go run main.go start
@@ -252,7 +295,7 @@ if (Test-PortInUse $BackendPort) {
     throw "Backend port $BackendPort is already in use. Stop the existing process or set -BackendUrl."
 }
 
-if (Test-PortInUse $FrontendPort) {
+if ($NeedsFrontend -and (Test-PortInUse $FrontendPort)) {
     throw "Frontend port $FrontendPort is already in use. Stop the existing process or set -FrontendPort."
 }
 
@@ -297,21 +340,11 @@ try {
         -FileName $Go `
         -Arguments "run main.go start" `
         -WorkingDirectory $RepoRoot `
-        -Environment @{ OCTOPUS_DEBUG = "true"; OCTOPUS_SERVER_PORT = $BackendPort }
+        -Environment @{ OCTOPUS_DEBUG = "true"; OCTOPUS_SERVER_PORT = $BackendPort; OCTOPUS_MANAGE_FRONTEND = "true" }
 
     $Processes.Add([pscustomobject]@{ Name = "api"; Process = $Backend })
 
-    Write-Step "Starting frontend at $FrontendUrl"
-	$Frontend = Start-LoggedProcess `
-		-Name "web" `
-		-FileName "cmd.exe" `
-		-Arguments "/d /s /c pnpm exec next dev -p $FrontendPort" `
-		-WorkingDirectory $WebRoot `
-		-Environment @{ NEXT_PUBLIC_API_BASE_URL = $BackendUrl }
-
-    $Processes.Add([pscustomobject]@{ Name = "web"; Process = $Frontend })
-
-    Write-Step "Ready. Open $FrontendUrl. Press Ctrl+C to stop both services."
+    Write-Step "Ready. Backend will manage frontend at $FrontendUrl. Press Ctrl+C to stop services."
 
     while ($Processes.Count -gt 0) {
         for ($Index = $Processes.Count - 1; $Index -ge 0; $Index--) {
