@@ -82,6 +82,82 @@ func TestChannelUpdatePersistsPricingRulesAsJSON(t *testing.T) {
 	}
 }
 
+func TestChannelUpdatePersistsJSONFields(t *testing.T) {
+	ctx := setupTestDB(t)
+
+	channel := &model.Channel{
+		Name:    "channel-json-fields",
+		Type:    outbound.OutboundTypeOpenAIChat,
+		Enabled: true,
+		Model:   "gpt-5.4",
+		BaseUrls: []model.BaseUrl{
+			{URL: "https://old.example/v1", Delay: 10},
+		},
+		CustomHeader: []model.CustomHeader{
+			{HeaderKey: "X-Old", HeaderValue: "old"},
+		},
+		Keys: []model.ChannelKey{
+			{
+				Enabled:    true,
+				ChannelKey: "sk-json-fields",
+				Remark:     "primary",
+				Models:     []string{"gpt-old"},
+			},
+		},
+	}
+	if err := ChannelCreate(channel, ctx); err != nil {
+		t.Fatalf("create channel: %v", err)
+	}
+
+	baseURLs := []model.BaseUrl{
+		{URL: "https://new.example/v1", Delay: 20},
+		{URL: "https://backup.example/v1", Delay: 30},
+	}
+	customHeaders := []model.CustomHeader{
+		{HeaderKey: "X-New", HeaderValue: "new"},
+	}
+	channelRule := model.PricingRule{Enabled: true, Currency: "CNY"}
+	keyModels := []string{"gpt-4o", "gpt-4o", "claude-3-5-sonnet"}
+	keyRule := model.PricingRule{Enabled: true, Currency: "CNY"}
+
+	updated, err := ChannelUpdate(&model.ChannelUpdateRequest{
+		ID:           channel.ID,
+		BaseUrls:     &baseURLs,
+		CustomHeader: &customHeaders,
+		PricingRule:  &channelRule,
+		KeysToUpdate: []model.ChannelKeyUpdateRequest{
+			{
+				ID:          channel.Keys[0].ID,
+				Models:      &keyModels,
+				PricingRule: &keyRule,
+			},
+		},
+	}, ctx)
+	if err != nil {
+		t.Fatalf("update channel json fields: %v", err)
+	}
+
+	if len(updated.BaseUrls) != 2 || updated.BaseUrls[0].URL != "https://new.example/v1" || updated.BaseUrls[1].Delay != 30 {
+		t.Fatalf("base urls = %#v, want persisted json base urls", updated.BaseUrls)
+	}
+	if len(updated.CustomHeader) != 1 || updated.CustomHeader[0].HeaderKey != "X-New" || updated.CustomHeader[0].HeaderValue != "new" {
+		t.Fatalf("custom headers = %#v, want persisted json custom headers", updated.CustomHeader)
+	}
+	if !updated.PricingRule.Enabled || updated.PricingRule.CurrencySymbol != model.DefaultPricingSymbol {
+		t.Fatalf("channel pricing rule = %#v, want normalized persisted rule", updated.PricingRule)
+	}
+	if len(updated.Keys) != 1 {
+		t.Fatalf("keys = %d, want 1", len(updated.Keys))
+	}
+	gotKey := updated.Keys[0]
+	if len(gotKey.Models) != 2 || gotKey.Models[0] != "gpt-4o" || gotKey.Models[1] != "claude-3-5-sonnet" {
+		t.Fatalf("key models = %#v, want normalized persisted models", gotKey.Models)
+	}
+	if !gotKey.PricingRule.Enabled || gotKey.PricingRule.CurrencySymbol != model.DefaultPricingSymbol {
+		t.Fatalf("key pricing rule = %#v, want normalized persisted rule", gotKey.PricingRule)
+	}
+}
+
 func TestRouteProfileUpdatePersistsPricingOverrideAsJSON(t *testing.T) {
 	ctx := setupTestDB(t)
 

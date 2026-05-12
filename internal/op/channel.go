@@ -200,7 +200,12 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 			case "enabled":
 				updatePayload[field] = updates.Enabled
 			case "base_urls":
-				updatePayload[field] = updates.BaseUrls
+				value, err := jsonDBValue(updates.BaseUrls)
+				if err != nil {
+					tx.Rollback()
+					return nil, fmt.Errorf("failed to serialize channel base urls: %w", err)
+				}
+				updatePayload[field] = value
 			case "model":
 				updatePayload[field] = updates.Model
 			case "custom_model":
@@ -210,7 +215,12 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 			case "auto_sync":
 				updatePayload[field] = updates.AutoSync
 			case "custom_header":
-				updatePayload[field] = updates.CustomHeader
+				value, err := jsonDBValue(updates.CustomHeader)
+				if err != nil {
+					tx.Rollback()
+					return nil, fmt.Errorf("failed to serialize channel custom headers: %w", err)
+				}
+				updatePayload[field] = value
 			case "channel_proxy":
 				updatePayload[field] = updates.ChannelProxy
 			case "param_override":
@@ -273,7 +283,12 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 				updatePayload["pricing_rule"] = value
 			}
 			if ku.Models != nil {
-				updatePayload["models"] = normalizeModelList(*ku.Models)
+				value, err := jsonDBValue(normalizeModelList(*ku.Models))
+				if err != nil {
+					tx.Rollback()
+					return nil, fmt.Errorf("failed to serialize channel key %d models: %w", ku.ID, err)
+				}
+				updatePayload["models"] = value
 			}
 			if ku.ModelsSyncedAt != nil {
 				updatePayload["models_synced_at"] = *ku.ModelsSyncedAt
