@@ -13,6 +13,7 @@ export enum ChannelType {
     Gemini = 3,
     Volcengine = 4,
     OpenAIEmbedding = 5,
+    NewAPIChat = 6,
 }
 
 export type BaseUrl = {

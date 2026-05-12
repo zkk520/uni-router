@@ -166,6 +166,33 @@ func TestFetchModelsByKeyReturnsPartialSuccess(t *testing.T) {
 	}
 }
 
+func TestFetchModelsByKeySupportsNewAPIChat(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("path = %q, want /v1/models", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer new-api-key" {
+			t.Fatalf("authorization = %q, want Bearer new-api-key", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"gpt-4o"},{"id":"claude-3-5-sonnet"}]}`))
+	}))
+	defer server.Close()
+
+	got := FetchModelsByKey(context.Background(), model.Channel{
+		Type:     outbound.OutboundTypeNewAPIChat,
+		BaseUrls: []model.BaseUrl{{URL: server.URL + "/v1"}},
+		Keys:     []model.ChannelKey{{ID: 1, Enabled: true, ChannelKey: "new-api-key"}},
+	})
+
+	if len(got.Results) != 1 || !got.Results[0].Success {
+		t.Fatalf("result = %#v, want one successful key", got.Results)
+	}
+	if len(got.Models) != 2 || got.Models[0] != "gpt-4o" || got.Models[1] != "claude-3-5-sonnet" {
+		t.Fatalf("models = %#v, want OpenAI-compatible New API models", got.Models)
+	}
+}
+
 func TestFetchModelsByKeyReturnsEmptySlicesWhenAllFail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":{"message":"invalid api key"}}`, http.StatusUnauthorized)

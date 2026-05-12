@@ -564,6 +564,7 @@
             "modelNoSelected": "No models selected",
             "modelClearAll": "Clear All",
             "typeOpenAIChat": "OpenAI Chat",
+            "typeNewAPIChat": "New API Chat",
             "typeOpenAIResponse": "OpenAI Response",
             "typeOpenAIEmbedding": "OpenAI Embedding",
             "typeAnthropic": "Anthropic",
