@@ -1,4 +1,4 @@
-import { ChannelType, DEFAULT_PRICING_RULE, PRICING_CURRENCY_OPTIONS, normalizePricingRule, type Channel, type PricingRule, useFetchModel } from '@/api/endpoints/channel';
+import { ChannelType, DEFAULT_PRICING_RULE, PRICING_CURRENCY_OPTIONS, normalizePricingRule, type Channel, type FetchModelResponse, type FetchModelResult, type PricingRule, useFetchModel } from '@/api/endpoints/channel';
 import {
     Select,
     SelectContent,
@@ -14,6 +14,12 @@ import { toast } from '@/components/common/Toast';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, X, Plus } from 'lucide-react';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export interface ChannelKeyFormItem {
     id?: number;
@@ -58,12 +64,50 @@ export interface ChannelFormProps {
     idPrefix?: string;
 }
 
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from "@/components/ui/accordion";
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function normalizeModelList(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return Array.from(new Set(
+        value
+            .filter((item): item is string => typeof item === 'string')
+            .map((item) => item.trim())
+            .filter(Boolean)
+    ));
+}
+
+function normalizeFetchModelResponse(data: unknown): FetchModelResponse {
+    if (Array.isArray(data)) {
+        return { results: [], models: normalizeModelList(data) };
+    }
+
+    if (!isRecord(data)) {
+        return { results: [], models: [] };
+    }
+
+    const results = Array.isArray(data.results)
+        ? data.results.map((item, index): FetchModelResult => {
+            const result = isRecord(item) ? item : {};
+            return {
+                key_id: typeof result.key_id === 'number' ? result.key_id : undefined,
+                key_index: typeof result.key_index === 'number' ? result.key_index : index,
+                remark: typeof result.remark === 'string' ? result.remark : '',
+                masked_key: typeof result.masked_key === 'string' ? result.masked_key : '',
+                success: result.success === true,
+                models: normalizeModelList(result.models),
+                error: typeof result.error === 'string' ? result.error : undefined,
+                models_synced_at: typeof result.models_synced_at === 'number' ? result.models_synced_at : undefined,
+            };
+        })
+        : [];
+
+    return {
+        results,
+        models: normalizeModelList(data.models),
+    };
+}
 
 function PricingCurrencySelect({
     id,
@@ -210,7 +254,7 @@ export function ChannelForm({
         onFormDataChange({ ...formData, model, custom_model });
     };
 
-    const applyFetchedModels = (results: Array<{ key_id?: number; key_index: number; success: boolean; models: string[]; error?: string; models_synced_at?: number }>, unionModels: string[]) => {
+    const applyFetchedModels = (results: FetchModelResult[]) => {
         const nextKeys = formData.keys.map((key, idx) => {
             const result = results.find((item) =>
                 (key.id && item.key_id === key.id) || (!key.id && item.key_index === idx)
@@ -218,12 +262,12 @@ export function ChannelForm({
             if (!result) return key;
             return {
                 ...key,
-                models: result.success ? result.models : (key.models ?? []),
+                models: result.success ? result.models : [],
                 models_synced_at: result.models_synced_at ?? Math.floor(Date.now() / 1000),
                 models_sync_error: result.success ? '' : result.error ?? t('modelRefreshFailed'),
             };
         });
-        const nextAuto = Array.from(new Set([...unionModels, ...nextKeys.flatMap((key) => key.models ?? [])].map((m) => m.trim()).filter(Boolean)));
+        const nextAuto = Array.from(new Set(nextKeys.flatMap((key) => key.models ?? []).map((m) => m.trim()).filter(Boolean)));
         onFormDataChange({
             ...formData,
             keys: nextKeys,
@@ -247,20 +291,28 @@ export function ChannelForm({
             },
             {
                 onSuccess: (data) => {
-                    if (data && data.results.length > 0) {
-                        applyFetchedModels(data.results, data.models);
-                        const successCount = data.results.filter((item) => item.success).length;
-                        const failedCount = data.results.length - successCount;
-                        if (data.models.length > 0) {
+                    const normalized = normalizeFetchModelResponse(data);
+                    if (normalized.results.length > 0) {
+                        applyFetchedModels(normalized.results);
+                        const successCount = normalized.results.filter((item) => item.success).length;
+                        const failedCount = normalized.results.length - successCount;
+                        if (normalized.models.length > 0) {
                             const description = failedCount > 0
-                                ? `${successCount}/${data.results.length} 个 Key 成功，${failedCount} 个失败`
+                                ? `${successCount}/${normalized.results.length} 个 Key 成功，${failedCount} 个失败`
                                 : `${successCount} 个 Key 成功`;
                             toast.success(t('modelRefreshSuccess'), { description });
                         } else if (failedCount > 0) {
-                            toast.error(t('modelRefreshFailed'), { description: data.results.find((item) => item.error)?.error });
+                            toast.error(t('modelRefreshFailed'), { description: normalized.results.find((item) => item.error)?.error });
                         } else {
                             toast.warning(t('modelRefreshEmpty'));
                         }
+                    } else if (normalized.models.length > 0) {
+                        onFormDataChange({
+                            ...formData,
+                            model: normalized.models.join(','),
+                            custom_model: customModels.join(','),
+                        });
+                        toast.success(t('modelRefreshSuccess'), { description: `${normalized.models.length} 个模型` });
                     } else {
                         toast.warning(t('modelRefreshEmpty'));
                     }
@@ -288,12 +340,24 @@ export function ChannelForm({
             },
             {
                 onSuccess: (data) => {
-                    const patched = data.results.map((item) => ({
-                        ...item,
-                        key_id: key.id,
-                        key_index: idx,
-                    }));
-                    applyFetchedModels(patched, data.models);
+                    const normalized = normalizeFetchModelResponse(data);
+                    const patched = normalized.results.length > 0
+                        ? normalized.results.map((item) => ({
+                            ...item,
+                            key_id: key.id,
+                            key_index: idx,
+                        }))
+                        : normalized.models.length > 0
+                            ? [{
+                                key_id: key.id,
+                                key_index: idx,
+                                remark: key.remark ?? '',
+                                masked_key: '',
+                                success: true,
+                                models: normalized.models,
+                            }]
+                            : [];
+                    applyFetchedModels(patched);
                     const result = patched[0];
                     if (result?.success) {
                         toast.success(t('modelRefreshSuccess'), { description: `${result.models.length} 个模型` });

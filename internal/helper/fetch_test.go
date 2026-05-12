@@ -2,8 +2,10 @@ package helper
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/bestruirui/octopus/internal/model"
@@ -156,8 +158,80 @@ func TestFetchModelsByKeyReturnsPartialSuccess(t *testing.T) {
 	if got.Results[1].Success || got.Results[1].Error == "" {
 		t.Fatalf("second key result = %#v, want failure with error", got.Results[1])
 	}
+	if got.Results[1].Models == nil || len(got.Results[1].Models) != 0 {
+		t.Fatalf("second key models = %#v, want empty slice", got.Results[1].Models)
+	}
 	if len(got.Models) != 2 || got.Models[0] != "gpt-4o" || got.Models[1] != "gpt-4o-mini" {
 		t.Fatalf("models = %#v, want successful key union", got.Models)
+	}
+}
+
+func TestFetchModelsByKeyReturnsEmptySlicesWhenAllFail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":{"message":"invalid api key"}}`, http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	got := FetchModelsByKey(context.Background(), model.Channel{
+		Type:     outbound.OutboundTypeOpenAIChat,
+		BaseUrls: []model.BaseUrl{{URL: server.URL + "/v1"}},
+		Keys: []model.ChannelKey{
+			{ID: 1, Enabled: true, ChannelKey: "bad-key-1"},
+			{ID: 2, Enabled: true, ChannelKey: "bad-key-2"},
+		},
+	})
+
+	if got.Models == nil || len(got.Models) != 0 {
+		t.Fatalf("models = %#v, want empty slice", got.Models)
+	}
+	if len(got.Results) != 2 {
+		t.Fatalf("results = %d, want 2", len(got.Results))
+	}
+	for _, result := range got.Results {
+		if result.Success || result.Error == "" {
+			t.Fatalf("result = %#v, want failure with error", result)
+		}
+		if result.Models == nil || len(result.Models) != 0 {
+			t.Fatalf("result models = %#v, want empty slice", result.Models)
+		}
+	}
+
+	payload, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	if string(payload) == "" || !json.Valid(payload) {
+		t.Fatalf("payload = %q, want valid json", string(payload))
+	}
+	if strings.Contains(string(payload), `"models":null`) {
+		t.Fatalf("payload = %s, want models serialized as []", string(payload))
+	}
+}
+
+func TestFetchModelsByKeyKeepsHTMLFriendlyError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<html><body>login</body></html>"))
+	}))
+	defer server.Close()
+
+	got := FetchModelsByKey(context.Background(), model.Channel{
+		Type:     outbound.OutboundTypeOpenAIChat,
+		BaseUrls: []model.BaseUrl{{URL: server.URL + "/v1"}},
+		Keys:     []model.ChannelKey{{ID: 1, Enabled: true, ChannelKey: "bad-key"}},
+	})
+
+	if len(got.Results) != 1 {
+		t.Fatalf("results = %d, want 1", len(got.Results))
+	}
+	if got.Results[0].Success {
+		t.Fatalf("result = %#v, want failure", got.Results[0])
+	}
+	if got.Results[0].Error != modelListHTMLMessage {
+		t.Fatalf("error = %q, want %q", got.Results[0].Error, modelListHTMLMessage)
+	}
+	if got.Results[0].Models == nil || len(got.Results[0].Models) != 0 {
+		t.Fatalf("models = %#v, want empty slice", got.Results[0].Models)
 	}
 }
 
