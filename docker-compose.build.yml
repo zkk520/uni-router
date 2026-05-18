@@ -1,6 +1,9 @@
 services:
   uni-router:
-    image: ghcr.io/zkk520/uni-router:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: uni-router:local
     container_name: uni-router
     ports:
       - "8080:8080"

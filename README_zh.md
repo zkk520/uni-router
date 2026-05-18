@@ -29,17 +29,29 @@
 
 ### 🐳 Docker 运行
 
-直接运行
+#### 使用 GHCR 镜像运行
+
+当前 GHCR 镜像暂时按私有镜像处理，首次拉取前需要先登录：
 
 ```bash
-docker run -d --name octopus -v /path/to/data:/app/data -p 8080:8080 bestrui/octopus
+docker login ghcr.io
+docker compose up -d
 ```
 
-或者使用 docker compose 运行
+服务启动后访问：
 
 ```bash
-wget https://raw.githubusercontent.com/bestruirui/octopus/refs/heads/dev/docker-compose.yml
-docker compose up -d
+http://localhost:8080
+```
+
+`./data` 目录会挂载到容器内 `/app/data`，用于持久化配置文件和 SQLite 数据库。
+
+#### 从源码构建运行
+
+如果你已 clone 当前仓库，也可以直接从源码构建镜像并启动：
+
+```bash
+docker compose -f docker-compose.build.yml up -d --build
 ```
 
 

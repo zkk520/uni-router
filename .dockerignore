@@ -1,0 +1,14 @@
+.git
+.github
+.claude
+.gocache
+.pnpm-store
+.vscode
+build
+data
+web/node_modules
+web/.next
+web/out
+static/out/*
+!static/out/README.md
+*.log
