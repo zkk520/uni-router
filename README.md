@@ -29,17 +29,30 @@
 
 ### 🐳 Docker
 
-Run directly:
+Run the public GHCR image directly. No GitHub login is required:
 
 ```bash
-docker run -d --name octopus -v /path/to/data:/app/data -p 8080:8080 bestrui/octopus
+docker run -d --name uni-router --restart unless-stopped -p 8080:8080 -v uni-router-data:/app/data ghcr.io/zkk520/uni-router:latest
 ```
 
-Or use docker compose:
+Or use the `docker-compose.yml` in this repository:
 
 ```bash
-wget https://raw.githubusercontent.com/bestruirui/octopus/refs/heads/dev/docker-compose.yml
 docker compose up -d
+```
+
+The service will be available at:
+
+```bash
+http://localhost:8080
+```
+
+Container data is persisted in `/app/data`. With the repository `docker-compose.yml`, data is stored in local `./data`; with the `docker run` command above, data is stored in the Docker named volume `uni-router-data`.
+
+To build the image from source instead:
+
+```bash
+docker compose -f docker-compose.build.yml up -d --build
 ```
 
 

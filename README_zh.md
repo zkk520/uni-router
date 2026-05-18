@@ -29,12 +29,17 @@
 
 ### 🐳 Docker 运行
 
-#### 使用 GHCR 镜像运行
+#### 使用公开 GHCR 镜像运行
 
-当前 GHCR 镜像暂时按私有镜像处理，首次拉取前需要先登录：
+镜像已发布到公开 GHCR，无需登录即可直接运行：
 
 ```bash
-docker login ghcr.io
+docker run -d --name uni-router --restart unless-stopped -p 8080:8080 -v uni-router-data:/app/data ghcr.io/zkk520/uni-router:latest
+```
+
+也可以使用仓库内的 `docker-compose.yml` 运行：
+
+```bash
 docker compose up -d
 ```
 
@@ -44,7 +49,7 @@ docker compose up -d
 http://localhost:8080
 ```
 
-`./data` 目录会挂载到容器内 `/app/data`，用于持久化配置文件和 SQLite 数据库。
+容器内 `/app/data` 用于持久化配置文件和 SQLite 数据库。使用仓库内 `docker-compose.yml` 时，数据会保存到当前目录的 `./data`；使用上面的 `docker run` 命令时，数据会保存到 Docker 命名卷 `uni-router-data`。
 
 #### 从源码构建运行
 
