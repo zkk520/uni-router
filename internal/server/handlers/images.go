@@ -3,10 +3,10 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/bestruirui/octopus/internal/relay"
-	"github.com/bestruirui/octopus/internal/server/middleware"
-	"github.com/bestruirui/octopus/internal/server/router"
 	"github.com/gin-gonic/gin"
+	"github.com/zkk520/uni-router/internal/relay"
+	"github.com/zkk520/uni-router/internal/server/middleware"
+	"github.com/zkk520/uni-router/internal/server/router"
 )
 
 func init() {

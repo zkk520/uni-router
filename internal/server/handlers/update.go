@@ -3,12 +3,12 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/bestruirui/octopus/internal/conf"
-	"github.com/bestruirui/octopus/internal/server/middleware"
-	"github.com/bestruirui/octopus/internal/server/resp"
-	"github.com/bestruirui/octopus/internal/server/router"
-	"github.com/bestruirui/octopus/internal/update"
 	"github.com/gin-gonic/gin"
+	"github.com/zkk520/uni-router/internal/conf"
+	"github.com/zkk520/uni-router/internal/server/middleware"
+	"github.com/zkk520/uni-router/internal/server/resp"
+	"github.com/zkk520/uni-router/internal/server/router"
+	"github.com/zkk520/uni-router/internal/update"
 )
 
 func init() {

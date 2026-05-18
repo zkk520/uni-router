@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bestruirui/octopus/internal/utils/log"
-	"github.com/bestruirui/octopus/internal/utils/shutdown"
+	"github.com/zkk520/uni-router/internal/utils/log"
+	"github.com/zkk520/uni-router/internal/utils/shutdown"
 )
 
 func RestartAfter(delay time.Duration, env map[string]string) {

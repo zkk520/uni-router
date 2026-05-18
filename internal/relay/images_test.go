@@ -3,7 +3,7 @@ package relay
 import (
 	"testing"
 
-	"github.com/bestruirui/octopus/internal/transformer/outbound"
+	"github.com/zkk520/uni-router/internal/transformer/outbound"
 )
 
 func TestIsImagesKeyTypeSupported(t *testing.T) {

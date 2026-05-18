@@ -304,10 +304,10 @@ func (r *InternalLLMRequest) fillMissingToolCallIDs() {
 				continue
 			}
 
-			candidate := fmt.Sprintf("call_octopus_%d_%d", messageIndex, toolCallIndex)
+			candidate := fmt.Sprintf("call_uni_router_%d_%d", messageIndex, toolCallIndex)
 			if _, exists := usedIDs[candidate]; exists {
 				for {
-					candidate = fmt.Sprintf("call_octopus_%d", sequence)
+					candidate = fmt.Sprintf("call_uni_router_%d", sequence)
 					sequence++
 					if _, conflict := usedIDs[candidate]; !conflict {
 						break
@@ -320,7 +320,6 @@ func (r *InternalLLMRequest) fillMissingToolCallIDs() {
 		}
 	}
 }
-
 
 func (r *InternalLLMRequest) fillMissingToolCallIDsFromToolMessages() {
 	for msgIndex := 0; msgIndex < len(r.Messages); msgIndex++ {

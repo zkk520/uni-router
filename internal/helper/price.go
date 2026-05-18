@@ -3,9 +3,9 @@ package helper
 import (
 	"context"
 
-	"github.com/bestruirui/octopus/internal/model"
-	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/price"
+	"github.com/zkk520/uni-router/internal/model"
+	"github.com/zkk520/uni-router/internal/op"
+	"github.com/zkk520/uni-router/internal/price"
 )
 
 func LLMPriceAddToDB(modelNames []string, ctx context.Context) error {

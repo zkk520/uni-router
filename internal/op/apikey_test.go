@@ -3,7 +3,7 @@ package op
 import (
 	"testing"
 
-	"github.com/bestruirui/octopus/internal/model"
+	"github.com/zkk520/uni-router/internal/model"
 )
 
 func createTestRoute(t *testing.T, name string) *model.RouteProfile {

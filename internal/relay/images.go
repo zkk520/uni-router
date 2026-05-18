@@ -16,15 +16,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bestruirui/octopus/internal/helper"
-	"github.com/bestruirui/octopus/internal/model"
-	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/price"
-	"github.com/bestruirui/octopus/internal/relay/bodycache"
-	"github.com/bestruirui/octopus/internal/server/resp"
-	"github.com/bestruirui/octopus/internal/transformer/outbound"
-	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/gin-gonic/gin"
+	"github.com/zkk520/uni-router/internal/helper"
+	"github.com/zkk520/uni-router/internal/model"
+	"github.com/zkk520/uni-router/internal/op"
+	"github.com/zkk520/uni-router/internal/price"
+	"github.com/zkk520/uni-router/internal/relay/bodycache"
+	"github.com/zkk520/uni-router/internal/server/resp"
+	"github.com/zkk520/uni-router/internal/transformer/outbound"
+	"github.com/zkk520/uni-router/internal/utils/log"
 )
 
 const imagesUpstreamErrorBodyLimit = 16 * 1024

@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bestruirui/octopus/internal/db"
-	"github.com/bestruirui/octopus/internal/model"
-	"github.com/bestruirui/octopus/internal/transformer/outbound"
+	"github.com/zkk520/uni-router/internal/db"
+	"github.com/zkk520/uni-router/internal/model"
+	"github.com/zkk520/uni-router/internal/transformer/outbound"
 )
 
 func setupTestDB(t *testing.T) context.Context {

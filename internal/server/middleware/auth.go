@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bestruirui/octopus/internal/conf"
-	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/server/auth"
-	"github.com/bestruirui/octopus/internal/server/resp"
 	"github.com/gin-gonic/gin"
+	"github.com/zkk520/uni-router/internal/conf"
+	"github.com/zkk520/uni-router/internal/op"
+	"github.com/zkk520/uni-router/internal/server/auth"
+	"github.com/zkk520/uni-router/internal/server/resp"
 )
 
 func Auth() gin.HandlerFunc {

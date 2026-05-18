@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/bestruirui/octopus/internal/conf"
-	"github.com/bestruirui/octopus/internal/op"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/zkk520/uni-router/internal/conf"
+	"github.com/zkk520/uni-router/internal/op"
 )
 
 func GenerateJWTToken(expiresMin int) (string, string, error) {

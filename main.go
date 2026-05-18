@@ -1,6 +1,6 @@
 package main
 
-import "github.com/bestruirui/octopus/cmd"
+import "github.com/zkk520/uni-router/cmd"
 
 func main() {
 	cmd.Execute()

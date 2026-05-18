@@ -1,15 +1,15 @@
 package cmd
 
 import (
-	"github.com/bestruirui/octopus/internal/conf"
-	"github.com/bestruirui/octopus/internal/db"
-	"github.com/bestruirui/octopus/internal/devfrontend"
-	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/server"
-	"github.com/bestruirui/octopus/internal/task"
-	"github.com/bestruirui/octopus/internal/utils/log"
-	"github.com/bestruirui/octopus/internal/utils/shutdown"
 	"github.com/spf13/cobra"
+	"github.com/zkk520/uni-router/internal/conf"
+	"github.com/zkk520/uni-router/internal/db"
+	"github.com/zkk520/uni-router/internal/devfrontend"
+	"github.com/zkk520/uni-router/internal/op"
+	"github.com/zkk520/uni-router/internal/server"
+	"github.com/zkk520/uni-router/internal/task"
+	"github.com/zkk520/uni-router/internal/utils/log"
+	"github.com/zkk520/uni-router/internal/utils/shutdown"
 )
 
 var cfgFile string

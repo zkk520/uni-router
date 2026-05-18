@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/bestruirui/octopus/internal/helper"
-	"github.com/bestruirui/octopus/internal/model"
-	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/price"
-	"github.com/bestruirui/octopus/internal/server/middleware"
-	"github.com/bestruirui/octopus/internal/server/resp"
-	"github.com/bestruirui/octopus/internal/server/router"
 	"github.com/gin-gonic/gin"
+	"github.com/zkk520/uni-router/internal/helper"
+	"github.com/zkk520/uni-router/internal/model"
+	"github.com/zkk520/uni-router/internal/op"
+	"github.com/zkk520/uni-router/internal/price"
+	"github.com/zkk520/uni-router/internal/server/middleware"
+	"github.com/zkk520/uni-router/internal/server/resp"
+	"github.com/zkk520/uni-router/internal/server/router"
 )
 
 func init() {
@@ -107,7 +107,7 @@ func getModelList(c *gin.Context) {
 				ID:      m,
 				Object:  "model",
 				Created: 1763395200,
-				OwnedBy: "octopus",
+				OwnedBy: "uni-router",
 			})
 		}
 		c.JSON(200, gin.H{

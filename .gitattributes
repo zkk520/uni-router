@@ -1,0 +1,5 @@
+*.sh text eol=lf
+Dockerfile text eol=lf
+scripts/dockerfiles/Dockerfile.* text eol=lf
+.github/workflows/*.yml text eol=lf
+.github/workflows/*.yaml text eol=lf

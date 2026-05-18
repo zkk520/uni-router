@@ -11,9 +11,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/bestruirui/octopus/internal/transformer/model"
-	"github.com/bestruirui/octopus/internal/utils/xurl"
 	"github.com/samber/lo"
+	"github.com/zkk520/uni-router/internal/transformer/model"
+	"github.com/zkk520/uni-router/internal/utils/xurl"
 )
 
 type MessagesOutbound struct{}

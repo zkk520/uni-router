@@ -3,8 +3,8 @@ package relay
 import (
 	"testing"
 
-	transformermodel "github.com/bestruirui/octopus/internal/transformer/model"
-	"github.com/bestruirui/octopus/internal/transformer/outbound"
+	transformermodel "github.com/zkk520/uni-router/internal/transformer/model"
+	"github.com/zkk520/uni-router/internal/transformer/outbound"
 )
 
 func TestIsRouteRequestCompatibleWithKeyType(t *testing.T) {

@@ -1,4 +1,4 @@
-module github.com/bestruirui/octopus
+module github.com/zkk520/uni-router
 
 go 1.24.4
 

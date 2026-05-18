@@ -171,7 +171,7 @@ function getAuthHeader(): string {
 
 function parseFilename(contentDisposition: string | null): string | null {
     if (!contentDisposition) return null;
-    // e.g. attachment; filename="octopus-export-20250101120000.json"
+    // e.g. attachment; filename="uni-router-export-20250101120000.json"
     const match = contentDisposition.match(/filename="([^"]+)"/i);
     return match?.[1] ?? null;
 }
@@ -180,7 +180,7 @@ function exportFallbackFilename() {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const ts = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-    return `octopus-export-${ts}.json`;
+    return `uni-router-export-${ts}.json`;
 }
 
 async function downloadBlob(blob: Blob, filename: string) {

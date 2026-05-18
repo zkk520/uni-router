@@ -3,11 +3,11 @@ package middleware
 import (
 	"strings"
 
-	"github.com/bestruirui/octopus/internal/conf"
-	"github.com/bestruirui/octopus/internal/model"
-	"github.com/bestruirui/octopus/internal/op"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/zkk520/uni-router/internal/conf"
+	"github.com/zkk520/uni-router/internal/model"
+	"github.com/zkk520/uni-router/internal/op"
 )
 
 func Cors() gin.HandlerFunc {

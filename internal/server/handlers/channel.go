@@ -7,14 +7,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bestruirui/octopus/internal/helper"
-	"github.com/bestruirui/octopus/internal/model"
-	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/server/middleware"
-	"github.com/bestruirui/octopus/internal/server/resp"
-	"github.com/bestruirui/octopus/internal/server/router"
-	"github.com/bestruirui/octopus/internal/task"
 	"github.com/gin-gonic/gin"
+	"github.com/zkk520/uni-router/internal/helper"
+	"github.com/zkk520/uni-router/internal/model"
+	"github.com/zkk520/uni-router/internal/op"
+	"github.com/zkk520/uni-router/internal/server/middleware"
+	"github.com/zkk520/uni-router/internal/server/resp"
+	"github.com/zkk520/uni-router/internal/server/router"
+	"github.com/zkk520/uni-router/internal/task"
 )
 
 func init() {

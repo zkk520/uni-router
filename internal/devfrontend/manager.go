@@ -8,14 +8,14 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/bestruirui/octopus/internal/conf"
-	"github.com/bestruirui/octopus/internal/model"
-	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/utils/log"
-	"github.com/bestruirui/octopus/internal/utils/portutil"
+	"github.com/zkk520/uni-router/internal/conf"
+	"github.com/zkk520/uni-router/internal/model"
+	"github.com/zkk520/uni-router/internal/op"
+	"github.com/zkk520/uni-router/internal/utils/log"
+	"github.com/zkk520/uni-router/internal/utils/portutil"
 )
 
-const ManageFrontendEnv = "OCTOPUS_MANAGE_FRONTEND"
+const ManageFrontendEnv = "UNI_ROUTER_MANAGE_FRONTEND"
 
 var manager = &Manager{}
 

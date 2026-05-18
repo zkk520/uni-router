@@ -5,7 +5,7 @@
         "password": "Password",
         "passwordPlaceholder": "Enter your password",
         "apikey": "API Key",
-        "apikeyPlaceholder": "Enter your API Key (sk-octopus-...)",
+        "apikeyPlaceholder": "Enter your API Key (sk-uni-router-...)",
         "mode": {
             "user": "Account",
             "apikey": "API Key"

@@ -3,8 +3,8 @@ package cmd
 import (
 	"os"
 
-	"github.com/bestruirui/octopus/internal/conf"
 	"github.com/spf13/cobra"
+	"github.com/zkk520/uni-router/internal/conf"
 )
 
 var rootCmd = &cobra.Command{

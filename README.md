@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="web/public/logo.svg" alt="Octopus Logo" width="120" height="120">
+<img src="web/public/logo.svg" alt="uni-router Logo" width="120" height="120">
 
-### Octopus
+### uni-router
 
 **A Simple, Beautiful, and Elegant LLM API Aggregation & Load Balancing Service for Individuals**
 
@@ -58,10 +58,10 @@ docker compose -f docker-compose.build.yml up -d --build
 
 ### 📦 Download from Release
 
-Download the binary for your platform from [Releases](https://github.com/bestruirui/octopus/releases), then run:
+Download the binary for your platform from [Releases](https://github.com/zkk520/uni-router/releases), then run:
 
 ```bash
-./octopus start
+./uni-router start
 ```
 
 ### 🛠️ Build from Source
@@ -73,14 +73,14 @@ Download the binary for your platform from [Releases](https://github.com/bestrui
 
 ```bash
 # Clone the repository
-git clone https://github.com/bestruirui/octopus.git
-cd octopus
+git clone https://github.com/zkk520/uni-router.git
+cd uni-router
 # Build frontend
 cd web && pnpm install && pnpm run build && cd ..
 # Move frontend assets to static directory
 mv web/out static/
 # Start the backend service
-go run main.go start 
+go run main.go start
 ```
 
 > 💡 **Tip**: The frontend build artifacts are embedded into the Go binary, so you must build the frontend before starting the backend.
@@ -128,14 +128,14 @@ To inspect or stop services already using the dev ports, run:
 .\dev.cmd -Stop All
 ```
 
-The scripts use backend `http://127.0.0.1:8080` and frontend `http://127.0.0.1:3000`, while setting `OCTOPUS_DEBUG` and `NEXT_PUBLIC_API_BASE_URL` for local development. In split mode, press `Ctrl+C` in each terminal to stop that service. In one-command mode, press `Ctrl+C` to stop the services managed by the aggregate script.
+The scripts use backend `http://127.0.0.1:8080` and frontend `http://127.0.0.1:3000`, while setting `UNI_ROUTER_DEBUG` and `NEXT_PUBLIC_API_BASE_URL` for local development. In split mode, press `Ctrl+C` in each terminal to stop that service. In one-command mode, press `Ctrl+C` to stop the services managed by the aggregate script.
 
 You can also start them manually:
 
 ```bash
 cd web && pnpm install && NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8080" pnpm run dev
 ## Open a new terminal, start the backend service
-OCTOPUS_DEBUG=true go run main.go start
+UNI_ROUTER_DEBUG=true go run main.go start
 ## Access the frontend at
 http://localhost:3000
 ```
@@ -197,7 +197,7 @@ Three database types are supported:
 {
   "database": {
     "type": "mysql",
-    "path": "root:password@tcp(127.0.0.1:3306)/octopus"
+    "path": "root:password@tcp(127.0.0.1:3306)/uni_router"
   }
 }
 ```
@@ -208,7 +208,7 @@ Three database types are supported:
 {
   "database": {
     "type": "postgres",
-    "path": "postgresql://user:password@localhost:5432/octopus?sslmode=disable"
+    "path": "postgresql://user:password@localhost:5432/uni_router?sslmode=disable"
   }
 }
 ```
@@ -217,21 +217,21 @@ Three database types are supported:
 
 ### 🌐 Environment Variables
 
-All configuration options can be overridden via environment variables using the format `OCTOPUS_` + configuration path (joined with `_`):
+All configuration options can be overridden via environment variables using the format `UNI_ROUTER_` + configuration path (joined with `_`):
 
 | Environment Variable | Configuration Option |
 |---------------------|---------------------|
-| `OCTOPUS_SERVER_PORT` | `server.port` |
-| `OCTOPUS_SERVER_HOST` | `server.host` |
-| `OCTOPUS_DATABASE_TYPE` | `database.type` |
-| `OCTOPUS_DATABASE_PATH` | `database.path` |
-| `OCTOPUS_LOG_LEVEL` | `log.level` |
-| `OCTOPUS_GITHUB_PAT` | For rate limiting when getting the latest version (optional) |
-| `OCTOPUS_RELAY_MAX_SSE_EVENT_SIZE` | Maximum SSE event size (optional) |
-| `OCTOPUS_IMAGES_BODY_MEMORY_THRESHOLD_MB` | Images request body in-memory threshold. If exceeded, it will be spooled to a temporary file (optional, default 16) |
-| `OCTOPUS_IMAGES_BODY_MAX_MB` | Images request body maximum size. Requests above this limit are rejected (optional, default 256) |
-| `OCTOPUS_IMAGES_BODY_TMP_DIR` | Images request body temporary directory (optional, default `./cache`) |
-| `OCTOPUS_IMAGES_BODY_TMP_CLEANUP_HOURS` | Startup cleanup threshold for temporary files (optional, default 24) |
+| `UNI_ROUTER_SERVER_PORT` | `server.port` |
+| `UNI_ROUTER_SERVER_HOST` | `server.host` |
+| `UNI_ROUTER_DATABASE_TYPE` | `database.type` |
+| `UNI_ROUTER_DATABASE_PATH` | `database.path` |
+| `UNI_ROUTER_LOG_LEVEL` | `log.level` |
+| `UNI_ROUTER_GITHUB_PAT` | For rate limiting when getting the latest version (optional) |
+| `UNI_ROUTER_RELAY_MAX_SSE_EVENT_SIZE` | Maximum SSE event size (optional) |
+| `UNI_ROUTER_IMAGES_BODY_MEMORY_THRESHOLD_MB` | Images request body in-memory threshold. If exceeded, it will be spooled to a temporary file (optional, default 16) |
+| `UNI_ROUTER_IMAGES_BODY_MAX_MB` | Images request body maximum size. Requests above this limit are rejected (optional, default 256) |
+| `UNI_ROUTER_IMAGES_BODY_TMP_DIR` | Images request body temporary directory (optional, default `./cache`) |
+| `UNI_ROUTER_IMAGES_BODY_TMP_CLEANUP_HOURS` | Startup cleanup threshold for temporary files (optional, default 24) |
 
 ## 📸 Screenshots
 
@@ -374,12 +374,12 @@ Since the program handles numerous statistics, writing to the database on every 
 from openai import OpenAI
 import os
 
-client = OpenAI(   
-    base_url="http://127.0.0.1:8080/v1",   
-    api_key="sk-octopus-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg", 
+client = OpenAI(
+    base_url="http://127.0.0.1:8080/v1",
+    api_key="sk-uni-router-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg",
 )
 completion = client.chat.completions.create(
-    model="octopus-openai",  # Use the correct group name
+    model="uni-router-openai",  # Use the correct group name
     messages = [
         {"role": "user", "content": "Hello"},
     ],
@@ -395,14 +395,14 @@ Edit `~/.claude/settings.json`
 {
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:8080",
-    "ANTHROPIC_AUTH_TOKEN": "sk-octopus-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg",
+    "ANTHROPIC_AUTH_TOKEN": "sk-uni-router-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg",
     "API_TIMEOUT_MS": "3000000",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "ANTHROPIC_MODEL": "octopus-sonnet-4-5",
-    "ANTHROPIC_SMALL_FAST_MODEL": "octopus-haiku-4-5",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "octopus-sonnet-4-5",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "octopus-sonnet-4-5",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "octopus-haiku-4-5"
+    "ANTHROPIC_MODEL": "uni-router-sonnet-4-5",
+    "ANTHROPIC_SMALL_FAST_MODEL": "uni-router-haiku-4-5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "uni-router-sonnet-4-5",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "uni-router-sonnet-4-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "uni-router-haiku-4-5"
   }
 }
 ```
@@ -412,12 +412,12 @@ Edit `~/.claude/settings.json`
 Edit `~/.codex/config.toml`
 
 ```toml
-model = "octopus-codex" # Use the correct group name
+model = "uni-router-codex" # Use the correct group name
 
-model_provider = "octopus"
+model_provider = "uni-router"
 
-[model_providers.octopus]
-name = "octopus"
+[model_providers.uni-router]
+name = "uni-router"
 base_url = "http://127.0.0.1:8080/v1"
 ```
 
@@ -425,7 +425,7 @@ Edit `~/.codex/auth.json`
 
 ```json
 {
-  "OPENAI_API_KEY": "sk-octopus-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg"
+  "OPENAI_API_KEY": "sk-uni-router-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg"
 }
 ```
 
@@ -435,4 +435,4 @@ Edit `~/.codex/auth.json`
 
 - 🙏 [looplj/axonhub](https://github.com/looplj/axonhub) - The LLM API adaptation module in this project is directly derived from this repository
 - 📊 [sst/models.dev](https://github.com/sst/models.dev) - AI model database providing model pricing data
-- 🇨🇳 [AtomGit](https://atomgit.com/bestruirui/octopus) - China-based code hosting
+- 🇨🇳 [AtomGit](https://atomgit.com/bestruirui/octopus) - Upstream project China-based code hosting

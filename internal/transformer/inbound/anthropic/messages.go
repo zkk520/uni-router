@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/bestruirui/octopus/internal/transformer/model"
-	"github.com/bestruirui/octopus/internal/utils/log"
-	"github.com/bestruirui/octopus/internal/utils/tokenizer"
-	"github.com/bestruirui/octopus/internal/utils/xurl"
 	"github.com/samber/lo"
+	"github.com/zkk520/uni-router/internal/transformer/model"
+	"github.com/zkk520/uni-router/internal/utils/log"
+	"github.com/zkk520/uni-router/internal/utils/tokenizer"
+	"github.com/zkk520/uni-router/internal/utils/xurl"
 )
 
 type MessagesInbound struct {

@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/bestruirui/octopus/internal/utils/log"
-	"github.com/bestruirui/octopus/internal/utils/shutdown"
+	"github.com/zkk520/uni-router/internal/utils/log"
+	"github.com/zkk520/uni-router/internal/utils/shutdown"
 )
 
 func UpdateCore() error {
@@ -53,27 +53,27 @@ func getDownloadFilename() (string, error) {
 	case "windows":
 		switch arch {
 		case "386":
-			return "octopus-windows-x86.zip", nil
+			return "uni-router-windows-x86.zip", nil
 		case "amd64":
-			return "octopus-windows-x86_64.zip", nil
+			return "uni-router-windows-x86_64.zip", nil
 		}
 	case "darwin":
 		switch arch {
 		case "amd64":
-			return "octopus-darwin-x86_64.zip", nil
+			return "uni-router-darwin-x86_64.zip", nil
 		case "arm64":
-			return "octopus-darwin-arm64.zip", nil
+			return "uni-router-darwin-arm64.zip", nil
 		}
 	case "linux":
 		switch arch {
 		case "386":
-			return "octopus-linux-x86.zip", nil
+			return "uni-router-linux-x86.zip", nil
 		case "amd64":
-			return "octopus-linux-x86_64.zip", nil
+			return "uni-router-linux-x86_64.zip", nil
 		case "arm":
-			return "octopus-linux-armv7.zip", nil
+			return "uni-router-linux-armv7.zip", nil
 		case "arm64":
-			return "octopus-linux-arm64.zip", nil
+			return "uni-router-linux-arm64.zip", nil
 		}
 	}
 	return "", fmt.Errorf("unsupported platform: %s/%s", goos, arch)

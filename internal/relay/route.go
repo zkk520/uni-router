@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	dbmodel "github.com/bestruirui/octopus/internal/model"
-	"github.com/bestruirui/octopus/internal/op"
-	"github.com/bestruirui/octopus/internal/server/resp"
-	"github.com/bestruirui/octopus/internal/transformer/model"
-	"github.com/bestruirui/octopus/internal/transformer/outbound"
-	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/gin-gonic/gin"
+	dbmodel "github.com/zkk520/uni-router/internal/model"
+	"github.com/zkk520/uni-router/internal/op"
+	"github.com/zkk520/uni-router/internal/server/resp"
+	"github.com/zkk520/uni-router/internal/transformer/model"
+	"github.com/zkk520/uni-router/internal/transformer/outbound"
+	"github.com/zkk520/uni-router/internal/utils/log"
 )
 
 func handleRoute(internalRequest *model.InternalLLMRequest, inAdapter model.Inbound, apiKeyID int, requestModel string, routerID int, c *gin.Context) {

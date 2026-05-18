@@ -214,10 +214,10 @@ function Start-BackendForeground {
         throw "Backend port $BackendPort is already in use. Stop the existing process or set -BackendUrl."
     }
 
-    $env:OCTOPUS_DEBUG = "true"
-    $env:OCTOPUS_SERVER_PORT = [string]$BackendPort
+    $env:UNI_ROUTER_DEBUG = "true"
+    $env:UNI_ROUTER_SERVER_PORT = [string]$BackendPort
     if ($Start -eq "All") {
-        $env:OCTOPUS_MANAGE_FRONTEND = "true"
+        $env:UNI_ROUTER_MANAGE_FRONTEND = "true"
     }
     Set-Location $RepoRoot
     Write-Step "Starting backend at $BackendUrl"
@@ -340,7 +340,7 @@ try {
         -FileName $Go `
         -Arguments "run main.go start" `
         -WorkingDirectory $RepoRoot `
-        -Environment @{ OCTOPUS_DEBUG = "true"; OCTOPUS_SERVER_PORT = $BackendPort; OCTOPUS_MANAGE_FRONTEND = "true" }
+        -Environment @{ UNI_ROUTER_DEBUG = "true"; UNI_ROUTER_SERVER_PORT = $BackendPort; UNI_ROUTER_MANAGE_FRONTEND = "true" }
 
     $Processes.Add([pscustomobject]@{ Name = "api"; Process = $Backend })
 

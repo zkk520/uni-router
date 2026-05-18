@@ -10,17 +10,16 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/bestruirui/octopus/internal/client"
-	"github.com/bestruirui/octopus/internal/conf"
-	"github.com/bestruirui/octopus/internal/utils/log"
+	"github.com/zkk520/uni-router/internal/client"
+	"github.com/zkk520/uni-router/internal/conf"
+	"github.com/zkk520/uni-router/internal/utils/log"
 )
 
 const (
-	updateUrl    = "https://github.com/bestruirui/octopus/releases/latest/download"
-	updateApiUrl = "https://api.github.com/repos/bestruirui/octopus/releases/latest"
+	updateUrl    = "https://github.com/zkk520/uni-router/releases/latest/download"
+	updateApiUrl = "https://api.github.com/repos/zkk520/uni-router/releases/latest"
 )
 
 type LatestInfo struct {
@@ -30,7 +29,7 @@ type LatestInfo struct {
 	Message     string `json:"message"`
 }
 
-var github_pat = os.Getenv(strings.ToUpper(conf.APP_NAME) + "_GITHUB_PAT")
+var github_pat = os.Getenv(conf.APP_ENV_PREFIX + "_GITHUB_PAT")
 
 // doRequestWithFallback performs an HTTP GET request, first without proxy, then with proxy if failed.
 func doRequestWithFallback(url string) ([]byte, error) {

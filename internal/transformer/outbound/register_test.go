@@ -3,7 +3,7 @@ package outbound
 import (
 	"testing"
 
-	"github.com/bestruirui/octopus/internal/transformer/outbound/openai"
+	"github.com/zkk520/uni-router/internal/transformer/outbound/openai"
 )
 
 func TestNewAPIChatUsesOpenAIChatOutbound(t *testing.T) {

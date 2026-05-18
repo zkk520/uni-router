@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/bestruirui/octopus/internal/model"
+	"github.com/zkk520/uni-router/internal/model"
 )
 
 func pricingRuleDBValue(rule model.PricingRule) ([]byte, error) {

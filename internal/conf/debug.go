@@ -2,9 +2,8 @@ package conf
 
 import (
 	"os"
-	"strings"
 )
 
 func IsDebug() bool {
-	return os.Getenv(strings.ToUpper(APP_NAME)+"_DEBUG") == "true"
+	return os.Getenv(APP_ENV_PREFIX+"_DEBUG") == "true"
 }

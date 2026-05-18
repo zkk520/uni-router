@@ -5,7 +5,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/bestruirui/octopus/internal/conf"
+	"github.com/zkk520/uni-router/internal/conf"
 
 	"github.com/spf13/cobra"
 )

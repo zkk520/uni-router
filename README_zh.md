@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="web/public/logo.svg" alt="Octopus Logo" width="120" height="120">
+<img src="web/public/logo.svg" alt="uni-router Logo" width="120" height="120">
 
-### Octopus
+### uni-router
 
 **为个人打造的简单、美观、优雅的 LLM API 聚合与负载均衡服务**
 
@@ -62,10 +62,10 @@ docker compose -f docker-compose.build.yml up -d --build
 
 ### 📦 从 Release 下载
 
-从 [Releases](https://github.com/bestruirui/octopus/releases) 下载对应平台的二进制文件，然后运行：
+从 [Releases](https://github.com/zkk520/uni-router/releases) 下载对应平台的二进制文件，然后运行：
 
 ```bash
-./octopus start
+./uni-router start
 ```
 
 ### 🛠️ 源码运行
@@ -77,14 +77,14 @@ docker compose -f docker-compose.build.yml up -d --build
 
 ```bash
 # 克隆项目
-git clone https://github.com/bestruirui/octopus.git
-cd octopus
+git clone https://github.com/zkk520/uni-router.git
+cd uni-router
 # 构建前端
 cd web && pnpm install && pnpm run build && cd ..
 # 移动前端产物到 static 目录
 mv web/out static/
 # 启动后端服务
-go run main.go start 
+go run main.go start
 ```
 
 > 💡 **提示**：前端构建产物会被嵌入到 Go 二进制文件中，所以必须先构建前端再启动后端。
@@ -132,14 +132,14 @@ go run main.go start
 .\dev.cmd -Stop All
 ```
 
-脚本会自动使用后端 `http://127.0.0.1:8080` 与前端 `http://127.0.0.1:3000`，并设置开发所需的 `OCTOPUS_DEBUG` 和 `NEXT_PUBLIC_API_BASE_URL`。分开启动时，在对应终端按 `Ctrl+C` 停止对应服务；一键启动时按 `Ctrl+C` 停止聚合脚本管理的服务。
+脚本会自动使用后端 `http://127.0.0.1:8080` 与前端 `http://127.0.0.1:3000`，并设置开发所需的 `UNI_ROUTER_DEBUG` 和 `NEXT_PUBLIC_API_BASE_URL`。分开启动时，在对应终端按 `Ctrl+C` 停止对应服务；一键启动时按 `Ctrl+C` 停止聚合脚本管理的服务。
 
 也可以手动分别启动：
 
 ```bash
 cd web && pnpm install && NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8080" pnpm run dev
 ## 新建终端,启动后端服务
-OCTOPUS_DEBUG=true go run main.go start
+UNI_ROUTER_DEBUG=true go run main.go start
 ## 访问前端地址
 http://localhost:3000
 ```
@@ -201,7 +201,7 @@ http://localhost:3000
 {
   "database": {
     "type": "mysql",
-    "path": "root:password@tcp(127.0.0.1:3306)/octopus"
+    "path": "root:password@tcp(127.0.0.1:3306)/uni_router"
   }
 }
 ```
@@ -212,7 +212,7 @@ http://localhost:3000
 {
   "database": {
     "type": "postgres",
-    "path": "postgresql://user:password@localhost:5432/octopus?sslmode=disable"
+    "path": "postgresql://user:password@localhost:5432/uni_router?sslmode=disable"
   }
 }
 ```
@@ -221,21 +221,21 @@ http://localhost:3000
 
 **环境变量：**
 
-所有配置项均可通过环境变量覆盖，格式为 `OCTOPUS_` + 配置路径（用 `_` 连接）：
+所有配置项均可通过环境变量覆盖，格式为 `UNI_ROUTER_` + 配置路径（用 `_` 连接）：
 
 | 环境变量 | 对应配置项 |
 |----------|-----------|
-| `OCTOPUS_SERVER_PORT` | `server.port` |
-| `OCTOPUS_SERVER_HOST` | `server.host` |
-| `OCTOPUS_DATABASE_TYPE` | `database.type` |
-| `OCTOPUS_DATABASE_PATH` | `database.path` |
-| `OCTOPUS_LOG_LEVEL` | `log.level` |
-| `OCTOPUS_GITHUB_PAT` | 用于获取最新版本时的速率限制(可选) |
-| `OCTOPUS_RELAY_MAX_SSE_EVENT_SIZE` | 最大 SSE 事件大小(可选) |
-| `OCTOPUS_IMAGES_BODY_MEMORY_THRESHOLD_MB` | Images 请求体内存缓存阈值，超过阈值会落盘临时文件(可选，默认 16) |
-| `OCTOPUS_IMAGES_BODY_MAX_MB` | Images 请求体最大大小限制，超过限制将拒绝请求(可选，默认 256) |
-| `OCTOPUS_IMAGES_BODY_TMP_DIR` | Images 请求体临时文件目录(可选，默认 `./cache`) |
-| `OCTOPUS_IMAGES_BODY_TMP_CLEANUP_HOURS` | 启动时清理临时文件的时间阈值(可选，默认 24) |
+| `UNI_ROUTER_SERVER_PORT` | `server.port` |
+| `UNI_ROUTER_SERVER_HOST` | `server.host` |
+| `UNI_ROUTER_DATABASE_TYPE` | `database.type` |
+| `UNI_ROUTER_DATABASE_PATH` | `database.path` |
+| `UNI_ROUTER_LOG_LEVEL` | `log.level` |
+| `UNI_ROUTER_GITHUB_PAT` | 用于获取最新版本时的速率限制(可选) |
+| `UNI_ROUTER_RELAY_MAX_SSE_EVENT_SIZE` | 最大 SSE 事件大小(可选) |
+| `UNI_ROUTER_IMAGES_BODY_MEMORY_THRESHOLD_MB` | Images 请求体内存缓存阈值，超过阈值会落盘临时文件(可选，默认 16) |
+| `UNI_ROUTER_IMAGES_BODY_MAX_MB` | Images 请求体最大大小限制，超过限制将拒绝请求(可选，默认 256) |
+| `UNI_ROUTER_IMAGES_BODY_TMP_DIR` | Images 请求体临时文件目录(可选，默认 `./cache`) |
+| `UNI_ROUTER_IMAGES_BODY_TMP_CLEANUP_HOURS` | 启动时清理临时文件的时间阈值(可选，默认 24) |
 
 
 ## 📸 界面预览
@@ -380,12 +380,12 @@ http://localhost:3000
 from openai import OpenAI
 import os
 
-client = OpenAI(   
-    base_url="http://127.0.0.1:8080/v1",   
-    api_key="sk-octopus-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg", 
+client = OpenAI(
+    base_url="http://127.0.0.1:8080/v1",
+    api_key="sk-uni-router-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg",
 )
 completion = client.chat.completions.create(
-    model="octopus-openai",  // 填写正确的分组名称
+    model="uni-router-openai",  // 填写正确的分组名称
     messages = [
         {"role": "user", "content": "Hello"},
     ],
@@ -401,14 +401,14 @@ print(completion.choices[0].message.content)
 {
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:8080",
-    "ANTHROPIC_AUTH_TOKEN": "sk-octopus-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg",
+    "ANTHROPIC_AUTH_TOKEN": "sk-uni-router-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg",
     "API_TIMEOUT_MS": "3000000",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "ANTHROPIC_MODEL": "octopus-sonnet-4-5",
-    "ANTHROPIC_SMALL_FAST_MODEL": "octopus-haiku-4-5",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "octopus-sonnet-4-5",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "octopus-sonnet-4-5",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "octopus-haiku-4-5"
+    "ANTHROPIC_MODEL": "uni-router-sonnet-4-5",
+    "ANTHROPIC_SMALL_FAST_MODEL": "uni-router-haiku-4-5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "uni-router-sonnet-4-5",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "uni-router-sonnet-4-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "uni-router-haiku-4-5"
   }
 }
 ```
@@ -418,19 +418,19 @@ print(completion.choices[0].message.content)
 编辑 `~/.codex/config.toml`
 
 ```toml
-model = "octopus-codex" # 填写正确的分组名称
+model = "uni-router-codex" # 填写正确的分组名称
 
-model_provider = "octopus"
+model_provider = "uni-router"
 
-[model_providers.octopus]
-name = "octopus"
+[model_providers.uni-router]
+name = "uni-router"
 base_url = "http://127.0.0.1:8080/v1"
 ```
 编辑 `~/.codex/auth.json`
 
 ```json
 {
-  "OPENAI_API_KEY": "sk-octopus-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg"
+  "OPENAI_API_KEY": "sk-uni-router-P48ROljwJmWBYVARjwQM8Nkiezlg7WOrXXOWDYY8TI5p9Mzg"
 }
 ```
 
@@ -441,4 +441,4 @@ base_url = "http://127.0.0.1:8080/v1"
 
 - 🙏 [looplj/axonhub](https://github.com/looplj/axonhub) - 本项目的 LLM API 适配模块直接源自该仓库的实现
 - 📊 [sst/models.dev](https://github.com/sst/models.dev) - AI 模型数据库，提供模型价格数据
-- 🇨🇳 [AtomGit](https://atomgit.com/bestruirui/octopus) - 国内代码托管
+- 🇨🇳 [AtomGit](https://atomgit.com/bestruirui/octopus) - 上游项目国内代码托管

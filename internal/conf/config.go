@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/spf13/viper"
+	"github.com/zkk520/uni-router/internal/utils/log"
 )
 
 type Server struct {
@@ -150,7 +150,7 @@ func Load(path string) error {
 	}
 
 	viper.AutomaticEnv()
-	viper.SetEnvPrefix(APP_NAME)
+	viper.SetEnvPrefix(APP_ENV_PREFIX)
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	setDefaults()

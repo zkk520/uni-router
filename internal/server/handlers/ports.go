@@ -6,17 +6,17 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bestruirui/octopus/internal/conf"
-	"github.com/bestruirui/octopus/internal/devfrontend"
-	"github.com/bestruirui/octopus/internal/model"
-	"github.com/bestruirui/octopus/internal/op"
-	appruntime "github.com/bestruirui/octopus/internal/runtime"
-	"github.com/bestruirui/octopus/internal/server/middleware"
-	"github.com/bestruirui/octopus/internal/server/resp"
-	"github.com/bestruirui/octopus/internal/server/router"
-	"github.com/bestruirui/octopus/internal/utils/log"
-	"github.com/bestruirui/octopus/internal/utils/portutil"
 	"github.com/gin-gonic/gin"
+	"github.com/zkk520/uni-router/internal/conf"
+	"github.com/zkk520/uni-router/internal/devfrontend"
+	"github.com/zkk520/uni-router/internal/model"
+	"github.com/zkk520/uni-router/internal/op"
+	appruntime "github.com/zkk520/uni-router/internal/runtime"
+	"github.com/zkk520/uni-router/internal/server/middleware"
+	"github.com/zkk520/uni-router/internal/server/resp"
+	"github.com/zkk520/uni-router/internal/server/router"
+	"github.com/zkk520/uni-router/internal/utils/log"
+	"github.com/zkk520/uni-router/internal/utils/portutil"
 )
 
 type portsInfo struct {
@@ -136,7 +136,7 @@ func setPorts(c *gin.Context) {
 
 	if backendChanged {
 		appruntime.RestartAfter(800*time.Millisecond, map[string]string{
-			"OCTOPUS_SERVER_PORT": strconv.Itoa(req.BackendPort),
+			"UNI_ROUTER_SERVER_PORT": strconv.Itoa(req.BackendPort),
 		})
 		return
 	}

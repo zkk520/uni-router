@@ -3,11 +3,11 @@
 
 /**
  * Cache naming
- * - Prefix MUST match `web/src/lib/sw.ts` (OCTOPUS_CACHE_PREFIX)
+ * - Prefix MUST match `web/src/lib/sw.ts` (UNI_ROUTER_CACHE_PREFIX)
  * - Bump CACHE_VERSION when you change caching behavior in this file
  * - FONT cache is version-independent (fonts persist across updates)
  */
-const CACHE_PREFIX = 'octopus';
+const CACHE_PREFIX = 'uni-router';
 const CACHE_VERSION = 'v1';
 const CACHE_NAMES = {
     static: `${CACHE_PREFIX}-static-${CACHE_VERSION}`,

@@ -1,11 +1,11 @@
 package outbound
 
 import (
-	"github.com/bestruirui/octopus/internal/transformer/model"
-	"github.com/bestruirui/octopus/internal/transformer/outbound/authropic"
-	"github.com/bestruirui/octopus/internal/transformer/outbound/gemini"
-	"github.com/bestruirui/octopus/internal/transformer/outbound/openai"
-	"github.com/bestruirui/octopus/internal/transformer/outbound/volcengine"
+	"github.com/zkk520/uni-router/internal/transformer/model"
+	"github.com/zkk520/uni-router/internal/transformer/outbound/authropic"
+	"github.com/zkk520/uni-router/internal/transformer/outbound/gemini"
+	"github.com/zkk520/uni-router/internal/transformer/outbound/openai"
+	"github.com/zkk520/uni-router/internal/transformer/outbound/volcengine"
 )
 
 type OutboundType int

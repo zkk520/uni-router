@@ -36,12 +36,12 @@ ARG AUTHOR=zkk520
 
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -tags=jsoniter \
-    -ldflags="-X 'github.com/bestruirui/octopus/internal/conf.Version=${VERSION}' \
-    -X 'github.com/bestruirui/octopus/internal/conf.BuildTime=${BUILD_TIME}' \
-    -X 'github.com/bestruirui/octopus/internal/conf.Author=${AUTHOR}' \
-    -X 'github.com/bestruirui/octopus/internal/conf.Commit=${COMMIT}' \
+    -ldflags="-X 'github.com/zkk520/uni-router/internal/conf.Version=${VERSION}' \
+    -X 'github.com/zkk520/uni-router/internal/conf.BuildTime=${BUILD_TIME}' \
+    -X 'github.com/zkk520/uni-router/internal/conf.Author=${AUTHOR}' \
+    -X 'github.com/zkk520/uni-router/internal/conf.Commit=${COMMIT}' \
     -s -w" \
-    -o /out/octopus .
+    -o /out/uni-router .
 
 FROM alpine:3.22
 
@@ -50,10 +50,10 @@ ENV TZ=Asia/Shanghai
 RUN apk add --no-cache ca-certificates su-exec tzdata && \
     mkdir -p /app/data
 
-COPY --from=backend /out/octopus /app/octopus
+COPY --from=backend /out/uni-router /app/uni-router
 COPY scripts/dockerfiles/entrypoint.sh /entrypoint.sh
 
-RUN chmod +x /entrypoint.sh /app/octopus
+RUN chmod +x /entrypoint.sh /app/uni-router
 
 EXPOSE 8080
 VOLUME ["/app/data"]
