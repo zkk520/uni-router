@@ -114,6 +114,10 @@ jobs:
           script: |
             set -e
             cd /opt/1panel/apps/uni-router
-            docker compose pull
+            for i in 1 2 3; do
+              docker compose pull && break
+              echo "第 $i 次拉取失败，10s 后重试..."
+              sleep 10
+            done
             docker compose up -d
             docker image prune -f
