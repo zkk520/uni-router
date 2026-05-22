@@ -24,6 +24,45 @@ check_deps() {
     fi
 }
 
+# ─── 配置 Docker daemon 代理（用于 docker pull）────────────────────────────
+
+setup_daemon_proxy() {
+    local proxy_host="127.0.0.1"
+    local proxy_port="7890"
+
+    # 检测 mihomo 是否在监听
+    if ! curl -sf --max-time 3 --proxy "http://${proxy_host}:${proxy_port}" https://ghcr.io/v2/ -o /dev/null; then
+        # 测试失败不代表代理不存在，只要端口开着就配置
+        if ! ss -tlnp 2>/dev/null | grep -q ":${proxy_port}"; then
+            echo "    未检测到本地代理（${proxy_host}:${proxy_port}），跳过 daemon 代理配置"
+            return 0
+        fi
+    fi
+
+    local override_dir="/etc/systemd/system/docker.service.d"
+    local override_file="${override_dir}/http-proxy.conf"
+
+    # 已存在则跳过
+    if [ -f "$override_file" ]; then
+        echo "    Docker daemon 代理已配置，跳过"
+        return 0
+    fi
+
+    echo "    配置 Docker daemon 代理 → http://${proxy_host}:${proxy_port}"
+    mkdir -p "$override_dir"
+    cat > "$override_file" << EOF
+[Service]
+Environment="HTTP_PROXY=http://${proxy_host}:${proxy_port}"
+Environment="HTTPS_PROXY=http://${proxy_host}:${proxy_port}"
+Environment="NO_PROXY=localhost,127.0.0.1,::1"
+EOF
+
+    systemctl daemon-reload
+    systemctl restart docker
+    sleep 2
+    echo "    Docker daemon 代理配置完成，已重启"
+}
+
 # ─── 停止旧容器（幂等）──────────────────────────────────────────────────────
 
 stop_existing() {
@@ -90,19 +129,23 @@ main() {
 
     check_deps
 
-    # 1. 创建部署目录
-    echo "[1/5] 创建部署目录 ${DEPLOY_DIR} ..."
+    # 1. 配置 Docker daemon 代理
+    echo "[1/6] 检测并配置 Docker daemon 代理..."
+    setup_daemon_proxy
+
+    # 2. 创建部署目录
+    echo "[2/6] 创建部署目录 ${DEPLOY_DIR} ..."
     mkdir -p "${DEPLOY_DIR}/data"
     cd "${DEPLOY_DIR}"
 
     stop_existing
 
-    # 2. 拉取镜像
-    echo "[2/5] 拉取镜像 ${IMAGE} ..."
+    # 3. 拉取镜像
+    echo "[3/6] 拉取镜像 ${IMAGE} ..."
     docker pull "${IMAGE}"
 
-    # 3. 启动临时容器以检测网关 IP
-    echo "[3/5] 启动临时容器，检测 Docker 网关..."
+    # 4. 启动临时容器以检测网关 IP
+    echo "[4/6] 启动临时容器，检测 Docker 网关..."
     write_compose_plain
     docker compose up -d
     sleep 3
@@ -122,14 +165,14 @@ main() {
 
     echo "    检测到 Docker 网关：${DOCKER_GATEWAY}"
 
-    # 4. 重新生成含代理的 compose 并重启
-    echo "[4/5] 重新生成代理配置并重启容器..."
+    # 5. 重新生成含代理的 compose 并重启
+    echo "[5/6] 重新生成代理配置并重启容器..."
     docker compose down
     write_compose_with_proxy "${DOCKER_GATEWAY}"
     docker compose up -d
 
-    # 5. 完成
-    echo "[5/5] 完成"
+    # 6. 完成
+    echo "[6/6] 完成"
     echo ""
     print_summary
 }
