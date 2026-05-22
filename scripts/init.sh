@@ -6,7 +6,7 @@ set -e
 DEPLOY_DIR="/opt/1panel/apps/uni-router"
 IMAGE="ghcr.io/zkk520/uni-router:latest"
 CONTAINER="uni-router"
-PORT=8080
+PORT=8090
 
 # ─── 检查依赖 ────────────────────────────────────────────────────────────────
 
@@ -81,7 +81,7 @@ services:
     image: ghcr.io/zkk520/uni-router:latest
     container_name: uni-router
     ports:
-      - "8080:8080"
+      - "8090:8080"
     volumes:
       - ./data:/app/data
     restart: unless-stopped
