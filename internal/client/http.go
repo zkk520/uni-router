@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/zkk520/uni-router/internal/model"
 	"github.com/zkk520/uni-router/internal/op"
@@ -101,7 +102,7 @@ func newHTTPClientNoProxy() (*http.Client, error) {
 		return nil, err
 	}
 	cloned.Proxy = nil
-	return &http.Client{Transport: cloned}, nil
+	return &http.Client{Transport: cloned, Timeout: 30 * time.Second}, nil
 }
 
 func newHTTPClientCustomProxy(proxyURLStr string) (*http.Client, error) {
@@ -131,5 +132,5 @@ func newHTTPClientCustomProxy(proxyURLStr string) (*http.Client, error) {
 		return nil, fmt.Errorf("unsupported proxy scheme: %s", proxyURL.Scheme)
 	}
 
-	return &http.Client{Transport: cloned}, nil
+	return &http.Client{Transport: cloned, Timeout: 30 * time.Second}, nil
 }

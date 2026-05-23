@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zkk520/uni-router/internal/helper"
@@ -111,9 +112,8 @@ func getModelList(c *gin.Context) {
 			})
 		}
 		c.JSON(200, gin.H{
-			"success": true,
-			"data":    openAIModels,
-			"object":  "list",
+			"object": "list",
+			"data":   openAIModels,
 		})
 	}
 }
@@ -145,7 +145,10 @@ func collectRouteModelList(ctx context.Context, route model.RouteProfile) []stri
 			fetchReq := *channel
 			fetchReq.Keys = []model.ChannelKey{usedKey}
 			fetchReq.Type = model.EffectiveChannelKeyType(*channel, usedKey)
-			fetched, err := helper.FetchModels(ctx, fetchReq)
+			// 使用独立 context，避免客户端超时断开后 fetch 被取消且无法缓存结果
+			fetchCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			fetched, err := helper.FetchModels(fetchCtx, fetchReq)
+			cancel()
 			if err == nil {
 				keyModels = fetched
 			}
