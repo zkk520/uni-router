@@ -4,5 +4,6 @@ static/out/*
 !static/out/README.md
 .vscode
 .claude/
+CLAUDE.md
 .gocache/
 .pnpm-store/
