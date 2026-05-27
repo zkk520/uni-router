@@ -182,7 +182,7 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 		}
 
 		// 尝试一次转发
-		statusCode, written, usage, upstreamCT, fwdErr := imagesAttempt(ctx, endpoint, c, bc, isMultipart, boundary, jsonPayload, stream, channel, usedKey.ChannelKey, 0, metrics)
+		statusCode, written, usage, upstreamCT, fwdErr := imagesAttempt(ctx, endpoint, c, bc, isMultipart, boundary, jsonPayload, stream, channel, keyType, usedKey.ChannelKey, 0, metrics)
 
 		// 更新 channel key 状态
 		usedKey.StatusCode = statusCode
@@ -242,6 +242,19 @@ func isImagesKeyTypeSupported(keyType outbound.OutboundType) bool {
 	return keyType == outbound.OutboundTypeOpenAIChat ||
 		keyType == outbound.OutboundTypeOpenAIResponse ||
 		keyType == outbound.OutboundTypeNewAPIChat
+}
+
+func imagesUpstreamURL(baseURL, endpoint string, keyType outbound.OutboundType) (*url.URL, error) {
+	normalizedBaseURL, err := outbound.NormalizeBaseURL(baseURL, keyType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to normalize base url: %w", err)
+	}
+	parsedURL, err := url.Parse(strings.TrimSuffix(normalizedBaseURL, "/"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse base url: %w", err)
+	}
+	parsedURL.Path += endpoint
+	return parsedURL, nil
 }
 
 type imagesUsage struct {
@@ -561,17 +574,16 @@ func imagesAttempt(
 	jsonPayload map[string]any,
 	stream bool,
 	channel *model.Channel,
+	keyType outbound.OutboundType,
 	channelKey string,
 	firstTokenTimeOutSec int,
 	metrics *imagesRelayMetrics,
 ) (statusCode int, written bool, usage *imagesUsage, upstreamCT string, err error) {
 	// 构建 URL（baseUrl.Path 后追加 endpoint）
-	baseURL := channel.GetBaseUrl()
-	parsedURL, err := url.Parse(strings.TrimSuffix(baseURL, "/"))
+	parsedURL, err := imagesUpstreamURL(channel.GetBaseUrl(), endpoint, keyType)
 	if err != nil {
-		return 0, false, nil, "", fmt.Errorf("failed to parse base url: %w", err)
+		return 0, false, nil, "", err
 	}
-	parsedURL.Path = parsedURL.Path + endpoint
 
 	var bodyReader io.Reader
 	var contentType string

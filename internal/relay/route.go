@@ -94,6 +94,7 @@ func handleRoute(internalRequest *model.InternalLLMRequest, inAdapter model.Inbo
 			outAdapter:   outAdapter,
 			channel:      channel,
 			usedKey:      usedKey,
+			keyType:      keyType,
 		}
 		span := req.startRouteAttempt(ep, channel, usedKey)
 		statusCode, fwdErr := ra.forward()

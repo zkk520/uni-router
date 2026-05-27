@@ -193,17 +193,44 @@ func TestFetchModelsByKeySupportsNewAPIChat(t *testing.T) {
 	}
 }
 
-func TestFetchModelsByKeyUsesPerKeyTypeOverride(t *testing.T) {
-	anthropicType := outbound.OutboundTypeAnthropic
+func TestFetchModelsByKeyAddsV1ForOpenAIBaseURL(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/models" {
 			t.Fatalf("path = %q, want /v1/models", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"gpt-4o"}]}`))
+	}))
+	defer server.Close()
+
+	got := FetchModelsByKey(context.Background(), model.Channel{
+		Type:     outbound.OutboundTypeOpenAIChat,
+		BaseUrls: []model.BaseUrl{{URL: server.URL}},
+		Keys:     []model.ChannelKey{{ID: 1, Enabled: true, ChannelKey: "openai-key"}},
+	})
+
+	if len(got.Results) != 1 || !got.Results[0].Success {
+		t.Fatalf("result = %#v, want one successful key", got.Results)
+	}
+	if len(got.Models) != 1 || got.Models[0] != "gpt-4o" {
+		t.Fatalf("models = %#v, want gpt-4o", got.Models)
+	}
+}
+
+func TestFetchModelsByKeyUsesPerKeyTypeOverride(t *testing.T) {
+	anthropicType := outbound.OutboundTypeAnthropic
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Header.Get("Authorization") == "Bearer openai-key":
+			if r.URL.Path != "/v1/models" {
+				t.Fatalf("openai path = %q, want /v1/models", r.URL.Path)
+			}
 			_, _ = w.Write([]byte(`{"data":[{"id":"gpt-4o"}]}`))
 		case r.Header.Get("X-Api-Key") == "anthropic-key":
+			if r.URL.Path != "/models" {
+				t.Fatalf("anthropic path = %q, want /models", r.URL.Path)
+			}
 			_, _ = w.Write([]byte(`{"data":[{"id":"claude-3-5-sonnet"}],"has_more":false}`))
 		default:
 			t.Fatalf("unexpected headers: authorization=%q x-api-key=%q", r.Header.Get("Authorization"), r.Header.Get("X-Api-Key"))
@@ -213,7 +240,7 @@ func TestFetchModelsByKeyUsesPerKeyTypeOverride(t *testing.T) {
 
 	got := FetchModelsByKey(context.Background(), model.Channel{
 		Type:     outbound.OutboundTypeOpenAIChat,
-		BaseUrls: []model.BaseUrl{{URL: server.URL + "/v1"}},
+		BaseUrls: []model.BaseUrl{{URL: server.URL}},
 		Keys: []model.ChannelKey{
 			{ID: 1, Enabled: true, ChannelKey: "openai-key"},
 			{ID: 2, Enabled: true, ChannelKey: "anthropic-key", Type: &anthropicType},

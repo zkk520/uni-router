@@ -298,13 +298,13 @@ The program automatically appends API paths based on channel type. You only need
 
 | Channel Type | Auto-appended Path | Base URL | Full Request URL Example |
 |--------------|-------------------|----------|--------------------------|
-| OpenAI Chat | `/chat/completions` | `https://api.openai.com/v1` | `https://api.openai.com/v1/chat/completions` |
-| OpenAI Responses | `/responses` | `https://api.openai.com/v1` | `https://api.openai.com/v1/responses` |
-| OpenAI Images | `/images/generations`, `/images/edits`, `/images/variations` | `https://api.openai.com/v1` | `https://api.openai.com/v1/images/generations` |
-| Anthropic | `/messages` | `https://api.anthropic.com/v1` | `https://api.anthropic.com/v1/messages` |
+| OpenAI Chat | `/v1/chat/completions` | `https://api.openai.com` | `https://api.openai.com/v1/chat/completions` |
+| OpenAI Responses | `/v1/responses` | `https://api.openai.com` | `https://api.openai.com/v1/responses` |
+| OpenAI Images | `/v1/images/generations`, `/v1/images/edits`, `/v1/images/variations` | `https://api.openai.com` | `https://api.openai.com/v1/images/generations` |
+| Anthropic | `/messages` | `https://api.anthropic.com` | `https://api.anthropic.com/messages` |
 | Gemini | `/models/:model:generateContent` | `https://generativelanguage.googleapis.com/v1beta` | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent` |
 
-> 💡 **Tip**: No need to include specific API endpoint paths in the Base URL - the program handles this automatically.
+> 💡 **Tip**: No need to include specific API endpoint paths in the Base URL. OpenAI-compatible protocols automatically add `/v1`; non-OpenAI protocols keep the original Base URL.
 
 ---
 

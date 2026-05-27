@@ -303,13 +303,13 @@ http://localhost:3000
 
 | 渠道类型 | 自动补全路径 | 填写 URL | 完整请求地址示例 |
 |----------|-------------|----------|-----------------|
-| OpenAI Chat | `/chat/completions` | `https://api.openai.com/v1` | `https://api.openai.com/v1/chat/completions` |
-| OpenAI Responses | `/responses` | `https://api.openai.com/v1` | `https://api.openai.com/v1/responses` |
-| OpenAI Images | `/images/generations`、`/images/edits`、`/images/variations` | `https://api.openai.com/v1` | `https://api.openai.com/v1/images/generations` |
-| Anthropic | `/messages` | `https://api.anthropic.com/v1` | `https://api.anthropic.com/v1/messages` |
+| OpenAI Chat | `/v1/chat/completions` | `https://api.openai.com` | `https://api.openai.com/v1/chat/completions` |
+| OpenAI Responses | `/v1/responses` | `https://api.openai.com` | `https://api.openai.com/v1/responses` |
+| OpenAI Images | `/v1/images/generations`、`/v1/images/edits`、`/v1/images/variations` | `https://api.openai.com` | `https://api.openai.com/v1/images/generations` |
+| Anthropic | `/messages` | `https://api.anthropic.com` | `https://api.anthropic.com/messages` |
 | Gemini | `/models/:model:generateContent` | `https://generativelanguage.googleapis.com/v1beta` | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent` |
 
-> 💡 **提示**：填写 Base URL 时无需包含具体的 API 端点路径，程序会自动处理。
+> 💡 **提示**：填写 Base URL 时无需包含具体的 API 端点路径。OpenAI 兼容协议会自动补 `/v1`，非 OpenAI 协议保持原始 Base URL。
 
 ---
 

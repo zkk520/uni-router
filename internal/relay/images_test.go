@@ -28,3 +28,23 @@ func TestIsImagesKeyTypeSupported(t *testing.T) {
 		})
 	}
 }
+
+func TestImagesUpstreamURLNormalizesOpenAIBaseURL(t *testing.T) {
+	got, err := imagesUpstreamURL("https://api.example.com", "/images/generations", outbound.OutboundTypeOpenAIChat)
+	if err != nil {
+		t.Fatalf("imagesUpstreamURL() error = %v", err)
+	}
+	if got.String() != "https://api.example.com/v1/images/generations" {
+		t.Fatalf("imagesUpstreamURL() = %q, want %q", got.String(), "https://api.example.com/v1/images/generations")
+	}
+}
+
+func TestImagesUpstreamURLDoesNotDuplicateV1(t *testing.T) {
+	got, err := imagesUpstreamURL("https://api.example.com/v1", "/images/generations", outbound.OutboundTypeNewAPIChat)
+	if err != nil {
+		t.Fatalf("imagesUpstreamURL() error = %v", err)
+	}
+	if got.String() != "https://api.example.com/v1/images/generations" {
+		t.Fatalf("imagesUpstreamURL() = %q, want %q", got.String(), "https://api.example.com/v1/images/generations")
+	}
+}

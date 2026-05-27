@@ -9,6 +9,7 @@ import (
 	"github.com/zkk520/uni-router/internal/conf"
 	dbmodel "github.com/zkk520/uni-router/internal/model"
 	"github.com/zkk520/uni-router/internal/transformer/model"
+	"github.com/zkk520/uni-router/internal/transformer/outbound"
 )
 
 // maxSSEEventSize 定义 SSE 事件的最大大小。
@@ -74,6 +75,7 @@ type relayAttempt struct {
 	outAdapter           model.Outbound
 	channel              *dbmodel.Channel
 	usedKey              dbmodel.ChannelKey
+	keyType              outbound.OutboundType
 	firstTokenTimeOutSec int
 }
 

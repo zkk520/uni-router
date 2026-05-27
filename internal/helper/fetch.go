@@ -18,7 +18,7 @@ import (
 
 const (
 	modelListInvalidJSONMessage = "上游模型列表响应不是有效 JSON，请检查 Base URL/供应商类型/API Key"
-	modelListHTMLMessage        = "上游返回了 HTML 页面，请确认 Base URL 是 API 地址（通常需要包含 /v1），并选择 New API Chat/OpenAI 兼容类型或正确的供应商类型"
+	modelListHTMLMessage        = "上游返回了 HTML 页面，请确认 Base URL 是 API 地址；OpenAI 兼容协议会自动补 /v1，请选择 New API Chat/OpenAI 兼容类型或正确的供应商类型"
 )
 
 func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
@@ -28,6 +28,11 @@ func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
 	if request.GetChannelKey().ChannelKey == "" {
 		return nil, fmt.Errorf("api key is required")
 	}
+	normalizedBaseURL, err := outbound.NormalizeBaseURL(request.GetBaseUrl(), request.Type)
+	if err != nil {
+		return nil, err
+	}
+	request.BaseUrls = []model.BaseUrl{{URL: normalizedBaseURL}}
 
 	client, err := ChannelHttpClient(&request)
 	if err != nil {

@@ -15,6 +15,7 @@ import (
 	"github.com/zkk520/uni-router/internal/server/resp"
 	"github.com/zkk520/uni-router/internal/transformer/inbound"
 	"github.com/zkk520/uni-router/internal/transformer/model"
+	"github.com/zkk520/uni-router/internal/transformer/outbound"
 	"github.com/zkk520/uni-router/internal/utils/log"
 )
 
@@ -66,11 +67,17 @@ func parseRequest(inboundType inbound.InboundType, c *gin.Context) (*model.Inter
 func (ra *relayAttempt) forward() (int, error) {
 	ctx := ra.c.Request.Context()
 
+	baseURL, err := outbound.NormalizeBaseURL(ra.channel.GetBaseUrl(), ra.keyType)
+	if err != nil {
+		log.Warnf("failed to normalize base url: %v", err)
+		return 0, fmt.Errorf("failed to normalize base url: %w", err)
+	}
+
 	// 构建出站请求
 	outboundRequest, err := ra.outAdapter.TransformRequest(
 		ctx,
 		ra.internalRequest,
-		ra.channel.GetBaseUrl(),
+		baseURL,
 		ra.usedKey.ChannelKey,
 	)
 	if err != nil {
