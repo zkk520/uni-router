@@ -20,12 +20,16 @@ import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { XIcon } from 'lucide-react';
 import useClickOutside from '@/hooks/useClickOutside';
+import { useSettingStore } from '@/stores/setting';
+
+export type MorphingDialogMotionPreset = 'auto' | 'rich' | 'simple';
 
 export type MorphingDialogContextType = {
   isOpen: boolean;
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   uniqueId: string;
   triggerRef: React.RefObject<HTMLDivElement | null>;
+  isRichMotion: boolean;
 };
 
 const MorphingDialogContext =
@@ -44,15 +48,43 @@ function useMorphingDialog() {
 export type MorphingDialogProviderProps = {
   children: React.ReactNode;
   transition?: Transition;
+  motionPreset?: MorphingDialogMotionPreset;
 };
+
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setPrefersReducedMotion(mediaQuery.matches);
+
+    update();
+    mediaQuery.addEventListener('change', update);
+
+    return () => {
+      mediaQuery.removeEventListener('change', update);
+    };
+  }, []);
+
+  return prefersReducedMotion;
+}
 
 function MorphingDialogProvider({
   children,
   transition,
+  motionPreset = 'auto',
 }: MorphingDialogProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const uniqueId = useId();
   const triggerRef = useRef<HTMLDivElement>(null!);
+  const advancedMotionEnabled = useSettingStore((state) => state.advancedMotionEnabled);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const isRichMotion = !prefersReducedMotion && (
+    motionPreset === 'rich' ||
+    (motionPreset === 'auto' && advancedMotionEnabled)
+  );
 
   const contextValue = useMemo(
     () => ({
@@ -60,8 +92,9 @@ function MorphingDialogProvider({
       setIsOpen,
       uniqueId,
       triggerRef,
+      isRichMotion,
     }),
-    [isOpen, uniqueId]
+    [isOpen, uniqueId, isRichMotion]
   );
 
   return (
@@ -74,11 +107,12 @@ function MorphingDialogProvider({
 export type MorphingDialogProps = {
   children: React.ReactNode;
   transition?: Transition;
+  motionPreset?: MorphingDialogMotionPreset;
 };
 
-function MorphingDialog({ children, transition }: MorphingDialogProps) {
+function MorphingDialog({ children, transition, motionPreset }: MorphingDialogProps) {
   return (
-    <MorphingDialogProvider>
+    <MorphingDialogProvider transition={transition} motionPreset={motionPreset}>
       <MotionConfig transition={transition}>{children}</MotionConfig>
     </MorphingDialogProvider>
   );
@@ -97,7 +131,7 @@ function MorphingDialogTrigger({
   style,
   triggerRef: triggerRefProp,
 }: MorphingDialogTriggerProps) {
-  const { setIsOpen, isOpen, uniqueId, triggerRef } = useMorphingDialog();
+  const { setIsOpen, isOpen, uniqueId, triggerRef, isRichMotion } = useMorphingDialog();
 
   const handleClick = useCallback(() => {
     setIsOpen(!isOpen);
@@ -133,7 +167,7 @@ function MorphingDialogTrigger({
   return (
     <motion.div
       ref={triggerRefProp ?? triggerRef}
-      layoutId={`dialog-${uniqueId}`}
+      layoutId={isRichMotion ? `dialog-${uniqueId}` : undefined}
       className={cn('relative cursor-pointer', className)}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
@@ -161,7 +195,7 @@ function MorphingDialogContent({
   className,
   style,
 }: MorphingDialogContentProps) {
-  const { setIsOpen, isOpen, uniqueId, triggerRef } = useMorphingDialog();
+  const { setIsOpen, isOpen, uniqueId, triggerRef, isRichMotion } = useMorphingDialog();
   const containerRef = useRef<HTMLDivElement>(null!);
   const firstFocusableElementRef = useRef<HTMLElement | null>(null);
   const lastFocusableElementRef = useRef<HTMLElement | null>(null);
@@ -239,16 +273,26 @@ function MorphingDialogContent({
     }
   );
 
+  const simpleMotionProps = isRichMotion
+    ? {}
+    : {
+      initial: { opacity: 0, y: 12, scale: 0.98 },
+      animate: { opacity: 1, y: 0, scale: 1 },
+      exit: { opacity: 0, y: 12, scale: 0.98 },
+      transition: { duration: 0.16, ease: 'easeOut' as const },
+    };
+
   return (
     <motion.div
       ref={containerRef}
-      layoutId={`dialog-${uniqueId}`}
+      layoutId={isRichMotion ? `dialog-${uniqueId}` : undefined}
       className={cn('overflow-hidden', className)}
       style={style}
       role='dialog'
       aria-modal='true'
       aria-labelledby={`motion-ui-morphing-dialog-title-${uniqueId}`}
       aria-describedby={`motion-ui-morphing-dialog-description-${uniqueId}`}
+      {...simpleMotionProps}
     >
       {children}
     </motion.div>
@@ -262,7 +306,7 @@ export type MorphingDialogContainerProps = {
 };
 
 function MorphingDialogContainer({ children }: MorphingDialogContainerProps) {
-  const { isOpen, uniqueId } = useMorphingDialog();
+  const { isOpen, uniqueId, isRichMotion } = useMorphingDialog();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -282,7 +326,10 @@ function MorphingDialogContainer({ children }: MorphingDialogContainerProps) {
         <>
           <motion.div
             key={`backdrop-${uniqueId}`}
-            className='fixed inset-0 h-full w-full bg-white/40 backdrop-blur-xs dark:bg-black/40 z-50'
+            className={cn(
+              'fixed inset-0 h-full w-full bg-white/40 dark:bg-black/40 z-50',
+              isRichMotion && 'backdrop-blur-xs'
+            )}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -308,14 +355,14 @@ function MorphingDialogTitle({
   className,
   style,
 }: MorphingDialogTitleProps) {
-  const { uniqueId } = useMorphingDialog();
+  const { uniqueId, isRichMotion } = useMorphingDialog();
 
   return (
     <motion.div
-      layoutId={`dialog-title-container-${uniqueId}`}
+      layoutId={isRichMotion ? `dialog-title-container-${uniqueId}` : undefined}
       className={className}
       style={style}
-      layout
+      layout={isRichMotion}
     >
       {children}
     </motion.div>
@@ -333,11 +380,11 @@ function MorphingDialogSubtitle({
   className,
   style,
 }: MorphingDialogSubtitleProps) {
-  const { uniqueId } = useMorphingDialog();
+  const { uniqueId, isRichMotion } = useMorphingDialog();
 
   return (
     <motion.div
-      layoutId={`dialog-subtitle-container-${uniqueId}`}
+      layoutId={isRichMotion ? `dialog-subtitle-container-${uniqueId}` : undefined}
       className={className}
       style={style}
     >
@@ -363,13 +410,13 @@ function MorphingDialogDescription({
   variants,
   disableLayoutAnimation,
 }: MorphingDialogDescriptionProps) {
-  const { uniqueId } = useMorphingDialog();
+  const { uniqueId, isRichMotion } = useMorphingDialog();
 
   return (
     <motion.div
       key={`dialog-description-${uniqueId}`}
       layoutId={
-        disableLayoutAnimation
+        disableLayoutAnimation || !isRichMotion
           ? undefined
           : `dialog-description-content-${uniqueId}`
       }
@@ -398,14 +445,14 @@ function MorphingDialogImage({
   className,
   style,
 }: MorphingDialogImageProps) {
-  const { uniqueId } = useMorphingDialog();
+  const { uniqueId, isRichMotion } = useMorphingDialog();
 
   return (
     <motion.img
       src={src}
       alt={alt}
       className={cn(className)}
-      layoutId={`dialog-img-${uniqueId}`}
+      layoutId={isRichMotion ? `dialog-img-${uniqueId}` : undefined}
       style={style}
     />
   );

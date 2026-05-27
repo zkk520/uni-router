@@ -150,6 +150,10 @@
             "zh_hant": "Chinese (Traditional)",
             "en": "English"
         },
+        "advancedMotion": {
+            "label": "Advanced Motion",
+            "description": "Use richer morphing and transition animations. Turn it off for smoother interaction on slower devices."
+        },
         "proxyUrl": {
             "label": "Proxy URL",
             "placeholder": "Enter proxy URL"

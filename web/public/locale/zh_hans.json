@@ -150,6 +150,10 @@
             "zh_hant": "繁体中文",
             "en": "English"
         },
+        "advancedMotion": {
+            "label": "高级动效",
+            "description": "开启后使用更多变形和过渡动画；关闭时优先保证低性能设备流畅。"
+        },
         "proxyUrl": {
             "label": "代理地址",
             "placeholder": "请输入代理地址"

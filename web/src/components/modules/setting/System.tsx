@@ -48,15 +48,14 @@ export function SettingSystem() {
     const [corsInputValue, setCorsInputValue] = useState('');
     const [backendPort, setBackendPort] = useState('');
     const [frontendPort, setFrontendPort] = useState('');
+    const [initialBackendPortValue, setInitialBackendPortValue] = useState('');
+    const [initialFrontendPortValue, setInitialFrontendPortValue] = useState('');
     const [confirmPortsOpen, setConfirmPortsOpen] = useState(false);
     const [portConflict, setPortConflict] = useState<PortConflictData | null>(null);
 
     const initialProxyUrl = useRef('');
     const initialStatsSaveInterval = useRef('');
     const initialCorsAllowOrigins = useRef('');
-    const initialBackendPort = useRef('');
-    const initialFrontendPort = useRef('');
-
     useEffect(() => {
         if (settings) {
             const proxy = settings.find(s => s.key === SettingKey.ProxyURL);
@@ -84,9 +83,9 @@ export function SettingSystem() {
         queueMicrotask(() => {
             setBackendPort(backend);
             setFrontendPort(frontend);
+            setInitialBackendPortValue(backend);
+            setInitialFrontendPortValue(frontend);
         });
-        initialBackendPort.current = backend;
-        initialFrontendPort.current = frontend;
     }, [portsInfo]);
 
     const handleSave = (key: string, value: string, initialValue: string) => {
@@ -160,8 +159,8 @@ export function SettingSystem() {
         saveCorsAllowOrigins(nextOrigins);
     };
 
-    const portsChanged = backendPort !== initialBackendPort.current
-        || (portsInfo?.frontend_port_configurable && frontendPort !== initialFrontendPort.current);
+    const portsChanged = backendPort !== initialBackendPortValue
+        || (portsInfo?.frontend_port_configurable && frontendPort !== initialFrontendPortValue);
 
     const buildPortsPayload = () => {
         const parsedBackendPort = parsePort(backendPort);
@@ -195,8 +194,8 @@ export function SettingSystem() {
         setPorts.mutate(payload, {
             onSuccess: (data) => {
                 setConfirmPortsOpen(false);
-                initialBackendPort.current = String(data.backend_port);
-                initialFrontendPort.current = String(data.frontend_port);
+                setInitialBackendPortValue(String(data.backend_port));
+                setInitialFrontendPortValue(String(data.frontend_port));
                 toast.success(t('ports.restartSuccess'));
                 const targetURL = data.debug && data.frontend_port_configurable ? data.frontend_url : data.backend_url;
                 window.setTimeout(() => {

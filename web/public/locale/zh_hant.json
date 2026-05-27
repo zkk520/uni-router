@@ -150,6 +150,10 @@
             "zh_hant": "繁體中文",
             "en": "English"
         },
+        "advancedMotion": {
+            "label": "進階動效",
+            "description": "開啟後使用更多變形和過渡動畫；關閉時優先保證低效能裝置流暢。"
+        },
         "proxyUrl": {
             "label": "代理位址",
             "placeholder": "請輸入代理位址"

@@ -2,14 +2,15 @@
 
 import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
-import { Sun, Moon, Monitor, Languages } from 'lucide-react';
+import { Sun, Moon, Monitor, Languages, Sparkles } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useSettingStore, type Locale } from '@/stores/setting';
 
 export function SettingAppearance() {
     const t = useTranslations('setting');
     const { theme, setTheme } = useTheme();
-    const { locale, setLocale } = useSettingStore();
+    const { locale, setLocale, advancedMotionEnabled, setAdvancedMotionEnabled } = useSettingStore();
 
     return (
         <div className="rounded-3xl border border-border bg-card p-6 space-y-5">
@@ -61,6 +62,24 @@ export function SettingAppearance() {
                         <SelectItem value="en" className="rounded-xl">{t('language.en')}</SelectItem>
                     </SelectContent>
                 </Select>
+            </div>
+
+            {/* 高级动效 */}
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                    <Sparkles className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                        <div className="text-sm font-medium">{t('advancedMotion.label')}</div>
+                        <div className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {t('advancedMotion.description')}
+                        </div>
+                    </div>
+                </div>
+                <Switch
+                    checked={advancedMotionEnabled}
+                    onCheckedChange={setAdvancedMotionEnabled}
+                    aria-label={t('advancedMotion.label')}
+                />
             </div>
         </div>
     );

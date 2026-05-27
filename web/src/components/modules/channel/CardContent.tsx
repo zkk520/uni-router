@@ -18,7 +18,6 @@ import {
     MorphingDialogClose,
     useMorphingDialog,
 } from '@/components/ui/morphing-dialog';
-import { Tabs, TabsContents, TabsContent } from '@/components/animate-ui/primitives/animate/tabs';
 import { type StatsMetricsFormatted } from '@/api/endpoints/stats';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -49,13 +48,8 @@ function channelTypeLabel(type: ChannelType) {
     }
 }
 
-export function CardContent({ channel, stats }: { channel: Channel; stats: StatsMetricsFormatted }) {
-    const { setIsOpen } = useMorphingDialog();
-    const updateChannel = useUpdateChannel();
-    const deleteChannel = useDeleteChannel();
-    const [isEditing, setIsEditing] = useState(false);
-    const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-    const [formData, setFormData] = useState<ChannelFormData>({
+function createChannelFormData(channel: Channel): ChannelFormData {
+    return {
         name: channel.name,
         type: channel.type,
         enabled: channel.enabled,
@@ -85,10 +79,17 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         auto_sync: channel.auto_sync,
         match_regex: channel.match_regex ?? '',
         pricing_rule: normalizePricingRule(channel.pricing_rule),
-    });
-    const t = useTranslations('channel.detail');
+    };
+}
 
-    const currentView = isEditing ? 'editing' : 'viewing';
+export function CardContent({ channel, stats }: { channel: Channel; stats: StatsMetricsFormatted }) {
+    const { setIsOpen } = useMorphingDialog();
+    const updateChannel = useUpdateChannel();
+    const deleteChannel = useDeleteChannel();
+    const [isEditing, setIsEditing] = useState(false);
+    const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+    const [formData, setFormData] = useState<ChannelFormData | null>(null);
+    const t = useTranslations('channel.detail');
 
     const baseUrlsEqual = (a: Channel['base_urls'] | undefined, b: Channel['base_urls'] | undefined) =>
         JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
@@ -99,6 +100,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
 
     const handleUpdate = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        if (!formData) return;
         const req: UpdateChannelRequest = { id: channel.id };
 
         // only send changed fields to avoid accidental clears
@@ -191,6 +193,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         updateChannel.mutate(req, {
             onSuccess: () => {
                 setIsEditing(false);
+                setFormData(null);
                 setIsOpen(false);
             },
             onError: (error) => {
@@ -198,6 +201,17 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                 toast.error(t('actions.saveFailed'), { description: errorMessage });
             }
         });
+    };
+
+    const handleEditClick = () => {
+        setIsConfirmingDelete(false);
+        setFormData(createChannelFormData(channel));
+        setIsEditing(true);
+    };
+
+    const handleCancelEdit = () => {
+        setIsEditing(false);
+        setFormData(null);
     };
 
     const handleDeleteClick = () => {
@@ -230,10 +244,9 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                 </header>
             </MorphingDialogTitle>
 
-            <MorphingDialogDescription>
-                <Tabs value={currentView}>
-                    <TabsContents>
-                        <TabsContent value="viewing" >
+            <MorphingDialogDescription disableLayoutAnimation>
+                {!isEditing ? (
+                    <>
                             <div className="max-h-[60vh] overflow-y-auto space-y-4 sm:space-y-5">
                                 <dl className="grid gap-3 grid-cols-1 sm:grid-cols-3">
                                     <div className="rounded-2xl border bg-linear-to-br from-chart-1/10 to-chart-1/5 p-3 sm:p-4">
@@ -501,7 +514,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                             {/* 操作按钮 */}
                             <div className="grid gap-3 sm:grid-cols-2 pt-2">
                                 <Button
-                                    onClick={() => (isConfirmingDelete ? setIsConfirmingDelete(false) : setIsEditing(true))}
+                                    onClick={() => (isConfirmingDelete ? setIsConfirmingDelete(false) : handleEditClick())}
                                     variant={isConfirmingDelete ? 'secondary' : 'default'}
                                     className="w-full rounded-2xl h-12"
                                 >
@@ -521,9 +534,8 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                             : t('actions.delete')}
                                 </Button>
                             </div>
-                        </TabsContent>
-
-                        <TabsContent value="editing">
+                    </>
+                ) : formData ? (
                             <ChannelForm
                                 formData={formData}
                                 onFormDataChange={setFormData}
@@ -531,13 +543,11 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                 isPending={updateChannel.isPending}
                                 submitText={t('actions.save')}
                                 pendingText={t('actions.saving')}
-                                onCancel={() => setIsEditing(false)}
+                                onCancel={handleCancelEdit}
                                 cancelText={t('actions.cancel')}
                                 idPrefix="channel"
                             />
-                        </TabsContent>
-                    </TabsContents>
-                </Tabs>
+                ) : null}
             </MorphingDialogDescription>
         </>
     );
