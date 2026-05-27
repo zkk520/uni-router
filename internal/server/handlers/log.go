@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"github.com/zkk520/uni-router/internal/server/middleware"
 	"github.com/zkk520/uni-router/internal/server/resp"
 	"github.com/zkk520/uni-router/internal/server/router"
+	"gorm.io/gorm"
 )
 
 func init() {
@@ -23,6 +25,10 @@ func init() {
 		AddRoute(
 			router.NewRoute("/clear", http.MethodDelete).
 				Handle(clearLog),
+		).
+		AddRoute(
+			router.NewRoute("/detail", http.MethodGet).
+				Handle(detailLog),
 		).
 		AddRoute(
 			router.NewRoute("/stream-token", http.MethodGet).
@@ -45,6 +51,7 @@ func listLog(c *gin.Context) {
 	routerID, _ := strconv.Atoi(c.Query("router_id"))
 	endpointID, _ := strconv.Atoi(c.Query("endpoint_id"))
 	status := c.Query("status")
+	includeContent, _ := strconv.ParseBool(c.DefaultQuery("include_content", "true"))
 
 	if page < 1 {
 		page = 1
@@ -69,20 +76,52 @@ func listLog(c *gin.Context) {
 		endTime = &et
 	}
 
-	logs, err := op.RelayLogListWithFilter(c.Request.Context(), op.RelayLogFilter{
+	filter := op.RelayLogFilter{
 		StartTime:  startTime,
 		EndTime:    endTime,
 		APIKeyName: apiKeyName,
 		RouterID:   routerID,
 		EndpointID: endpointID,
 		Status:     status,
-	}, page, pageSize)
+	}
+
+	if !includeContent {
+		logs, err := op.RelayLogSummaryListWithFilter(c.Request.Context(), filter, page, pageSize)
+		if err != nil {
+			resp.Error(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		resp.Success(c, logs)
+		return
+	}
+
+	logs, err := op.RelayLogListWithFilter(c.Request.Context(), filter, page, pageSize)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	resp.Success(c, logs)
+}
+
+func detailLog(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Query("id"), 10, 64)
+	if err != nil || id <= 0 {
+		resp.Error(c, http.StatusBadRequest, "invalid log id")
+		return
+	}
+
+	relayLog, err := op.RelayLogGet(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			resp.Error(c, http.StatusNotFound, "log not found")
+			return
+		}
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	resp.Success(c, relayLog)
 }
 
 func clearLog(c *gin.Context) {
@@ -129,7 +168,7 @@ func streamLog(c *gin.Context) {
 			if !ok {
 				return
 			}
-			data, err := json.Marshal(log)
+			data, err := json.Marshal(op.RelayLogToSummary(log))
 			if err != nil {
 				continue
 			}

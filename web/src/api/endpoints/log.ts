@@ -1,5 +1,5 @@
 import type { InfiniteData } from '@tanstack/react-query';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient, API_BASE_URL } from '../client';
 import { logger } from '@/lib/logger';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -57,6 +57,10 @@ export interface RelayLog {
     total_cost_by_currency?: Record<string, CostCurrencyMetrics>;
     request_content: string;     // 请求内容
     response_content: string;    // 响应内容
+    request_content_length?: number;
+    response_content_length?: number;
+    has_request_content?: boolean;
+    has_response_content?: boolean;
     error: string;               // 错误信息
     attempts?: ChannelAttempt[]; // 所有尝试记录
     total_attempts?: number;     // 总尝试次数
@@ -125,6 +129,28 @@ function logMatchesFilters(log: RelayLog, filters: ReturnType<typeof normalizeFi
 }
 
 const logsInfiniteQueryKey = (pageSize: number, filters: ReturnType<typeof normalizeFilters>) => ['logs', 'infinite', pageSize, filters] as const;
+const logDetailQueryKey = (id: number) => ['logs', 'detail', id] as const;
+
+function toLogSummary(log: RelayLog): RelayLog {
+    return {
+        ...log,
+        request_content_length: log.request_content_length ?? log.request_content?.length ?? 0,
+        response_content_length: log.response_content_length ?? log.response_content?.length ?? 0,
+        has_request_content: log.has_request_content ?? !!log.request_content,
+        has_response_content: log.has_response_content ?? !!log.response_content,
+        request_content: '',
+        response_content: '',
+    };
+}
+
+export function useLogDetail(id: number | undefined, enabled: boolean) {
+    return useQuery({
+        queryKey: logDetailQueryKey(id ?? 0),
+        queryFn: () => apiClient.get<RelayLog>(`/api/v1/log/detail?id=${id}`),
+        enabled: enabled && !!id,
+        staleTime: 5 * 60 * 1000,
+    });
+}
 
 /**
  * 日志管理 Hook
@@ -156,6 +182,7 @@ export function useLogs(options: { pageSize?: number; filters?: Omit<LogListPara
             const params = new URLSearchParams();
             params.set('page', String(pageParam));
             params.set('page_size', String(pageSize));
+            params.set('include_content', 'false');
             if (filters.start_time != null) params.set('start_time', String(filters.start_time));
             if (filters.end_time != null) params.set('end_time', String(filters.end_time));
             if (filters.api_key_name) params.set('api_key_name', filters.api_key_name);
@@ -163,7 +190,7 @@ export function useLogs(options: { pageSize?: number; filters?: Omit<LogListPara
             if (filters.endpoint_id) params.set('endpoint_id', String(filters.endpoint_id));
             if (filters.status) params.set('status', filters.status);
             const result = await apiClient.get<RelayLog[] | null>(`/api/v1/log/list?${params.toString()}`);
-            return result ?? [];
+            return (result ?? []).map(toLogSummary);
         },
         getNextPageParam: (lastPage, allPages) => {
             if (!lastPage || lastPage.length < pageSize) return undefined;
@@ -203,9 +230,27 @@ export function useLogs(options: { pageSize?: number; filters?: Omit<LogListPara
 
     useEffect(() => {
         let cancelled = false;
+        let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+        let reconnectAttempt = 0;
+
+        const closeCurrent = () => {
+            eventSourceRef.current?.close();
+            eventSourceRef.current = null;
+        };
+
+        const scheduleReconnect = () => {
+            if (cancelled) return;
+            const delay = Math.min(30000, 1000 * 2 ** reconnectAttempt);
+            reconnectAttempt += 1;
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                void connect();
+            }, delay);
+        };
 
         const connect = async () => {
             try {
+                closeCurrent();
                 const { token } = await apiClient.get<{ token: string }>('/api/v1/log/stream-token');
                 if (cancelled) return;
 
@@ -215,11 +260,12 @@ export function useLogs(options: { pageSize?: number; filters?: Omit<LogListPara
                 eventSource.onopen = () => {
                     setIsConnected(true);
                     setError(null);
+                    reconnectAttempt = 0;
                 };
 
                 eventSource.onmessage = (event) => {
                     try {
-                        const log: RelayLog = JSON.parse(event.data);
+                        const log: RelayLog = toLogSummary(JSON.parse(event.data));
                         if (!logMatchesFilters(log, filters)) return;
                         queryClient.setQueryData(
                             logsInfiniteQueryKey(pageSize, filters),
@@ -243,13 +289,14 @@ export function useLogs(options: { pageSize?: number; filters?: Omit<LogListPara
                 eventSource.onerror = () => {
                     setIsConnected(false);
                     setError(new Error('SSE 连接断开'));
-                    eventSource.close();
-                    eventSourceRef.current = null;
+                    closeCurrent();
+                    scheduleReconnect();
                 };
             } catch (e) {
                 if (cancelled) return;
                 setError(e instanceof Error ? e : new Error('获取 stream token 失败'));
                 logger.error('获取 stream token 失败:', e);
+                scheduleReconnect();
             }
         };
 
@@ -257,8 +304,8 @@ export function useLogs(options: { pageSize?: number; filters?: Omit<LogListPara
 
         return () => {
             cancelled = true;
-            eventSourceRef.current?.close();
-            eventSourceRef.current = null;
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            closeCurrent();
             setIsConnected(false);
         };
     }, [filters, pageSize, queryClient]);

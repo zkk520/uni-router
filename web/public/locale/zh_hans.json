@@ -451,6 +451,8 @@
             "responseContent": "响应内容",
             "noRequestContent": "(无请求内容)",
             "noResponseContent": "(无响应内容)",
+            "detailLoadFailed": "日志详情加载失败",
+            "retry": "重试",
             "firstTokenTime": "首字时间",
             "tokens": "tokens",
             "retryDetails": "重试详情",

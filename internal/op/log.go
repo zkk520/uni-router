@@ -6,15 +6,18 @@ import (
 	"encoding/hex"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/zkk520/uni-router/internal/db"
 	"github.com/zkk520/uni-router/internal/model"
 	"github.com/zkk520/uni-router/internal/utils/log"
 	"github.com/zkk520/uni-router/internal/utils/snowflake"
+	"gorm.io/gorm"
 )
 
 const relayLogMaxSize = 20
 const relayLogMaxSizeNoDB = 100 // 当不保存到数据库时，允许更大的缓存用于实时查询
+const relayLogContentTruncatedSuffix = "...(truncated)"
 
 var relayLogCache = make([]model.RelayLog, 0, relayLogMaxSize)
 var relayLogCacheLock sync.Mutex
@@ -119,6 +122,9 @@ func RelayLogAdd(ctx context.Context, relayLog model.RelayLog) error {
 	if err != nil {
 		return err
 	}
+	if err := relayLogApplyContentLimits(&relayLog); err != nil {
+		return err
+	}
 	maxSize := relayLogMaxSize
 	if !enabled {
 		maxSize = relayLogMaxSizeNoDB
@@ -141,6 +147,43 @@ func RelayLogAdd(ctx context.Context, relayLog model.RelayLog) error {
 	}
 	relayLogCacheLock.Unlock()
 	return nil
+}
+
+func relayLogApplyContentLimits(relayLog *model.RelayLog) error {
+	requestMaxBytes, err := SettingGetInt(model.SettingKeyRelayLogRequestMaxBytes)
+	if err != nil {
+		return err
+	}
+	responseMaxBytes, err := SettingGetInt(model.SettingKeyRelayLogResponseMaxBytes)
+	if err != nil {
+		return err
+	}
+	relayLog.RequestContent = truncateRelayLogContent(relayLog.RequestContent, requestMaxBytes)
+	relayLog.ResponseContent = truncateRelayLogContent(relayLog.ResponseContent, responseMaxBytes)
+	return nil
+}
+
+func truncateRelayLogContent(content string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(content) <= maxBytes {
+		return content
+	}
+	suffix := relayLogContentTruncatedSuffix
+	if maxBytes <= len(suffix) {
+		return suffix[:maxBytes]
+	}
+	cutLimit := maxBytes - len(suffix)
+	cut := 0
+	for idx, r := range content {
+		next := idx + utf8.RuneLen(r)
+		if next > cutLimit {
+			break
+		}
+		cut = next
+	}
+	return content[:cut] + suffix
 }
 
 func RelayLogSaveDBTask(ctx context.Context) error {
@@ -275,6 +318,149 @@ func RelayLogListWithFilter(ctx context.Context, filter RelayLogFilter, page, pa
 	}
 
 	return result, nil
+}
+
+func RelayLogSummaryListWithFilter(ctx context.Context, filter RelayLogFilter, page, pageSize int) ([]model.RelayLogSummary, error) {
+	enabled, err := SettingGetBool(model.SettingKeyRelayLogKeepEnabled)
+	if err != nil {
+		return nil, err
+	}
+	hasTimeFilter := filter.StartTime != nil && filter.EndTime != nil
+
+	relayLogCacheLock.Lock()
+	var cachedLogs []model.RelayLogSummary
+	for _, item := range relayLogCache {
+		if relayLogMatchFilter(item, filter, hasTimeFilter) {
+			cachedLogs = append(cachedLogs, RelayLogToSummary(item))
+		}
+	}
+	relayLogCacheLock.Unlock()
+
+	for i, j := 0, len(cachedLogs)-1; i < j; i, j = i+1, j-1 {
+		cachedLogs[i], cachedLogs[j] = cachedLogs[j], cachedLogs[i]
+	}
+
+	cacheCount := len(cachedLogs)
+	offset := (page - 1) * pageSize
+	result := make([]model.RelayLogSummary, 0, pageSize)
+
+	if offset < cacheCount {
+		cacheEnd := offset + pageSize
+		if cacheEnd > cacheCount {
+			cacheEnd = cacheCount
+		}
+		result = append(result, cachedLogs[offset:cacheEnd]...)
+	}
+
+	if enabled {
+		remaining := pageSize - len(result)
+		if remaining > 0 {
+			dbOffset := 0
+			if offset > cacheCount {
+				dbOffset = offset - cacheCount
+			}
+			query := applyRelayLogFilter(db.GetDB().WithContext(ctx).Model(&model.RelayLog{}), filter, hasTimeFilter)
+
+			var dbLogs []model.RelayLogSummary
+			if err := query.Select(relayLogSummarySelect()).
+				Order("id DESC").
+				Offset(dbOffset).
+				Limit(remaining).
+				Scan(&dbLogs).Error; err != nil {
+				return nil, err
+			}
+			result = append(result, dbLogs...)
+		}
+	}
+
+	return result, nil
+}
+
+func RelayLogGet(ctx context.Context, id int64) (model.RelayLog, error) {
+	relayLogCacheLock.Lock()
+	for _, item := range relayLogCache {
+		if item.ID == id {
+			relayLogCacheLock.Unlock()
+			return item, nil
+		}
+	}
+	relayLogCacheLock.Unlock()
+
+	var relayLog model.RelayLog
+	err := db.GetDB().WithContext(ctx).First(&relayLog, "id = ?", id).Error
+	return relayLog, err
+}
+
+func RelayLogToSummary(relayLog model.RelayLog) model.RelayLogSummary {
+	summary := model.RelayLogSummary{
+		RelayLog:              relayLog,
+		RequestContentLength:  len(relayLog.RequestContent),
+		ResponseContentLength: len(relayLog.ResponseContent),
+		HasRequestContent:     relayLog.RequestContent != "",
+		HasResponseContent:    relayLog.ResponseContent != "",
+	}
+	summary.RequestContent = ""
+	summary.ResponseContent = ""
+	return summary
+}
+
+func relayLogSummarySelect() []string {
+	return []string{
+		"id",
+		"time",
+		"request_model_name",
+		"request_api_key_name",
+		"router_id",
+		"router_name",
+		"endpoint_id",
+		"endpoint_name",
+		"channel_id",
+		"channel_key_id",
+		"channel_name",
+		"actual_model_name",
+		"input_tokens",
+		"output_tokens",
+		"ftut",
+		"use_time",
+		"cost",
+		"cost_currency",
+		"cost_currency_symbol",
+		"pricing_multiplier",
+		"pricing_unit",
+		"pricing_rule_source",
+		"input_cost_by_currency",
+		"output_cost_by_currency",
+		"total_cost_by_currency",
+		"error",
+		"attempts",
+		"total_attempts",
+		"LENGTH(request_content) AS request_content_length",
+		"LENGTH(response_content) AS response_content_length",
+		"CASE WHEN request_content <> '' THEN 1 ELSE 0 END AS has_request_content",
+		"CASE WHEN response_content <> '' THEN 1 ELSE 0 END AS has_response_content",
+	}
+}
+
+func applyRelayLogFilter(query *gorm.DB, filter RelayLogFilter, hasTimeFilter bool) *gorm.DB {
+	if hasTimeFilter {
+		query = query.Where("time >= ? AND time <= ?", *filter.StartTime, *filter.EndTime)
+	}
+	if filter.APIKeyName != "" {
+		query = query.Where("request_api_key_name = ?", filter.APIKeyName)
+	}
+	if filter.RouterID > 0 {
+		query = query.Where("router_id = ?", filter.RouterID)
+	}
+	if filter.EndpointID > 0 {
+		query = query.Where("endpoint_id = ?", filter.EndpointID)
+	}
+	if filter.Status == "success" {
+		query = query.Where("error = ''")
+	}
+	if filter.Status == "failed" {
+		query = query.Where("error <> ''")
+	}
+	return query
 }
 
 func relayLogMatchFilter(item model.RelayLog, filter RelayLogFilter, hasTimeFilter bool) bool {

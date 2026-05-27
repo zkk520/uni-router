@@ -57,3 +57,11 @@ type RelayLog struct {
 	Attempts             []ChannelAttempt               `json:"attempts" gorm:"serializer:json"` // 所有尝试记录
 	TotalAttempts        int                            `json:"total_attempts"`                  // 总尝试次数
 }
+
+type RelayLogSummary struct {
+	RelayLog
+	RequestContentLength  int  `json:"request_content_length"`
+	ResponseContentLength int  `json:"response_content_length"`
+	HasRequestContent     bool `json:"has_request_content"`
+	HasResponseContent    bool `json:"has_response_content"`
+}

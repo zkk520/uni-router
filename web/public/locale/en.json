@@ -451,6 +451,8 @@
             "responseContent": "Response Content",
             "noRequestContent": "(No request content)",
             "noResponseContent": "(No response content)",
+            "detailLoadFailed": "Failed to load log detail",
+            "retry": "Retry",
             "firstTokenTime": "First Token Time",
             "tokens": "tokens",
             "retryDetails": "Retry Details",

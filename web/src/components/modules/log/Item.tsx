@@ -8,7 +8,7 @@ import JsonView from '@uiw/react-json-view';
 import { githubDarkTheme } from '@uiw/react-json-view/githubDark';
 import { githubLightTheme } from '@uiw/react-json-view/githubLight';
 import { useTheme } from 'next-themes';
-import { type RelayLog, type ChannelAttempt } from '@/api/endpoints/log';
+import { type RelayLog, type ChannelAttempt, useLogDetail } from '@/api/endpoints/log';
 import { getModelIcon } from '@/lib/model-icons';
 import { Badge } from '@/components/ui/badge';
 import { cn, formatCurrencyCosts } from '@/lib/utils';
@@ -175,10 +175,25 @@ function RetryBadgeWithTooltip({ channelName, brandColor, attempts }: RetryBadge
     );
 }
 
-function DeferredJsonContent({ content, fallbackText }: { content: string | undefined; fallbackText: string }) {
+function DeferredJsonContent({
+    log,
+    contentField,
+    fallbackText,
+}: {
+    log: RelayLog;
+    contentField: 'request_content' | 'response_content';
+    fallbackText: string;
+}) {
+    const t = useTranslations('log.card');
     const { resolvedTheme } = useTheme();
     const { isOpen } = useMorphingDialog();
     const [shouldRender, setShouldRender] = useState(false);
+    const hasContent = contentField === 'request_content'
+        ? log.has_request_content ?? !!log.request_content
+        : log.has_response_content ?? !!log.response_content;
+    const initialContent = log[contentField];
+    const detail = useLogDetail(log.id, isOpen && hasContent && !initialContent);
+    const content = detail.data?.[contentField] ?? initialContent;
 
     const parsed = useMemo(() => {
         if (!content) return { isJson: false, data: null };
@@ -199,6 +214,30 @@ function DeferredJsonContent({ content, fallbackText }: { content: string | unde
     if (!isOpen) {
         if (shouldRender) setShouldRender(false);
         return null;
+    }
+
+    if (detail.isLoading && !content) {
+        return (
+            <div className="p-4 flex items-center justify-center h-full">
+                <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+            </div>
+        );
+    }
+
+    if (detail.isError && !content) {
+        return (
+            <div className="p-4 flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <span>{t('detailLoadFailed')}</span>
+                <button
+                    type="button"
+                    onClick={() => void detail.refetch()}
+                    className="rounded-xl border border-border px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
+                >
+                    {t('retry')}
+                </button>
+            </div>
+        );
     }
 
     if (!content) {
@@ -578,7 +617,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                                 </Badge>
                                             </div>
                                             <div className="flex-1 overflow-auto min-h-0">
-                                                <DeferredJsonContent content={log.request_content} fallbackText={t('noRequestContent')} />
+                                                <DeferredJsonContent log={log} contentField="request_content" fallbackText={t('noRequestContent')} />
                                             </div>
                                         </div>
                                         <div className="flex flex-col rounded-2xl border border-border bg-muted/30 overflow-hidden min-h-0">
@@ -590,7 +629,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                                 </Badge>
                                             </div>
                                             <div className="flex-1 overflow-auto min-h-0">
-                                                <DeferredJsonContent content={log.response_content} fallbackText={t('noResponseContent')} />
+                                                <DeferredJsonContent log={log} contentField="response_content" fallbackText={t('noResponseContent')} />
                                             </div>
                                         </div>
                                     </div>

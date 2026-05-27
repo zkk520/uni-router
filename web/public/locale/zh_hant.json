@@ -451,6 +451,8 @@
             "responseContent": "響應內容",
             "noRequestContent": "(無請求內容)",
             "noResponseContent": "(無響應內容)",
+            "detailLoadFailed": "日誌詳情載入失敗",
+            "retry": "重試",
             "firstTokenTime": "首字時間",
             "tokens": "tokens",
             "retryDetails": "重試詳情",
