@@ -16,13 +16,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CONTENT_MAP } from '@/route';
 import { apiClient } from '@/api/client';
 import { logger } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
+import { LogOut } from 'lucide-react';
 
 function timeout(ms: number) {
     return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 export function AppContainer() {
-    const { isAuthenticated, isAPIKeyAuth, isLoading: authLoading } = useAuth();
+    const { isAuthenticated, isAPIKeyAuth, isLoading: authLoading, logout } = useAuth();
     const { activeItem, direction } = useNavStore();
     const t = useTranslations('navbar');
     const queryClient = useQueryClient();
@@ -161,6 +163,13 @@ export function AppContainer() {
         !logoAnimationComplete ||
         (isAuthenticated && !bootstrapComplete);
 
+    const handleAdminLogout = () => {
+        queryClient.clear();
+        bootstrapStartedRef.current = false;
+        setBootstrapComplete(false);
+        logout();
+    };
+
     // 加载页面
     if (isLoading) {
         return (
@@ -230,8 +239,18 @@ export function AppContainer() {
                             </motion.div>
                         </AnimatePresence>
                     </div>
-                    <div className="ml-auto">
+                    <div className="ml-auto flex shrink-0 items-center gap-2">
                         <Toolbar />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleAdminLogout}
+                            className="rounded-xl hover:bg-destructive/10 hover:text-destructive"
+                            aria-label={t('logout')}
+                            title={t('logout')}
+                        >
+                            <LogOut className="size-4" />
+                        </Button>
                     </div>
                 </header>
                 <AnimatePresence mode="wait" initial={false}>

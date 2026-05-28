@@ -50,7 +50,8 @@
         "model": "價格",
         "log": "日誌",
         "token": "令牌管理",
-        "setting": "設定"
+        "setting": "設定",
+        "logout": "登出"
     },
     "toolbar": {
         "popover": {

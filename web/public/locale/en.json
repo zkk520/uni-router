@@ -50,7 +50,8 @@
         "model": "Price",
         "log": "Log",
         "token": "Tokens",
-        "setting": "Setting"
+        "setting": "Setting",
+        "logout": "Logout"
     },
     "toolbar": {
         "popover": {
