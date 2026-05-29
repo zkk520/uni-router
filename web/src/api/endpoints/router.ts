@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import type { Channel, ChannelType, PricingRule } from './channel';
 import type { APIKey } from './apikey';
@@ -70,9 +70,74 @@ export interface RouteProfileUpdateRequest {
     endpoints_to_delete?: number[];
 }
 
+const routerListQueryKey = ['routers', 'list'] as const;
+const routerDetailQueryKey = (id: number) => ['routers', 'detail', id] as const;
+
+type RouterCacheSnapshot = {
+    list?: RouteProfile[];
+    detail?: RouteProfile;
+};
+
+function mergeRoute(router: RouteProfile, next: RouteProfile) {
+    return { ...router, ...next };
+}
+
+function applyRouteCache(queryClient: QueryClient, router: RouteProfile) {
+    queryClient.setQueryData<RouteProfile>(routerDetailQueryKey(router.id), router);
+    queryClient.setQueryData<RouteProfile[]>(routerListQueryKey, (current) =>
+        current?.map((item) => item.id === router.id ? mergeRoute(item, router) : item)
+    );
+}
+
+function patchRouteCache(
+    queryClient: QueryClient,
+    routerID: number,
+    patcher: (router: RouteProfile) => RouteProfile
+) {
+    queryClient.setQueryData<RouteProfile>(routerDetailQueryKey(routerID), (current) =>
+        current ? patcher(current) : current
+    );
+    queryClient.setQueryData<RouteProfile[]>(routerListQueryKey, (current) =>
+        current?.map((item) => item.id === routerID ? patcher(item) : item)
+    );
+}
+
+function restoreRouteCache(queryClient: QueryClient, routerID: number, snapshot?: RouterCacheSnapshot) {
+    if (!snapshot) return;
+    queryClient.setQueryData(routerListQueryKey, snapshot.list);
+    queryClient.setQueryData(routerDetailQueryKey(routerID), snapshot.detail);
+}
+
+function routeCacheSnapshot(queryClient: QueryClient, routerID: number): RouterCacheSnapshot {
+    return {
+        list: queryClient.getQueryData<RouteProfile[]>(routerListQueryKey),
+        detail: queryClient.getQueryData<RouteProfile>(routerDetailQueryKey(routerID)),
+    };
+}
+
+function canOptimisticallyUpdateRoute(data: RouteProfileUpdateRequest) {
+    return !data.endpoints_to_add?.length && !data.endpoints_to_delete?.length;
+}
+
+function applyRouteUpdate(router: RouteProfile, data: RouteProfileUpdateRequest): RouteProfile {
+    const next: RouteProfile = { ...router };
+    if (data.name !== undefined) next.name = data.name;
+    if (data.mode !== undefined) next.mode = data.mode;
+    if (data.preferred_endpoint_id !== undefined) next.preferred_endpoint_id = data.preferred_endpoint_id;
+    if (data.failover_enabled !== undefined) next.failover_enabled = data.failover_enabled;
+    if (data.endpoints_to_update?.length && router.endpoints) {
+        const updates = new Map(data.endpoints_to_update.map((endpoint) => [endpoint.id, endpoint]));
+        next.endpoints = router.endpoints.map((endpoint) => {
+            const update = updates.get(endpoint.id);
+            return update ? { ...endpoint, ...update } : endpoint;
+        });
+    }
+    return next;
+}
+
 export function useRouterList() {
     return useQuery({
-        queryKey: ['routers', 'list'],
+        queryKey: routerListQueryKey,
         queryFn: () => apiClient.get<RouteProfile[]>('/api/v1/router/list'),
         refetchInterval: 30000,
     });
@@ -107,7 +172,19 @@ export function useUpdateRouter() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (data: RouteProfileUpdateRequest) => apiClient.post<RouteProfile>('/api/v1/router/update', data),
-        onSuccess: (_, variables) => {
+        onMutate: async (variables) => {
+            await queryClient.cancelQueries({ queryKey: ['routers'] });
+            const snapshot = routeCacheSnapshot(queryClient, variables.id);
+            if (canOptimisticallyUpdateRoute(variables)) {
+                patchRouteCache(queryClient, variables.id, (router) => applyRouteUpdate(router, variables));
+            }
+            return { snapshot };
+        },
+        onError: (_, variables, context) => {
+            restoreRouteCache(queryClient, variables.id, context?.snapshot);
+        },
+        onSuccess: (router, variables) => {
+            applyRouteCache(queryClient, router);
             queryClient.invalidateQueries({ queryKey: ['routers'] });
             queryClient.invalidateQueries({ queryKey: ['routers', 'detail', variables.id] });
         },
@@ -127,7 +204,20 @@ export function useSwitchRouterEndpoint() {
     return useMutation({
         mutationFn: (data: { router_id: number; endpoint_id: number }) =>
             apiClient.post<RouteProfile>('/api/v1/router/switch', data),
-        onSuccess: (_, variables) => {
+        onMutate: async (variables) => {
+            await queryClient.cancelQueries({ queryKey: ['routers'] });
+            const snapshot = routeCacheSnapshot(queryClient, variables.router_id);
+            patchRouteCache(queryClient, variables.router_id, (router) => ({
+                ...router,
+                preferred_endpoint_id: variables.endpoint_id,
+            }));
+            return { snapshot };
+        },
+        onError: (_, variables, context) => {
+            restoreRouteCache(queryClient, variables.router_id, context?.snapshot);
+        },
+        onSuccess: (router, variables) => {
+            applyRouteCache(queryClient, router);
             queryClient.invalidateQueries({ queryKey: ['routers'] });
             queryClient.invalidateQueries({ queryKey: ['routers', 'detail', variables.router_id] });
         },

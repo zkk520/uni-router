@@ -421,6 +421,16 @@ function RouterDetail({ routerId }: { routerId: number }) {
                         const current = router.preferred_endpoint_id === endpoint.id;
                         const invalid = !label.keyEnabled;
                         const duplicate = duplicateEndpointIds.has(endpoint.id);
+                        const isSwitchingEndpoint = switchEndpoint.isPending && switchEndpoint.variables?.endpoint_id === endpoint.id;
+                        const switchDisabledReason = current
+                            ? '当前使用'
+                            : !endpoint.enabled
+                                ? '请先启用端点'
+                                : invalid
+                                    ? '上游密钥无效'
+                                    : endpoint.status === 'error'
+                                        ? '端点状态异常，请先测试或修复'
+                                        : undefined;
                         const totalWeight = endpoints.reduce((sum, item) => sum + Math.max(1, item.weight || 1), 0);
                         const percent = Math.round((Math.max(1, endpoint.weight || 1) / totalWeight) * 100);
                         return (
@@ -472,12 +482,18 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                             <Button
                                                 variant={current ? 'secondary' : 'default'}
                                                 size="sm"
-                                                disabled={current || invalid || endpoint.status === 'error'}
+                                                disabled={!!switchDisabledReason || switchEndpoint.isPending}
+                                                title={switchDisabledReason}
                                                 onClick={() => switchEndpoint.mutate({ router_id: router.id, endpoint_id: endpoint.id }, {
                                                     onSuccess: () => toast.success(`已切换到 ${endpoint.name}`),
+                                                    onError: (error) => toast.error('切换端点失败', { description: error.message }),
                                                 })}
                                             >
-                                                <Check className="size-4 mr-1" />
+                                                {isSwitchingEndpoint ? (
+                                                    <Loader2 className="size-4 mr-1 animate-spin" />
+                                                ) : (
+                                                    <Check className="size-4 mr-1" />
+                                                )}
                                                 {current ? '当前使用' : '设为当前'}
                                             </Button>
                                         ) : (
@@ -549,7 +565,11 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                         />
                                     </label>
                                     <label className="flex items-center gap-2 pt-5 text-sm">
-                                        <Switch checked={endpoint.enabled} onCheckedChange={(checked) => updateEndpoint(endpoint, { enabled: checked })} />
+                                        <Switch
+                                            checked={endpoint.enabled}
+                                            disabled={updateRouter.isPending}
+                                            onCheckedChange={(checked) => updateEndpoint(endpoint, { enabled: checked })}
+                                        />
                                         启用
                                     </label>
                                 </div>
