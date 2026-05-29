@@ -198,7 +198,7 @@ export function Model() {
                                         className={cn(
                                             'px-3 pb-3',
                                             layout === 'grid'
-                                                ? 'grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
+                                                ? 'grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-3'
                                                 : 'grid gap-3'
                                         )}
                                     >

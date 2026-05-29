@@ -149,6 +149,28 @@ export const ModelItem = memo(function ModelItem({ model, layout = 'grid' }: Mod
     }, [isEditOpen, updateOverlayRect, closeEdit]);
 
     const shouldRenderEditPortal = isEditOpen || overlayRect !== null;
+    const priceMetrics = [
+        {
+            label: t('overlay.input'),
+            value: model.input,
+            icon: ArrowDownToLine,
+        },
+        {
+            label: t('overlay.output'),
+            value: model.output,
+            icon: ArrowUpFromLine,
+        },
+        {
+            label: t('overlay.cacheRead'),
+            value: model.cache_read,
+            icon: ArrowDownToLine,
+        },
+        {
+            label: t('overlay.cacheWrite'),
+            value: model.cache_write,
+            icon: ArrowUpFromLine,
+        },
+    ];
 
     return (
         <article
@@ -228,54 +250,31 @@ export const ModelItem = memo(function ModelItem({ model, layout = 'grid' }: Mod
                     </div>
                 </div>
             ) : (
-                <div className="flex items-center gap-3">
-                    <ModelAvatar size={52} />
-                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+                <div className="grid gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <ModelAvatar size={44} />
                         <Tooltip side="top" sideOffset={10} align="start">
-                            <TooltipTrigger className="truncate text-base font-semibold leading-tight text-card-foreground">
+                            <TooltipTrigger className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-card-foreground">
                                 {model.name}
                             </TooltipTrigger>
                             <TooltipContent key={model.name}>{model.name}</TooltipContent>
                         </Tooltip>
+                    </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2">
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <ArrowDownToLine className="size-3.5" style={{ color: brandColor }} />
-                                    {t('overlay.input')}
-                                </div>
-                                <div className="mt-1 text-sm font-medium text-card-foreground tabular-nums">
-                                    {model.input.toFixed(2)}$
-                                </div>
-                            </div>
-                            <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2">
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <ArrowUpFromLine className="size-3.5" style={{ color: brandColor }} />
-                                    {t('overlay.output')}
-                                </div>
-                                <div className="mt-1 text-sm font-medium text-card-foreground tabular-nums">
-                                    {model.output.toFixed(2)}$
+                    <div className="grid grid-cols-2 gap-2">
+                        {priceMetrics.map((metric) => (
+                            <div key={metric.label} className="min-w-0 rounded-2xl border border-border/70 bg-muted/20 px-3 py-2">
+                                <div className="flex min-w-0 items-center justify-between gap-2">
+                                    <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                                        <metric.icon className="size-3.5 shrink-0" style={{ color: brandColor }} />
+                                        <span className="truncate whitespace-nowrap">{metric.label}</span>
+                                    </div>
+                                    <div className="shrink-0 whitespace-nowrap text-sm font-medium text-card-foreground tabular-nums">
+                                        {metric.value.toFixed(2)}$
+                                    </div>
                                 </div>
                             </div>
-                            <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2">
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <ArrowDownToLine className="size-3.5" style={{ color: brandColor }} />
-                                    {t('overlay.cacheRead')}
-                                </div>
-                                <div className="mt-1 text-sm font-medium text-card-foreground tabular-nums">
-                                    {model.cache_read.toFixed(2)}$
-                                </div>
-                            </div>
-                            <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2">
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <ArrowUpFromLine className="size-3.5" style={{ color: brandColor }} />
-                                    {t('overlay.cacheWrite')}
-                                </div>
-                                <div className="mt-1 text-sm font-medium text-card-foreground tabular-nums">
-                                    {model.cache_write.toFixed(2)}$
-                                </div>
-                            </div>
-                        </div>
+                        ))}
                     </div>
                 </div>
             )}
