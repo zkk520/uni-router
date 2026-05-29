@@ -26,7 +26,7 @@ func TestNormalizeBaseURLAddsV1ForOpenAICompatibleTypes(t *testing.T) {
 	}
 }
 
-func TestNormalizeBaseURLDoesNotDuplicateV1(t *testing.T) {
+func TestNormalizeBaseURLDoesNotDuplicateVersionPath(t *testing.T) {
 	tests := []struct {
 		name    string
 		baseURL string
@@ -43,7 +43,48 @@ func TestNormalizeBaseURLDoesNotDuplicateV1(t *testing.T) {
 			want:    "https://api.example.com/proxy/v1",
 		},
 		{
-			name:    "v1beta is not v1",
+			name:    "DashScope compatible mode",
+			baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			want:    "https://dashscope.aliyuncs.com/compatible-mode/v1",
+		},
+		{
+			name:    "Zhipu v4",
+			baseURL: "https://open.bigmodel.cn/api/paas/v4",
+			want:    "https://open.bigmodel.cn/api/paas/v4",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NormalizeBaseURL(tt.baseURL, OutboundTypeOpenAIChat)
+			if err != nil {
+				t.Fatalf("NormalizeBaseURL() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("NormalizeBaseURL() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeBaseURLAddsV1WhenPathHasNoVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseURL string
+		want    string
+	}{
+		{
+			name:    "bare domain",
+			baseURL: "https://api.example.com",
+			want:    "https://api.example.com/v1",
+		},
+		{
+			name:    "proxy path",
+			baseURL: "https://api.example.com/proxy",
+			want:    "https://api.example.com/proxy/v1",
+		},
+		{
+			name:    "v1beta is not a version segment",
 			baseURL: "https://api.example.com/v1beta",
 			want:    "https://api.example.com/v1beta/v1",
 		},
@@ -51,7 +92,7 @@ func TestNormalizeBaseURLDoesNotDuplicateV1(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NormalizeBaseURL(tt.baseURL, OutboundTypeOpenAIChat)
+			got, err := NormalizeBaseURL(tt.baseURL, OutboundTypeNewAPIChat)
 			if err != nil {
 				t.Fatalf("NormalizeBaseURL() error = %v", err)
 			}

@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 import { formatCount, formatCurrencyCosts, formatTime } from '@/lib/utils';
 import { StatsChannel, StatsChannelKey, type StatsMetricsFormatted } from './stats';
 /**
- * 供应商类型枚举
+ * 协议类型枚举
  */
 export enum ChannelType {
     OpenAIChat = 0,

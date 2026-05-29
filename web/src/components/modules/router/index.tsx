@@ -57,7 +57,7 @@ function channelTypeLabel(type?: ChannelType) {
         case ChannelType.OpenAIChat:
             return 'OpenAI Chat';
         case ChannelType.NewAPIChat:
-            return 'New API Chat';
+            return 'OpenAI 兼容';
         case ChannelType.OpenAIResponse:
             return 'OpenAI Response';
         case ChannelType.Anthropic:

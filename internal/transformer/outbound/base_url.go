@@ -18,7 +18,7 @@ func NormalizeBaseURL(baseURL string, keyType OutboundType) (string, error) {
 	if !isOpenAICompatibleType(keyType) {
 		return trimmed, nil
 	}
-	if hasPathSegment(parsed.Path, "v1") {
+	if hasVersionPathSegment(parsed.Path) {
 		return parsed.String(), nil
 	}
 
@@ -39,11 +39,23 @@ func isOpenAICompatibleType(keyType OutboundType) bool {
 	}
 }
 
-func hasPathSegment(pathValue, segment string) bool {
+func hasVersionPathSegment(pathValue string) bool {
 	for _, part := range strings.Split(pathValue, "/") {
-		if part == segment {
+		if isVersionSegment(part) {
 			return true
 		}
 	}
 	return false
+}
+
+func isVersionSegment(segment string) bool {
+	if len(segment) < 2 || segment[0] != 'v' {
+		return false
+	}
+	for _, r := range segment[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }

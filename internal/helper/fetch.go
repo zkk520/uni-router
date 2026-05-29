@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	modelListInvalidJSONMessage = "上游模型列表响应不是有效 JSON，请检查 Base URL/供应商类型/API Key"
-	modelListHTMLMessage        = "上游返回了 HTML 页面，请确认 Base URL 是 API 地址；OpenAI 兼容协议会自动补 /v1，请选择 New API Chat/OpenAI 兼容类型或正确的供应商类型"
+	modelListInvalidJSONMessage = "上游模型列表响应不是有效 JSON，请检查 Base URL/默认协议类型/API Key"
+	modelListHTMLMessage        = "上游返回了 HTML 页面，请确认 Base URL 是 API 地址；OpenAI 兼容协议会自动补 /v1，请选择 OpenAI 兼容或正确的默认协议类型"
 )
 
 func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {

@@ -21,6 +21,61 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 
+type ChannelProviderPreset = {
+    id: string;
+    nameKey: string;
+    descriptionKey: string;
+    baseUrl: string;
+    type: ChannelType;
+};
+
+const CUSTOM_PROVIDER_PRESET = '__custom_provider';
+
+const CHANNEL_PROVIDER_PRESETS: ChannelProviderPreset[] = [
+    {
+        id: 'xai',
+        nameKey: 'providerXAI',
+        descriptionKey: 'providerXAIDescription',
+        baseUrl: 'https://api.x.ai/v1',
+        type: ChannelType.NewAPIChat,
+    },
+    {
+        id: 'deepseek',
+        nameKey: 'providerDeepSeek',
+        descriptionKey: 'providerDeepSeekDescription',
+        baseUrl: 'https://api.deepseek.com/v1',
+        type: ChannelType.NewAPIChat,
+    },
+    {
+        id: 'dashscope',
+        nameKey: 'providerDashScope',
+        descriptionKey: 'providerDashScopeDescription',
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        type: ChannelType.NewAPIChat,
+    },
+    {
+        id: 'moonshot',
+        nameKey: 'providerMoonshot',
+        descriptionKey: 'providerMoonshotDescription',
+        baseUrl: 'https://api.moonshot.cn/v1',
+        type: ChannelType.NewAPIChat,
+    },
+    {
+        id: 'zhipu',
+        nameKey: 'providerZhipu',
+        descriptionKey: 'providerZhipuDescription',
+        baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+        type: ChannelType.NewAPIChat,
+    },
+    {
+        id: 'siliconflow',
+        nameKey: 'providerSiliconFlow',
+        descriptionKey: 'providerSiliconFlowDescription',
+        baseUrl: 'https://api.siliconflow.cn/v1',
+        type: ChannelType.NewAPIChat,
+    },
+];
+
 export interface ChannelKeyFormItem {
     id?: number;
     enabled: boolean;
@@ -498,8 +553,75 @@ export function ChannelForm({
 
     const pricingRule = normalizePricingRule(formData.pricing_rule);
 
+    const applyProviderPreset = (preset: ChannelProviderPreset) => {
+        const nextBaseUrls = formData.base_urls?.length
+            ? formData.base_urls.map((item, index) => index === 0 ? { ...item, url: preset.baseUrl } : item)
+            : [{ url: preset.baseUrl, delay: 0 }];
+
+        onFormDataChange({
+            ...formData,
+            name: t(preset.nameKey),
+            type: preset.type,
+            base_urls: nextBaseUrls,
+        });
+    };
+
     return (
         <form onSubmit={onSubmit} className="space-y-4 px-1">
+            <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <label htmlFor={`${idPrefix}-provider-preset`} className="text-sm font-medium text-card-foreground">
+                            {t('providerPreset')}
+                        </label>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                            {t('providerPresetHint')}
+                        </div>
+                    </div>
+                    <Select
+                        value={CUSTOM_PROVIDER_PRESET}
+                        onValueChange={(value) => {
+                            const preset = CHANNEL_PROVIDER_PRESETS.find((item) => item.id === value);
+                            if (preset) applyProviderPreset(preset);
+                        }}
+                    >
+                        <SelectTrigger id={`${idPrefix}-provider-preset`} className="w-full rounded-xl border border-border px-4 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-64">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                            <SelectItem className="rounded-xl" value={CUSTOM_PROVIDER_PRESET}>
+                                {t('providerCustom')}
+                            </SelectItem>
+                            {CHANNEL_PROVIDER_PRESETS.map((preset) => (
+                                <SelectItem className="rounded-xl" key={preset.id} value={preset.id}>
+                                    {t(preset.nameKey)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {CHANNEL_PROVIDER_PRESETS.map((preset) => (
+                        <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => applyProviderPreset(preset)}
+                            className="min-h-20 rounded-xl border border-border/70 bg-background/70 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="truncate text-sm font-medium text-card-foreground">{t(preset.nameKey)}</span>
+                                <Badge variant="outline" className="shrink-0 text-[10px]">
+                                    {channelTypeLabel(t, preset.type)}
+                                </Badge>
+                            </div>
+                            <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                                {t(preset.descriptionKey)}
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <label htmlFor={`${idPrefix}-name`} className="text-sm font-medium text-card-foreground">
