@@ -20,6 +20,14 @@
 
 ## 项目上下文
 
+## Trellis 工作流
+
+- 本仓库已初始化 Trellis，核心配置位于 `.trellis/`，Codex 配置位于 `.codex/`，共享 skills 位于 `.agents/skills/`。
+- Codex hooks 使用 `.codex/hooks.json` 中的 `UserPromptSubmit`，命令为 `uv run python -X utf8 .codex/hooks/inject-workflow-state.py`。
+- 新会话或任务推进时，优先阅读 `.trellis/workflow.md` 和 `.trellis/spec/` 中的项目约定；需要继续当前 Trellis 任务时使用 `trellis-continue` skill。
+- Trellis 的本地开发者身份文件 `.trellis/.developer` 和运行态目录 `.trellis/.runtime/` 不提交到 Git。
+- Codex 0.129+ 首次使用 hooks 时，需要在 TUI 中运行 `/hooks` 并审批 Trellis 的 `UserPromptSubmit` hook。
+
 ### 开发命令
 
 Windows 推荐分离启动：
