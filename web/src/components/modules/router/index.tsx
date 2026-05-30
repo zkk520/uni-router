@@ -664,7 +664,7 @@ export function Router() {
                         },
                     ]}
                     action={(
-                        <Button className="h-10 flex-1 rounded-lg shadow-sm sm:flex-none" onClick={create} disabled={createRouter.isPending}>
+                        <Button className="h-10 min-w-[6.5rem] rounded-lg px-3 shadow-sm" onClick={create} disabled={createRouter.isPending}>
                             <Plus className="size-4" />
                             创建路由
                         </Button>

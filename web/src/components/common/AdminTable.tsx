@@ -38,7 +38,7 @@ export function AdminToolbar({
     if (compact) {
         return (
             <div className="rounded-lg border border-border bg-card/95 p-4 shadow-sm">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:justify-between">
                     <div className="relative min-w-0 lg:max-w-80 lg:flex-1">
                         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -48,10 +48,10 @@ export function AdminToolbar({
                             className="h-10 rounded-lg bg-background/80 pl-9 shadow-none"
                         />
                     </div>
-                    <div className="flex min-w-0 items-center gap-2">
+                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.5rem_max-content] items-center gap-2 sm:grid-cols-[minmax(10rem,12rem)_2.5rem_max-content] lg:grid-cols-[11rem_2.5rem_max-content]">
                         {filters.map((filter) => (
                             <Select key={filter.label} value={filter.value} onValueChange={filter.onChange}>
-                                <SelectTrigger className="h-10 min-w-0 flex-1 rounded-lg bg-background/80 shadow-none lg:w-44 lg:flex-none">
+                                <SelectTrigger className="h-10 min-w-0 rounded-lg bg-background/80 shadow-none [&>span]:truncate">
                                     <SelectValue placeholder={filter.label} />
                                 </SelectTrigger>
                                 <SelectContent className="rounded-lg">
@@ -68,7 +68,7 @@ export function AdminToolbar({
                                 <RefreshCw className="size-4" />
                             </Button>
                         ) : null}
-                        <div className="flex min-w-0 flex-1 justify-end lg:flex-none">
+                        <div className="flex min-w-0 justify-end">
                             {action}
                         </div>
                     </div>
