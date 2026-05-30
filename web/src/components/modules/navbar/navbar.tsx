@@ -5,73 +5,75 @@ import { cn } from "@/lib/utils"
 import { useNavStore, type NavItem } from "@/components/modules/navbar"
 import { ROUTES } from "@/route/config"
 import { usePreload } from "@/route/use-preload"
-import { ENTRANCE_VARIANTS } from "@/lib/animations/fluid-transitions"
 import { useTranslations } from "next-intl"
+import Logo from "@/components/modules/logo"
 
-export function NavBar() {
+type NavBarProps = {
+    onNavigate?: () => void
+}
+
+const groups = [
+    { label: "管理后台", ids: ["home", "channel", "router", "model", "log"] },
+    { label: "账户", ids: ["token", "setting"] },
+] as const
+
+export function NavBar({ onNavigate }: NavBarProps) {
     const { activeItem, setActiveItem } = useNavStore()
     const { preload } = usePreload()
     const t = useTranslations("navbar")
 
+    const handleNavigate = (id: string) => {
+        setActiveItem(id as NavItem)
+        onNavigate?.()
+    }
+
     return (
-        <div className="relative z-50 md:min-h-screen">
-            <motion.nav
-                aria-label="Main Navigation"
-                className={cn(
-                    "fixed bottom-6 left-1/2 -translate-x-1/2 flex max-w-[calc(100vw-1rem)] items-center gap-0.5 p-2",
-                    "md:sticky md:top-30 md:left-auto md:bottom-auto md:max-w-none md:translate-x-0 md:flex-col md:gap-2 md:p-3",
-                    "bg-sidebar text-sidebar-foreground border border-sidebar-border rounded-3xl",
-                    "custom-shadow"
-                )}
-                variants={ENTRANCE_VARIANTS.navbar}
-                initial="initial"
-                animate="animate"
-            >
-                {ROUTES.map((route, index) => {
-                    const isActive = activeItem === route.id
-                    const label = t(route.id)
-                    return (
-                        <motion.button
-                            key={route.id}
-                            type="button"
-                            aria-label={label}
-                            title={label}
-                            onClick={() => setActiveItem(route.id as NavItem)}
-                            onMouseEnter={() => preload(route.id)}
-                            className={cn(
-                                "relative z-20 flex min-w-0 w-[calc((100vw-2.75rem)/7)] max-w-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5 text-center",
-                                "md:w-24 md:max-w-none md:flex-row md:justify-start md:gap-2 md:px-3 md:py-2.5 md:text-left",
-                                isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/60 hover:bg-sidebar-accent"
-                            )}
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{
-                                opacity: 1,
-                                scale: 1,
-                                transition: {
-                                    delay: index * 0.05,
-                                    duration: 0.3,
-                                }
-                            }}
-                            whileHover={{ scale: 1.1, zIndex: 30 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            {isActive && (
-                                <motion.div
-                                    layoutId="navbar-indicator"
-                                    className="absolute inset-0 bg-sidebar-primary rounded-2xl z-0"
-                                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                />
-                            )}
-                            <span className="relative z-10 flex shrink-0">
-                                <route.icon className="size-5 md:size-4" strokeWidth={2} />
-                            </span>
-                            <span className="relative z-10 w-full truncate text-[10px] font-medium leading-tight md:text-xs">
-                                {label}
-                            </span>
-                        </motion.button>
-                    )
-                })}
-            </motion.nav>
-        </div>
+        <aside className="flex h-full min-h-0 w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+            <div className="flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border px-5">
+                <Logo size={38} />
+                <div className="min-w-0">
+                    <div className="truncate text-lg font-bold tracking-tight">uni-router</div>
+                    <div className="mt-0.5 inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                        Admin
+                    </div>
+                </div>
+            </div>
+
+            <nav aria-label="Main Navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+                <div className="grid gap-5">
+                    {groups.map((group) => (
+                        <div key={group.label} className="grid gap-1">
+                            <div className="px-3 pb-1 text-xs font-medium text-muted-foreground">{group.label}</div>
+                            {group.ids.map((id) => {
+                                const route = ROUTES.find((item) => item.id === id)
+                                if (!route) return null
+                                const isActive = activeItem === route.id
+                                const label = t(route.id)
+                                return (
+                                    <motion.button
+                                        key={route.id}
+                                        type="button"
+                                        aria-label={label}
+                                        title={label}
+                                        onClick={() => handleNavigate(route.id)}
+                                        onMouseEnter={() => preload(route.id)}
+                                        className={cn(
+                                            "relative flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors",
+                                            isActive
+                                                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                                : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                                        )}
+                                        whileTap={{ scale: 0.98 }}
+                                    >
+                                        <route.icon className="size-4 shrink-0" strokeWidth={2} />
+                                        <span className="truncate">{label}</span>
+                                    </motion.button>
+                                )
+                            })}
+                        </div>
+                    ))}
+                </div>
+            </nav>
+        </aside>
     )
 }

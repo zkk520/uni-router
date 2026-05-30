@@ -57,7 +57,7 @@ export function Rank() {
                     return (
                         <div
                             key={channel.raw.id}
-                            className="flex items-center gap-3 p-3 rounded-2xl hover:bg-accent/5 transition-colors"
+                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/5 transition-colors"
                         >
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-lg shrink-0">
                                 {medal || rank}
@@ -121,7 +121,7 @@ export function Rank() {
     };
 
     return (
-        <div className="rounded-3xl bg-card text-card-foreground border-card-border border p-4">
+        <div className="rounded-lg bg-card text-card-foreground border-card-border border p-4">
             <Tabs value={rankSortMode} onValueChange={(value) => setRankSortMode(value as RankSortMode)}>
                 <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-base">{t('title')}</h3>

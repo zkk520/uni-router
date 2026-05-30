@@ -4,6 +4,7 @@ import { apiClient, API_BASE_URL } from '../client';
 import { logger } from '@/lib/logger';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CostCurrencyMetrics } from '@/lib/utils';
+import type { PaginatedResponse } from '../types';
 
 /**
  * 尝试状态
@@ -324,4 +325,24 @@ export function useLogs(options: { pageSize?: number; filters?: Omit<LogListPara
         loadMore,
         clear,
     };
+}
+
+export function useLogPage(params: LogListParams & { include_content?: boolean }) {
+    return useQuery({
+        queryKey: ['logs', 'page', params],
+        queryFn: async () => {
+            const query: Record<string, string | number | boolean> = {};
+            for (const [key, value] of Object.entries(params)) {
+                if (value === undefined || value === '' || value === 'all') continue;
+                query[key] = value as string | number | boolean;
+            }
+            const result = await apiClient.get<PaginatedResponse<RelayLog>>('/api/v1/log/page', query);
+            return {
+                ...result,
+                items: result.items.map(toLogSummary),
+            };
+        },
+        refetchInterval: 30000,
+        refetchOnMount: 'always',
+    });
 }

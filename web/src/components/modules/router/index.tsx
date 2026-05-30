@@ -1,12 +1,12 @@
 'use client';
 
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Cable, Check, KeyRound, Loader2, Plus, Trash2, X, TestTube2 } from 'lucide-react';
+import { Check, KeyRound, Loader2, Plus, Trash2, X, TestTube2 } from 'lucide-react';
 import {
     useCreateRouter,
     useDeleteRouter,
     useRouterDetail,
-    useRouterList,
+    useRouterPage,
     useRouterOptions,
     useSwitchRouterEndpoint,
     useTestRouterEndpoint,
@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { AdminPagination, AdminToolbar } from '@/components/common/AdminTable';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -219,7 +220,7 @@ function AddEndpointForm({
     };
 
     return (
-        <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-4">
+        <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4">
             <SectionTitle
                 title="添加候选端点"
                 description="从已有供应商和密钥中选择一条上游路径，加入当前路由的端点池。"
@@ -365,7 +366,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
 
     return (
         <div className="flex h-full min-h-0 flex-col gap-4">
-            <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="rounded-lg border border-border bg-card p-4">
                 <SectionTitle
                     title="路由策略"
                     description="定义这条路由的名称、分配模式，以及上游失败后是否继续尝试其他端点。"
@@ -399,7 +400,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
 
             <AddEndpointForm options={options} endpoints={endpoints} onAdd={addEndpoint} />
 
-            <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-border bg-card p-4">
+            <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card p-4">
                 <SectionTitle
                     title="端点池"
                     description={router.mode === 'weighted'
@@ -408,7 +409,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
                 />
                 <div className="min-h-0 flex-1 overflow-auto space-y-3 pr-1">
                     {endpoints.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                        <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
                             添加端点后此路由才能使用。
                         </div>
                     ) : endpoints.map((endpoint) => {
@@ -437,7 +438,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
                             <div
                                 key={endpoint.id}
                                 className={cn(
-                                    'rounded-2xl border bg-background p-4 transition-colors',
+                                    'rounded-lg border bg-background p-4 transition-colors',
                                     current ? 'border-primary/60' : 'border-border',
                                     duplicate && 'border-amber-500/70',
                                     invalid && 'border-destructive/40'
@@ -587,11 +588,23 @@ function RouterDetail({ routerId }: { routerId: number }) {
 }
 
 export function Router() {
-    const { data: routers = [], error, isLoading } = useRouterList();
     const createRouter = useCreateRouter();
     const deleteRouter = useDeleteRouter();
     const createAPIKey = useCreateAPIKey();
     const [selectedId, setSelectedId] = useState<number | null>(null);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [keyword, setKeyword] = useState('');
+    const [mode, setMode] = useState<string>('all');
+    const { data, error, isLoading, refetch } = useRouterPage({
+        page,
+        page_size: pageSize,
+        keyword,
+        mode: mode === 'all' ? 'all' : mode as RouteMode,
+        sort_by: 'id',
+        sort_order: 'desc',
+    });
+    const routers = data?.items ?? [];
 
     const selected = selectedId ?? routers[0]?.id ?? null;
 
@@ -624,17 +637,39 @@ export function Router() {
     };
 
     return (
-        <div className="grid h-full min-h-0 gap-4 md:grid-cols-[300px_1fr]">
-            <div className="flex min-h-0 flex-col rounded-2xl border border-border bg-card p-4">
-                <div className="mb-3 flex items-center justify-between">
-                    <h2 className="flex items-center gap-2 text-lg font-bold">
-                        <Cable className="size-5" />
-                        路由
-                    </h2>
-                    <Button size="sm" onClick={create} disabled={createRouter.isPending}>
-                        <Plus className="size-4" />
-                    </Button>
-                </div>
+        <div className="grid h-full min-h-0 gap-4 md:grid-cols-[360px_1fr]">
+            <div className="flex min-h-0 flex-col gap-3">
+                <AdminToolbar
+                    search={keyword}
+                    searchPlaceholder="搜索路由..."
+                    onSearchChange={(value) => {
+                        setKeyword(value);
+                        setPage(1);
+                    }}
+                    onRefresh={() => refetch()}
+                    filters={[
+                        {
+                            label: '模式',
+                            value: mode,
+                            onChange: (value) => {
+                                setMode(value);
+                                setPage(1);
+                            },
+                            options: [
+                                { value: 'all', label: '全部模式' },
+                                { value: 'manual', label: '手动' },
+                                { value: 'weighted', label: '加权' },
+                            ],
+                        },
+                    ]}
+                    action={(
+                        <Button className="h-10 rounded-lg shadow-sm" onClick={create} disabled={createRouter.isPending}>
+                            <Plus className="size-4" />
+                            创建路由
+                        </Button>
+                    )}
+                />
+                <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card/95 p-4 shadow-sm">
                 <div className="min-h-0 flex-1 overflow-auto space-y-2">
                     {isLoading ? (
                         <div className="flex justify-center p-6"><Loader2 className="size-5 animate-spin" /></div>
@@ -755,8 +790,19 @@ export function Router() {
                         );
                     })}
                 </div>
+                <AdminPagination
+                    page={data?.page ?? page}
+                    pageSize={data?.page_size ?? pageSize}
+                    total={data?.total ?? 0}
+                    onPageChange={setPage}
+                    onPageSizeChange={(value) => {
+                        setPageSize(value);
+                        setPage(1);
+                    }}
+                />
+                </div>
             </div>
-            <div className="min-h-0 rounded-2xl border border-border bg-background p-4">
+            <div className="min-h-0 rounded-lg border border-border bg-card/95 p-4 shadow-sm">
                 {selected ? <RouterDetail routerId={selected} /> : (
                     <div className="flex h-full items-center justify-center text-muted-foreground">创建一个路由后开始使用。</div>
                 )}

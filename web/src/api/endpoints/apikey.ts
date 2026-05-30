@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { useAuthStore } from './user';
 import { StatsAPIKey, StatsAPIKeyFormatted } from './stats';
 import { formatCount, formatCurrencyCosts, formatTime } from '@/lib/utils';
+import type { PaginatedResponse, PaginationParams } from '../types';
 
 /**
  * API Key 数据
@@ -112,6 +113,28 @@ export function useAPIKeyList() {
     });
 }
 
+export type APIKeyPageParams = PaginationParams & {
+    enabled?: boolean | 'all';
+    router_id?: number | 'all';
+};
+
+function toQuery(params: object) {
+    const query: Record<string, string | number | boolean> = {};
+    for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === '' || value === 'all') continue;
+        query[key] = value as string | number | boolean;
+    }
+    return query;
+}
+
+export function useAPIKeyPage(params: APIKeyPageParams) {
+    return useQuery({
+        queryKey: ['apikeys', 'page', params],
+        queryFn: async () => apiClient.get<PaginatedResponse<APIKey>>('/api/v1/apikey/page', toQuery(params)),
+        refetchInterval: 30000,
+    });
+}
+
 /**
  * 创建 API Key Hook
  * 
@@ -132,6 +155,7 @@ export function useCreateAPIKey() {
         onSuccess: (data) => {
             logger.log('API Key 创建成功:', data);
             queryClient.invalidateQueries({ queryKey: ['apikeys', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['apikeys', 'page'] });
             queryClient.invalidateQueries({ queryKey: ['routers'] });
         },
         onError: (error) => {
@@ -162,6 +186,7 @@ export function useUpdateAPIKey() {
         onSuccess: (data) => {
             logger.log('API Key 更新成功:', data);
             queryClient.invalidateQueries({ queryKey: ['apikeys', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['apikeys', 'page'] });
         },
         onError: (error) => {
             logger.error('API Key 更新失败:', error);
@@ -187,6 +212,7 @@ export function useDeleteAPIKey() {
         onSuccess: () => {
             logger.log('API Key 删除成功');
             queryClient.invalidateQueries({ queryKey: ['apikeys', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['apikeys', 'page'] });
         },
         onError: (error) => {
             logger.error('API Key 删除失败:', error);

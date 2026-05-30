@@ -25,6 +25,10 @@ func init() {
 				Handle(listLLM),
 		).
 		AddRoute(
+			router.NewRoute("/page", http.MethodGet).
+				Handle(pageLLM),
+		).
+		AddRoute(
 			router.NewRoute("/create", http.MethodPost).
 				Handle(createLLM),
 		).
@@ -175,6 +179,28 @@ func listLLM(c *gin.Context) {
 		return
 	}
 	resp.Success(c, models)
+}
+
+func pageLLM(c *gin.Context) {
+	var priced *bool
+	if c.Query("priced") != "" {
+		value, ok := parseOptionalBool(c.Query("priced"))
+		if !ok {
+			resp.Error(c, http.StatusBadRequest, resp.ErrInvalidParam)
+			return
+		}
+		priced = value
+	}
+	result, err := op.LLMPage(c.Request.Context(), op.LLMPageFilter{
+		PageParams: parsePageParams(c),
+		Provider:   c.Query("provider"),
+		Priced:     priced,
+	})
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	resp.Success(c, result)
 }
 
 func listLLMPresets(c *gin.Context) {

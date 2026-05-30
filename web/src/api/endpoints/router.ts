@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { apiClient } from '../client';
 import type { Channel, ChannelType, PricingRule } from './channel';
 import type { APIKey } from './apikey';
+import type { PaginatedResponse, PaginationParams } from '../types';
 
 export type RouteMode = 'manual' | 'weighted';
 export type RouteEndpointStatus = 'unknown' | 'normal' | 'error';
@@ -139,6 +140,27 @@ export function useRouterList() {
     return useQuery({
         queryKey: routerListQueryKey,
         queryFn: () => apiClient.get<RouteProfile[]>('/api/v1/router/list'),
+        refetchInterval: 30000,
+    });
+}
+
+export type RouterPageParams = PaginationParams & {
+    mode?: RouteMode | 'all';
+};
+
+function toQuery(params: object) {
+    const query: Record<string, string | number | boolean> = {};
+    for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === '' || value === 'all') continue;
+        query[key] = value as string | number | boolean;
+    }
+    return query;
+}
+
+export function useRouterPage(params: RouterPageParams) {
+    return useQuery({
+        queryKey: ['routers', 'page', params],
+        queryFn: () => apiClient.get<PaginatedResponse<RouteProfile>>('/api/v1/router/page', toQuery(params)),
         refetchInterval: 30000,
     });
 }

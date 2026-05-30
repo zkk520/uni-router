@@ -18,6 +18,7 @@ func init() {
 		Use(middleware.Auth()).
 		Use(middleware.RequireJSON()).
 		AddRoute(router.NewRoute("/list", http.MethodGet).Handle(listRouter)).
+		AddRoute(router.NewRoute("/page", http.MethodGet).Handle(pageRouter)).
 		AddRoute(router.NewRoute("/options", http.MethodGet).Handle(routerOptions)).
 		AddRoute(router.NewRoute("/create", http.MethodPost).Handle(createRouter)).
 		AddRoute(router.NewRoute("/update", http.MethodPost).Handle(updateRouter)).
@@ -34,6 +35,18 @@ func listRouter(c *gin.Context) {
 		return
 	}
 	resp.Success(c, routes)
+}
+
+func pageRouter(c *gin.Context) {
+	result, err := op.RouteProfilePage(c.Request.Context(), op.RoutePageFilter{
+		PageParams: parsePageParams(c),
+		Mode:       c.Query("mode"),
+	})
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	resp.Success(c, result)
 }
 
 func getRouter(c *gin.Context) {

@@ -3,6 +3,7 @@ import { apiClient } from '../client';
 import { logger } from '@/lib/logger';
 import { formatCount, formatCurrencyCosts, formatTime } from '@/lib/utils';
 import { StatsChannel, StatsChannelKey, type StatsMetricsFormatted } from './stats';
+import type { PaginatedResponse, PaginationParams } from '../types';
 /**
  * 协议类型枚举
  */
@@ -257,12 +258,70 @@ export function useCreateChannel() {
         onSuccess: (data) => {
             logger.log('供应商创建成功:', data);
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['channels', 'page'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'list'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
             logger.warn('供应商创建失败:', error instanceof Error ? error.message : String(error));
         },
+    });
+}
+
+export type ChannelPageParams = PaginationParams & {
+    enabled?: boolean | 'all';
+    type?: number | 'all';
+};
+
+function toQuery(params: object) {
+    const query: Record<string, string | number | boolean> = {};
+    for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === '' || value === 'all') continue;
+        query[key] = value as string | number | boolean;
+    }
+    return query;
+}
+
+function formatChannel(item: ChannelServer) {
+    return {
+        raw: ({
+            ...item,
+            base_urls: item.base_urls ?? [],
+            custom_header: item.custom_header ?? [],
+            keys: (item.keys ?? []).map((key) => ({
+                ...key,
+                models: key.models ?? [],
+                models_synced_at: key.models_synced_at ?? 0,
+                models_sync_error: key.models_sync_error ?? '',
+                pricing_rule: normalizePricingRule(key.pricing_rule),
+            })),
+            pricing_rule: normalizePricingRule(item.pricing_rule),
+        }) satisfies Channel,
+        formatted: {
+            input_token: formatCount(item.stats.input_token),
+            output_token: formatCount(item.stats.output_token),
+            total_token: formatCount(item.stats.input_token + item.stats.output_token),
+            input_cost: formatCurrencyCosts(item.stats.input_cost_by_currency, item.stats.input_cost),
+            output_cost: formatCurrencyCosts(item.stats.output_cost_by_currency, item.stats.output_cost),
+            total_cost: formatCurrencyCosts(item.stats.total_cost_by_currency, item.stats.input_cost + item.stats.output_cost),
+            request_success: formatCount(item.stats.request_success),
+            request_failed: formatCount(item.stats.request_failed),
+            request_count: formatCount(item.stats.request_success + item.stats.request_failed),
+            wait_time: formatTime(item.stats.wait_time),
+        }
+    };
+}
+
+export function useChannelPage(params: ChannelPageParams) {
+    return useQuery({
+        queryKey: ['channels', 'page', params],
+        queryFn: async () => apiClient.get<PaginatedResponse<ChannelServer>>('/api/v1/channel/page', toQuery(params)),
+        select: (data) => ({
+            ...data,
+            items: data.items.map(formatChannel),
+        }) as PaginatedResponse<{ raw: Channel; formatted: StatsMetricsFormatted }>,
+        refetchInterval: 30000,
+        refetchOnMount: 'always',
     });
 }
 
@@ -293,6 +352,7 @@ export function useUpdateChannel() {
         onSuccess: (data) => {
             logger.log('供应商更新成功:', data);
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['channels', 'page'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
@@ -319,6 +379,7 @@ export function useDeleteChannel() {
         onSuccess: () => {
             logger.log('供应商删除成功');
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['channels', 'page'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
@@ -346,6 +407,7 @@ export function useEnableChannel() {
         onSuccess: () => {
             logger.log('供应商状态更新成功');
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['channels', 'page'] });
         },
         onError: (error) => {
             logger.warn('供应商状态更新失败:', error instanceof Error ? error.message : String(error));
@@ -420,6 +482,7 @@ export function useSyncChannel() {
             logger.log('供应商同步成功');
             queryClient.invalidateQueries({ queryKey: ['channels', 'last-sync-time'] });
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['channels', 'page'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'list'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },

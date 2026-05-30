@@ -228,14 +228,14 @@ export function SettingSystem() {
     };
 
     return (
-        <div className="rounded-3xl border border-border bg-card p-6 space-y-5">
+        <div className="rounded-lg border border-border bg-card p-6 space-y-5">
             <h2 className="text-lg font-bold text-card-foreground flex items-center gap-2">
                 <Monitor className="h-5 w-5" />
                 {t('system')}
             </h2>
 
             {/* 运行端口 */}
-            <div className="space-y-3 rounded-2xl border border-border/60 p-4">
+            <div className="space-y-3 rounded-lg border border-border/60 p-4">
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <Server className="h-5 w-5 text-muted-foreground" />
@@ -358,7 +358,7 @@ export function SettingSystem() {
                             </span>
                         </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-72 space-y-2 rounded-3xl p-3 bg-card">
+                    <PopoverContent className="w-72 space-y-2 rounded-lg p-3 bg-card">
                         <Input
                             value={corsInputValue}
                             onChange={(e) => setCorsInputValue(e.target.value)}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Info, Tag, Github, RefreshCw, AlertTriangle, Download, Loader2 } from 'lucide-react';
+import { Info, Tag, Github, AlertTriangle, Download, Loader2 } from 'lucide-react';
 import { APP_VERSION, GITHUB_REPO } from '@/lib/info';
 import { useLatestInfo, useNowVersion, useUpdateCore } from '@/api/endpoints/update';
 import { Button } from '@/components/ui/button';
@@ -65,7 +65,7 @@ export function SettingInfo() {
     };
 
     return (
-        <div className="rounded-3xl border border-border bg-card p-6 space-y-5">
+        <div className="rounded-lg border border-border bg-card p-6 space-y-5">
             <h2 className="text-lg font-bold text-card-foreground flex items-center gap-2">
                 <Info className="h-5 w-5" />
                 {t('info.title')}

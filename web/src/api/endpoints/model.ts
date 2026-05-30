@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { logger } from '@/lib/logger';
+import type { PaginatedResponse, PaginationParams } from '../types';
 
 /**
  * LLM 价格信息
@@ -46,6 +47,29 @@ export function useModelList() {
         queryFn: async () => {
             return apiClient.get<LLMInfo[]>('/api/v1/model/list');
         },
+        refetchInterval: 30000,
+        refetchOnMount: 'always',
+    });
+}
+
+export type ModelPageParams = PaginationParams & {
+    provider?: string;
+    priced?: boolean | 'all';
+};
+
+function toQuery(params: object) {
+    const query: Record<string, string | number | boolean> = {};
+    for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === '' || value === 'all') continue;
+        query[key] = value as string | number | boolean;
+    }
+    return query;
+}
+
+export function useModelPage(params: ModelPageParams) {
+    return useQuery({
+        queryKey: ['models', 'page', params],
+        queryFn: async () => apiClient.get<PaginatedResponse<LLMInfo>>('/api/v1/model/page', toQuery(params)),
         refetchInterval: 30000,
         refetchOnMount: 'always',
     });
@@ -107,6 +131,7 @@ export function useUpdateModel() {
         onSuccess: (data) => {
             logger.log('模型更新成功:', data);
             queryClient.invalidateQueries({ queryKey: ['models', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['models', 'page'] });
         },
         onError: (error) => {
             logger.error('模型更新失败:', error);
@@ -138,6 +163,7 @@ export function useCreateModel() {
         onSuccess: (data) => {
             logger.log('模型创建成功:', data);
             queryClient.invalidateQueries({ queryKey: ['models', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['models', 'page'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'presets'] });
         },
         onError: (error) => {
@@ -164,6 +190,7 @@ export function useDeleteModel() {
         onSuccess: () => {
             logger.log('模型删除成功');
             queryClient.invalidateQueries({ queryKey: ['models', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['models', 'page'] });
             queryClient.invalidateQueries({ queryKey: ['models', 'presets'] });
         },
         onError: (error) => {

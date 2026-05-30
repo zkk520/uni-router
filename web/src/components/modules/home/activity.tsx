@@ -87,7 +87,7 @@ export function Activity() {
     }, [days, isLoading, checkScroll]);
 
     return (
-        <div className="rounded-3xl bg-card border-card-border border text-card-foreground custom-shadow">
+        <div className="rounded-lg bg-card border-card-border border text-card-foreground custom-shadow">
             <div
                 ref={scrollRef}
                 onScroll={checkScroll}
@@ -148,7 +148,7 @@ export function Activity() {
 
                     return (
                         <div
-                            className={`fixed z-50 w-fit min-w-max text-sm bg-background text-foreground border rounded-3xl p-3 transition-opacity duration-500 pointer-events-none ${tooltip.visible ? 'opacity-100' : 'opacity-0'}`}
+                            className={`fixed z-50 w-fit min-w-max text-sm bg-background text-foreground border rounded-lg p-3 transition-opacity duration-500 pointer-events-none ${tooltip.visible ? 'opacity-100' : 'opacity-0'}`}
                             style={{
                                 left: tooltip.x,
                                 top: tooltip.y,

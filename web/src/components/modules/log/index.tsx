@@ -1,32 +1,51 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { useLogs } from '@/api/endpoints/log';
-import { LogCard } from './Item';
-import { Filter, Loader2, RotateCcw } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { AlertCircle, Clock, Cpu, DollarSign, Eye, KeyRound, Route, Zap } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { VirtualizedGrid } from '@/components/common/VirtualizedGrid';
 import { useAPIKeyList } from '@/api/endpoints/apikey';
+import { useLogPage, type RelayLog } from '@/api/endpoints/log';
 import { useRouterList } from '@/api/endpoints/router';
+import { AdminPagination, AdminTableShell, AdminToolbar } from '@/components/common/AdminTable';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    MorphingDialog,
+    MorphingDialogContainer,
+    MorphingDialogContent,
+    MorphingDialogTrigger,
+} from '@/components/ui/morphing-dialog';
+import { LogCard } from './Item';
+import { cn, formatCurrencyCosts } from '@/lib/utils';
 
 const ALL = 'all';
 type LogStatusFilter = 'all' | 'success' | 'failed';
 
-/**
- * 日志页面组件
- * - 初始加载 pageSize 条历史日志
- * - SSE 实时推送新日志
- * - 滚动自动加载更多
- */
+function formatTimestamp(timestamp: number) {
+    return new Date(timestamp * 1000).toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    });
+}
+
+function formatDuration(ms: number) {
+    if (!ms) return '0ms';
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(2)}s`;
+}
+
+function formatCost(log: RelayLog) {
+    const formatted = formatCurrencyCosts(log.total_cost_by_currency, log.cost);
+    return `${formatted.formatted.value}${formatted.formatted.unit}`;
+}
+
 export function Log() {
     const t = useTranslations('log');
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [status, setStatus] = useState<LogStatusFilter>('all');
     const [apiKeyName, setAPIKeyName] = useState(ALL);
     const [routerID, setRouterID] = useState(ALL);
@@ -39,155 +58,192 @@ export function Log() {
     const endpointOptions = useMemo(() => {
         if (!selectedRouterID) {
             return routers.flatMap((router) =>
-                (router.endpoints ?? []).map((endpoint) => ({
-                    ...endpoint,
-                    routerName: router.name,
-                }))
+                (router.endpoints ?? []).map((endpoint) => ({ ...endpoint, routerName: router.name }))
             );
         }
         const router = routers.find((item) => item.id === selectedRouterID);
-        return (router?.endpoints ?? []).map((endpoint) => ({
-            ...endpoint,
-            routerName: router?.name ?? '',
-        }));
+        return (router?.endpoints ?? []).map((endpoint) => ({ ...endpoint, routerName: router?.name ?? '' }));
     }, [routers, selectedRouterID]);
 
-    const filters = useMemo(() => ({
-        status: status === 'all' ? undefined : status,
+    const params = useMemo(() => ({
+        page,
+        page_size: pageSize,
+        include_content: false,
+        status: status === ALL ? undefined : status,
         api_key_name: apiKeyName === ALL ? undefined : apiKeyName,
         router_id: routerID === ALL ? undefined : Number(routerID),
         endpoint_id: endpointID === ALL ? undefined : Number(endpointID),
-    }), [apiKeyName, endpointID, routerID, status]);
+    }), [apiKeyName, endpointID, page, pageSize, routerID, status]);
 
-    const hasActiveFilters = status !== 'all' || apiKeyName !== ALL || routerID !== ALL || endpointID !== ALL;
-    const { logs, hasMore, isLoading, isLoadingMore, loadMore } = useLogs({ pageSize: 10, filters });
+    const { data, isLoading, refetch } = useLogPage(params);
+    const rows = data?.items ?? [];
 
-    const canLoadMore = hasMore && !isLoading && !isLoadingMore && logs.length > 0;
-    const handleReachEnd = useCallback(() => {
-        if (!canLoadMore) return;
-        void loadMore();
-    }, [canLoadMore, loadMore]);
-
-    const resetFilters = useCallback(() => {
-        setStatus('all');
-        setAPIKeyName(ALL);
-        setRouterID(ALL);
-        setEndpointID(ALL);
-    }, []);
-
-    const handleRouterChange = useCallback((value: string) => {
+    const handleRouterChange = (value: string) => {
         setRouterID(value);
         setEndpointID(ALL);
-    }, []);
-
-    const footer = useMemo(() => {
-        if (hasMore && (isLoading || isLoadingMore)) {
-            return (
-                <div className="flex justify-center py-4">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-            );
-        }
-        if (!hasMore && logs.length > 0) {
-            return (
-                <div className="flex justify-center py-4">
-                    <span className="text-sm text-muted-foreground">{t('list.noMore')}</span>
-                </div>
-            );
-        }
-        return null;
-    }, [hasMore, isLoading, isLoadingMore, logs.length, t]);
+        setPage(1);
+    };
 
     return (
-        <div className="flex h-full min-h-0 flex-col gap-3">
-            <div className="shrink-0 rounded-2xl border border-border bg-card p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                        <Filter className="size-3.5" />
-                        {t('filters.title')}
-                    </div>
+        <div className="flex h-full min-h-0 flex-col gap-4">
+            <AdminToolbar
+                search=""
+                searchPlaceholder={t('filters.title')}
+                onSearchChange={() => undefined}
+                onRefresh={() => refetch()}
+                filters={[
+                    {
+                        label: t('filters.statusAll'),
+                        value: status,
+                        onChange: (value) => {
+                            setStatus(value as LogStatusFilter);
+                            setPage(1);
+                        },
+                        options: [
+                            { value: ALL, label: t('filters.statusAll') },
+                            { value: 'success', label: t('filters.statusSuccess') },
+                            { value: 'failed', label: t('filters.statusFailed') },
+                        ],
+                    },
+                    {
+                        label: t('filters.allKeys'),
+                        value: apiKeyName,
+                        onChange: (value) => {
+                            setAPIKeyName(value);
+                            setPage(1);
+                        },
+                        options: [
+                            { value: ALL, label: t('filters.allKeys') },
+                            ...apiKeys.map((key) => ({ value: key.name, label: key.name })),
+                        ],
+                    },
+                    {
+                        label: t('filters.allRouters'),
+                        value: routerID,
+                        onChange: handleRouterChange,
+                        options: [
+                            { value: ALL, label: t('filters.allRouters') },
+                            ...routers.map((router) => ({ value: String(router.id), label: router.name })),
+                        ],
+                    },
+                    {
+                        label: t('filters.allEndpoints'),
+                        value: endpointID,
+                        onChange: (value) => {
+                            setEndpointID(value);
+                            setPage(1);
+                        },
+                        options: [
+                            { value: ALL, label: t('filters.allEndpoints') },
+                            ...endpointOptions.map((endpoint) => ({
+                                value: String(endpoint.id),
+                                label: selectedRouterID ? endpoint.name : `${endpoint.routerName} / ${endpoint.name}`,
+                            })),
+                        ],
+                    },
+                ]}
+            />
 
-                    <Select value={status} onValueChange={(value) => setStatus(value as LogStatusFilter)}>
-                        <SelectTrigger size="sm" className="w-[132px] rounded-xl">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                            <SelectItem value="all">{t('filters.statusAll')}</SelectItem>
-                            <SelectItem value="success">{t('filters.statusSuccess')}</SelectItem>
-                            <SelectItem value="failed">{t('filters.statusFailed')}</SelectItem>
-                        </SelectContent>
-                    </Select>
+            <AdminTableShell>
+                <Table className="min-w-[1120px]">
+                    <TableHeader className="sticky top-0 z-10 bg-muted/50">
+                        <TableRow>
+                            <TableHead>时间</TableHead>
+                            <TableHead className="min-w-64">模型链路</TableHead>
+                            <TableHead>令牌</TableHead>
+                            <TableHead>路由</TableHead>
+                            <TableHead>耗时</TableHead>
+                            <TableHead>Token</TableHead>
+                            <TableHead>成本</TableHead>
+                            <TableHead>状态</TableHead>
+                            <TableHead className="text-right">操作</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading ? (
+                            <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">加载中...</TableCell></TableRow>
+                        ) : rows.length === 0 ? (
+                            <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">暂无日志</TableCell></TableRow>
+                        ) : rows.map((log) => {
+                            const failed = !!log.error;
+                            return (
+                                <TableRow key={log.id}>
+                                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                                        <Clock className="mr-1 inline size-3.5" />
+                                        {formatTimestamp(log.time)}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="min-w-0">
+                                            <div className="truncate font-medium">{log.request_model_name}</div>
+                                            <div className="truncate text-xs text-muted-foreground">{log.channel_name} / {log.actual_model_name}</div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="max-w-40">
+                                        <div className="flex min-w-0 items-center gap-1 text-sm">
+                                            <KeyRound className="size-3.5 shrink-0 text-muted-foreground" />
+                                            <span className="truncate">{log.request_api_key_name || '-'}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="max-w-44">
+                                        <div className="flex min-w-0 items-center gap-1 text-sm">
+                                            <Route className="size-3.5 shrink-0 text-muted-foreground" />
+                                            <span className="truncate">{log.router_name || (log.router_id ? `Router #${log.router_id}` : '-')}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="grid gap-1 text-xs text-muted-foreground">
+                                            <span><Zap className="mr-1 inline size-3.5" />FTUT {formatDuration(log.ftut)}</span>
+                                            <span><Cpu className="mr-1 inline size-3.5" />{formatDuration(log.use_time)}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap text-sm">
+                                        {log.input_tokens.toLocaleString()} / {log.output_tokens.toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap font-medium text-emerald-700 dark:text-emerald-400">
+                                        <DollarSign className="mr-1 inline size-3.5" />
+                                        {formatCost(log)}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge className={cn(
+                                            failed
+                                                ? 'bg-destructive/15 text-destructive hover:bg-destructive/15'
+                                                : 'bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15'
+                                        )}>
+                                            {failed ? '失败' : '成功'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex justify-end">
+                                            <MorphingDialog>
+                                                <MorphingDialogTrigger className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                                                    {failed ? <AlertCircle className="size-3.5" /> : <Eye className="size-3.5" />}
+                                                    详情
+                                                </MorphingDialogTrigger>
+                                                <MorphingDialogContainer>
+                                                    <MorphingDialogContent className="w-[calc(100vw-2rem)] max-w-6xl rounded-lg bg-card p-0 text-card-foreground shadow-xl">
+                                                        <LogCard log={log} />
+                                                    </MorphingDialogContent>
+                                                </MorphingDialogContainer>
+                                            </MorphingDialog>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </AdminTableShell>
 
-                    <Select value={apiKeyName} onValueChange={setAPIKeyName}>
-                        <SelectTrigger size="sm" className="w-[160px] rounded-xl">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                            <SelectItem value={ALL}>{t('filters.allKeys')}</SelectItem>
-                            {apiKeys.map((key) => (
-                                <SelectItem key={key.id} value={key.name}>
-                                    {key.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    <Select value={routerID} onValueChange={handleRouterChange}>
-                        <SelectTrigger size="sm" className="w-[170px] rounded-xl">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                            <SelectItem value={ALL}>{t('filters.allRouters')}</SelectItem>
-                            {routers.map((router) => (
-                                <SelectItem key={router.id} value={String(router.id)}>
-                                    {router.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    <Select value={endpointID} onValueChange={setEndpointID}>
-                        <SelectTrigger size="sm" className="w-[190px] rounded-xl">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                            <SelectItem value={ALL}>{t('filters.allEndpoints')}</SelectItem>
-                            {endpointOptions.map((endpoint) => (
-                                <SelectItem key={endpoint.id} value={String(endpoint.id)}>
-                                    {selectedRouterID ? endpoint.name : `${endpoint.routerName} / ${endpoint.name}`}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    {hasActiveFilters && (
-                        <button
-                            type="button"
-                            onClick={resetFilters}
-                            className="ml-auto flex h-8 items-center gap-1.5 rounded-xl border border-border bg-muted/30 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        >
-                            <RotateCcw className="size-3.5" />
-                            {t('filters.reset')}
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            <div className="min-h-0 flex-1">
-                <VirtualizedGrid
-                    items={logs}
-                    layout="list"
-                    columns={{ default: 1 }}
-                    estimateItemHeight={120}
-                    overscan={8}
-                    getItemKey={(log) => `log-${log.id}`}
-                    renderItem={(log) => <LogCard log={log} />}
-                    footer={footer}
-                    onReachEnd={handleReachEnd}
-                    reachEndEnabled={canLoadMore}
-                    reachEndOffset={2}
-                />
-            </div>
+            <AdminPagination
+                page={data?.page ?? page}
+                pageSize={data?.page_size ?? pageSize}
+                total={data?.total ?? 0}
+                onPageChange={setPage}
+                onPageSizeChange={(value) => {
+                    setPageSize(value);
+                    setPage(1);
+                }}
+            />
         </div>
     );
 }

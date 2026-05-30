@@ -2,9 +2,8 @@
 
 import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { KeyRound, Plus, Loader, Trash2, Check, X, Info, CalendarDays, Pencil, Maximize2 } from 'lucide-react';
+import { KeyRound, Plus, Loader, Trash2, Check, X, Info, CalendarDays, Pencil, Maximize2, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { PageWrapper } from '@/components/common/PageWrapper';
 import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -18,6 +17,7 @@ import {
 } from '@/components/ui/morphing-dialog';
 import {
     useAPIKeyList,
+    useAPIKeyPage,
     useCreateAPIKey,
     useUpdateAPIKey,
     useDeleteAPIKey,
@@ -25,10 +25,39 @@ import {
 } from '@/api/endpoints/apikey';
 import { useRouterList } from '@/api/endpoints/router';
 import { useStatsAPIKey } from '@/api/endpoints/stats';
+import { AdminPagination, AdminTableShell, AdminToolbar } from '@/components/common/AdminTable';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/common/Toast';
 import { CopyIconButton } from '@/components/common/CopyButton';
 import type { ApiError } from '@/api/types';
+
+function maskAPIKey(apiKey: string) {
+    if (!apiKey) return '未生成';
+    if (apiKey.length <= 12) return '****';
+    return `${apiKey.slice(0, 7)}...${apiKey.slice(-4)}`;
+}
+
+function formatExpireAt(expireAt?: number) {
+    if (!expireAt) return '永久有效';
+    return new Date(expireAt * 1000).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
 
 function toExpireAt(date: Date, time: string): number {
     const t = /^\d{2}:\d{2}$/.test(time) ? time : '00:00';
@@ -217,7 +246,7 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
                             align="start"
                             side="bottom"
                             sideOffset={8}
-                            className="w-fit rounded-2xl border border-border/60 shadow-xl overflow-hidden bg-card p-0"
+                            className="w-fit rounded-lg border border-border/60 shadow-xl overflow-hidden bg-card p-0"
                         >
                             <Calendar
                                 mode="single"
@@ -326,7 +355,7 @@ function APIKeyFormOverlay({
     return (
         <motion.div
             layoutId={layoutId}
-            className="absolute left-1/2 top-1/2 z-20 w-[min(420px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 bg-card p-5 rounded-3xl border border-border max-h-[80vh] overflow-auto"
+            className="absolute left-1/2 top-1/2 z-20 w-[min(420px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 bg-card p-5 rounded-lg border border-border max-h-[80vh] overflow-auto"
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         >
             <APIKeyForm
@@ -356,7 +385,7 @@ function APIKeyStatsCard({
     return (
         <motion.div
             layoutId={layoutId}
-            className="absolute left-1/2 top-1/2 z-30 w-[min(320px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex flex-col bg-card p-5 rounded-3xl border border-border max-h-[80vh] overflow-auto"
+            className="absolute left-1/2 top-1/2 z-30 w-[min(320px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex flex-col bg-card p-5 rounded-lg border border-border max-h-[80vh] overflow-auto"
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         >
             <div className="flex items-center justify-between gap-2 mb-3">
@@ -719,7 +748,7 @@ function APIKeyDialogPanel() {
     return (
         <APIKeyPanelBase
             idPrefix="apikey-dialog"
-            containerClassName="rounded-3xl border border-border bg-card p-6 space-y-5 relative w-screen max-w-full md:max-w-xl"
+            containerClassName="rounded-lg border border-border bg-card p-6 space-y-5 relative w-screen max-w-full md:max-w-xl"
             listClassName="space-y-2 h-[calc(100vh-10rem)] overflow-y-auto"
             renderHeaderExtra={() => (
                 <button
@@ -739,7 +768,7 @@ export function SettingAPIKey() {
     return (
         <APIKeyPanelBase
             idPrefix="apikey"
-            containerClassName="rounded-3xl border border-border bg-card p-6 space-y-5 relative"
+            containerClassName="rounded-lg border border-border bg-card p-6 space-y-5 relative"
             listClassName="space-y-2 h-36 overflow-y-auto"
             renderHeaderExtra={() => (
                 <MorphingDialog>
@@ -758,16 +787,252 @@ export function SettingAPIKey() {
 }
 
 export function TokenManagement() {
+    const t = useTranslations('setting');
+    const { data: routers = [] } = useRouterList();
+    const { data: statsList = [] } = useStatsAPIKey();
+    const createAPIKey = useCreateAPIKey();
+    const updateAPIKey = useUpdateAPIKey();
+    const deleteAPIKey = useDeleteAPIKey();
+
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [keyword, setKeyword] = useState('');
+    const [enabled, setEnabled] = useState<string>('all');
+    const [routerID, setRouterID] = useState<string>('all');
+    const [isAdding, setIsAdding] = useState(false);
+    const [editingKey, setEditingKey] = useState<APIKey | null>(null);
+
+    const { data, isLoading, isError, refetch } = useAPIKeyPage({
+        page,
+        page_size: pageSize,
+        keyword,
+        enabled: enabled === 'all' ? 'all' : enabled === 'true',
+        router_id: routerID === 'all' ? 'all' : Number(routerID),
+        sort_by: 'id',
+        sort_order: 'desc',
+    });
+    const rows = data?.items ?? [];
+    const statsByKey = useMemo(() => new Map(statsList.map((item) => [item.api_key_id, item])), [statsList]);
+    const routerNameByID = useMemo(() => new Map(routers.map((router) => [router.id, router.name])), [routers]);
+
+    const handleCreate = useCallback((payload: Omit<APIKey, 'id' | 'api_key'>) => {
+        createAPIKey.mutate(payload, {
+            onSuccess: () => {
+                toast.success(t('apiKey.toast.createSuccess'));
+                setIsAdding(false);
+            },
+            onError: (error) => {
+                const msg = (error as unknown as ApiError)?.message;
+                toast.error(t('apiKey.toast.createError'), { description: msg });
+            },
+        });
+    }, [createAPIKey, t]);
+
+    const handleUpdate = useCallback((apiKey: APIKey, payload: Omit<APIKey, 'id' | 'api_key'>) => {
+        updateAPIKey.mutate({ id: apiKey.id, ...payload }, {
+            onSuccess: () => {
+                toast.success(t('apiKey.toast.updateSuccess'));
+                setEditingKey(null);
+            },
+            onError: (error) => {
+                const msg = (error as unknown as ApiError)?.message;
+                toast.error(t('apiKey.toast.updateError'), { description: msg });
+            },
+        });
+    }, [t, updateAPIKey]);
+
+    const handleDelete = useCallback((apiKey: APIKey) => {
+        if (!window.confirm(`删除令牌 ${apiKey.name}？`)) return;
+        deleteAPIKey.mutate(apiKey.id, {
+            onSuccess: () => toast.success(t('apiKey.toast.deleteSuccess')),
+            onError: (error) => {
+                const msg = (error as unknown as ApiError)?.message;
+                toast.error(t('apiKey.toast.deleteError'), { description: msg });
+            },
+        });
+    }, [deleteAPIKey, t]);
+
     return (
-        <div className="h-full min-h-0 overflow-y-auto overscroll-contain rounded-t-3xl">
-            <PageWrapper className="mx-auto w-full max-w-3xl pb-24 md:pb-4">
-                <APIKeyPanelBase
-                    key="token-management-panel"
-                    idPrefix="token-management"
-                    containerClassName="relative flex h-[calc(100dvh-11rem)] min-h-[420px] flex-col gap-5 rounded-3xl border border-border bg-card p-6"
-                    listClassName="min-h-0 flex-1 space-y-2 overflow-y-auto"
-                />
-            </PageWrapper>
+        <div className="flex h-full min-h-0 flex-col gap-4">
+            <AdminToolbar
+                search={keyword}
+                searchPlaceholder="搜索名称或 Key..."
+                onSearchChange={(value) => {
+                    setKeyword(value);
+                    setPage(1);
+                }}
+                onRefresh={() => refetch()}
+                filters={[
+                    {
+                        label: '状态',
+                        value: enabled,
+                        onChange: (value) => {
+                            setEnabled(value);
+                            setPage(1);
+                        },
+                        options: [
+                            { value: 'all', label: '全部状态' },
+                            { value: 'true', label: '活跃' },
+                            { value: 'false', label: '禁用' },
+                        ],
+                    },
+                    {
+                        label: '路由',
+                        value: routerID,
+                        onChange: (value) => {
+                            setRouterID(value);
+                            setPage(1);
+                        },
+                        options: [
+                            { value: 'all', label: '全部路由' },
+                            ...routers.map((router) => ({ value: String(router.id), label: router.name })),
+                        ],
+                    },
+                ]}
+                action={(
+                    <Dialog open={isAdding} onOpenChange={setIsAdding}>
+                        <DialogTrigger asChild>
+                            <Button className="h-10 rounded-lg shadow-sm">
+                                <Plus className="size-4" />
+                                创建令牌
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="rounded-lg">
+                            <DialogHeader>
+                                <DialogTitle>创建令牌</DialogTitle>
+                                <DialogDescription>为指定路由创建访问令牌。</DialogDescription>
+                            </DialogHeader>
+                            <APIKeyForm
+                                isPending={createAPIKey.isPending}
+                                submitLabel={t('apiKey.form.create')}
+                                onSubmit={handleCreate}
+                                onClose={() => setIsAdding(false)}
+                            />
+                        </DialogContent>
+                    </Dialog>
+                )}
+            />
+
+            <AdminTableShell>
+                <Table className="min-w-[1080px]">
+                    <TableHeader className="sticky top-0 z-10 bg-muted/50">
+                        <TableRow>
+                            <TableHead className="min-w-48">名称</TableHead>
+                            <TableHead>API Key</TableHead>
+                            <TableHead>路由</TableHead>
+                            <TableHead>用量</TableHead>
+                            <TableHead>额度</TableHead>
+                            <TableHead>过期时间</TableHead>
+                            <TableHead>状态</TableHead>
+                            <TableHead className="text-right">操作</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading ? (
+                            <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">加载中...</TableCell></TableRow>
+                        ) : isError ? (
+                            <TableRow><TableCell colSpan={8} className="h-32 text-center text-destructive">令牌加载失败</TableCell></TableRow>
+                        ) : rows.length === 0 ? (
+                            <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">暂无令牌</TableCell></TableRow>
+                        ) : rows.map((apiKey) => {
+                            const stats = statsByKey.get(apiKey.id);
+                            return (
+                                <TableRow key={apiKey.id}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                                <KeyRound className="size-4" />
+                                            </span>
+                                            <span className="truncate font-medium">{apiKey.name}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <code className="rounded-md bg-muted px-2 py-1 text-xs text-primary">{maskAPIKey(apiKey.api_key)}</code>
+                                            <CopyIconButton
+                                                text={apiKey.api_key}
+                                                className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                copyIconClassName="size-3.5"
+                                                checkIconClassName="size-3.5"
+                                            />
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>{apiKey.router_id ? routerNameByID.get(apiKey.router_id) ?? `Router #${apiKey.router_id}` : '-'}</TableCell>
+                                    <TableCell>
+                                        <div className="grid gap-1 text-xs text-muted-foreground">
+                                            <span>请求 {stats?.request_count.formatted.value ?? '0'}{stats?.request_count.formatted.unit ?? ''}</span>
+                                            <span>Token {stats?.total_token.formatted.value ?? '0'}{stats?.total_token.formatted.unit ?? ''}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {apiKey.max_cost ? (
+                                            <span>{stats?.total_cost.formatted.value ?? '0'}{stats?.total_cost.formatted.unit ?? ''} / ${apiKey.max_cost.toFixed(2)}</span>
+                                        ) : (
+                                            <span className="text-muted-foreground">无限制</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>{formatExpireAt(apiKey.expire_at)}</TableCell>
+                                    <TableCell>
+                                        <Badge className={apiKey.enabled ? 'bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15' : 'bg-slate-500/15 text-slate-600 hover:bg-slate-500/15'}>
+                                            {apiKey.enabled ? '活跃' : '禁用'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center justify-end gap-1">
+                                            <Dialog open={editingKey?.id === apiKey.id} onOpenChange={(open) => setEditingKey(open ? apiKey : null)}>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs text-muted-foreground">
+                                                        <Pencil className="size-3.5" />
+                                                        编辑
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="rounded-lg">
+                                                    <DialogHeader>
+                                                        <DialogTitle>编辑令牌</DialogTitle>
+                                                        <DialogDescription>{apiKey.name}</DialogDescription>
+                                                    </DialogHeader>
+                                                    <APIKeyForm
+                                                        apiKey={apiKey}
+                                                        isPending={updateAPIKey.isPending}
+                                                        submitLabel={t('apiKey.form.save')}
+                                                        onSubmit={(payload) => handleUpdate(apiKey, payload)}
+                                                        onClose={() => setEditingKey(null)}
+                                                    />
+                                                </DialogContent>
+                                            </Dialog>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                                disabled={deleteAPIKey.isPending}
+                                                onClick={() => handleDelete(apiKey)}
+                                            >
+                                                {deleteAPIKey.isPending && deleteAPIKey.variables === apiKey.id ? (
+                                                    <RefreshCw className="size-3.5 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="size-3.5" />
+                                                )}
+                                                删除
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </AdminTableShell>
+
+            <AdminPagination
+                page={data?.page ?? page}
+                pageSize={data?.page_size ?? pageSize}
+                total={data?.total ?? 0}
+                onPageChange={setPage}
+                onPageSizeChange={(value) => {
+                    setPageSize(value);
+                    setPage(1);
+                }}
+            />
         </div>
     );
 }

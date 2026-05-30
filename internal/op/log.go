@@ -269,7 +269,7 @@ func RelayLogListWithFilter(ctx context.Context, filter RelayLogFilter, page, pa
 	cacheCount := len(cachedLogs)
 	offset := (page - 1) * pageSize
 
-	var result []model.RelayLog
+	result := make([]model.RelayLog, 0, pageSize)
 
 	// 先从缓存中取（缓存是最新的日志）
 	if offset < cacheCount {
@@ -374,6 +374,34 @@ func RelayLogSummaryListWithFilter(ctx context.Context, filter RelayLogFilter, p
 	}
 
 	return result, nil
+}
+
+func RelayLogCountWithFilter(ctx context.Context, filter RelayLogFilter) (int, error) {
+	enabled, err := SettingGetBool(model.SettingKeyRelayLogKeepEnabled)
+	if err != nil {
+		return 0, err
+	}
+	hasTimeFilter := filter.StartTime != nil && filter.EndTime != nil
+	total := 0
+
+	relayLogCacheLock.Lock()
+	for _, item := range relayLogCache {
+		if relayLogMatchFilter(item, filter, hasTimeFilter) {
+			total++
+		}
+	}
+	relayLogCacheLock.Unlock()
+
+	if enabled {
+		var dbTotal int64
+		query := applyRelayLogFilter(db.GetDB().WithContext(ctx).Model(&model.RelayLog{}), filter, hasTimeFilter)
+		if err := query.Count(&dbTotal).Error; err != nil {
+			return 0, err
+		}
+		total += int(dbTotal)
+	}
+
+	return total, nil
 }
 
 func RelayLogGet(ctx context.Context, id int64) (model.RelayLog, error) {

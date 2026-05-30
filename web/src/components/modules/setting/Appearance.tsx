@@ -13,7 +13,7 @@ export function SettingAppearance() {
     const { locale, setLocale, advancedMotionEnabled, setAdvancedMotionEnabled } = useSettingStore();
 
     return (
-        <div className="rounded-3xl border border-border bg-card p-6 space-y-5">
+        <div className="rounded-lg border border-border bg-card p-6 space-y-5">
             <h2 className="text-lg font-bold text-card-foreground flex items-center gap-2">
                 <Sun className="h-5 w-5" />
                 {t('appearance')}

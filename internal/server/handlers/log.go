@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/zkk520/uni-router/internal/model"
 	"github.com/zkk520/uni-router/internal/op"
 	"github.com/zkk520/uni-router/internal/server/middleware"
 	"github.com/zkk520/uni-router/internal/server/resp"
@@ -21,6 +22,10 @@ func init() {
 		AddRoute(
 			router.NewRoute("/list", http.MethodGet).
 				Handle(listLog),
+		).
+		AddRoute(
+			router.NewRoute("/page", http.MethodGet).
+				Handle(pageLog),
 		).
 		AddRoute(
 			router.NewRoute("/clear", http.MethodDelete).
@@ -43,50 +48,15 @@ func init() {
 }
 
 func listLog(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	startTimeStr := c.Query("start_time")
-	endTimeStr := c.Query("end_time")
-	apiKeyName := c.Query("api_key_name")
-	routerID, _ := strconv.Atoi(c.Query("router_id"))
-	endpointID, _ := strconv.Atoi(c.Query("endpoint_id"))
-	status := c.Query("status")
-	includeContent, _ := strconv.ParseBool(c.DefaultQuery("include_content", "true"))
-
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-
-	var startTime, endTime *int
-	if startTimeStr != "" && endTimeStr != "" {
-		st, err := strconv.Atoi(startTimeStr)
-		if err != nil {
-			resp.Error(c, http.StatusBadRequest, err.Error())
-			return
-		}
-		et, err := strconv.Atoi(endTimeStr)
-		if err != nil {
-			resp.Error(c, http.StatusBadRequest, err.Error())
-			return
-		}
-		startTime = &st
-		endTime = &et
-	}
-
-	filter := op.RelayLogFilter{
-		StartTime:  startTime,
-		EndTime:    endTime,
-		APIKeyName: apiKeyName,
-		RouterID:   routerID,
-		EndpointID: endpointID,
-		Status:     status,
+	pageParams := parsePageParams(c)
+	filter, includeContent, err := parseLogQuery(c)
+	if err != nil {
+		resp.Error(c, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	if !includeContent {
-		logs, err := op.RelayLogSummaryListWithFilter(c.Request.Context(), filter, page, pageSize)
+		logs, err := op.RelayLogSummaryListWithFilter(c.Request.Context(), filter, pageParams.Page, pageParams.PageSize)
 		if err != nil {
 			resp.Error(c, http.StatusInternalServerError, err.Error())
 			return
@@ -95,13 +65,97 @@ func listLog(c *gin.Context) {
 		return
 	}
 
-	logs, err := op.RelayLogListWithFilter(c.Request.Context(), filter, page, pageSize)
+	logs, err := op.RelayLogListWithFilter(c.Request.Context(), filter, pageParams.Page, pageParams.PageSize)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	resp.Success(c, logs)
+}
+
+func parseLogQuery(c *gin.Context) (op.RelayLogFilter, bool, error) {
+	startTimeStr := c.Query("start_time")
+	endTimeStr := c.Query("end_time")
+	apiKeyName := c.Query("api_key_name")
+	routerID, _ := strconv.Atoi(c.Query("router_id"))
+	endpointID, _ := strconv.Atoi(c.Query("endpoint_id"))
+	status := c.Query("status")
+	includeContent, _ := strconv.ParseBool(c.DefaultQuery("include_content", "true"))
+
+	var startTime, endTime *int
+	if startTimeStr != "" && endTimeStr != "" {
+		st, err := strconv.Atoi(startTimeStr)
+		if err != nil {
+			return op.RelayLogFilter{}, includeContent, err
+		}
+		et, err := strconv.Atoi(endTimeStr)
+		if err != nil {
+			return op.RelayLogFilter{}, includeContent, err
+		}
+		startTime = &st
+		endTime = &et
+	}
+
+	return op.RelayLogFilter{
+		StartTime:  startTime,
+		EndTime:    endTime,
+		APIKeyName: apiKeyName,
+		RouterID:   routerID,
+		EndpointID: endpointID,
+		Status:     status,
+	}, includeContent, nil
+}
+
+func pageLog(c *gin.Context) {
+	pageParams := parsePageParams(c)
+	filter, includeContent, err := parseLogQuery(c)
+	if err != nil {
+		resp.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !includeContent {
+		logs, err := op.RelayLogSummaryListWithFilter(c.Request.Context(), filter, pageParams.Page, pageParams.PageSize)
+		if err != nil {
+			resp.Error(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if logs == nil {
+			logs = []model.RelayLogSummary{}
+		}
+		total, err := op.RelayLogCountWithFilter(c.Request.Context(), filter)
+		if err != nil {
+			resp.Error(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		resp.Success(c, op.PageResult[model.RelayLogSummary]{
+			Items:    logs,
+			Total:    total,
+			Page:     pageParams.Page,
+			PageSize: pageParams.PageSize,
+		})
+		return
+	}
+
+	logs, err := op.RelayLogListWithFilter(c.Request.Context(), filter, pageParams.Page, pageParams.PageSize)
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if logs == nil {
+		logs = []model.RelayLog{}
+	}
+	total, err := op.RelayLogCountWithFilter(c.Request.Context(), filter)
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	resp.Success(c, op.PageResult[model.RelayLog]{
+		Items:    logs,
+		Total:    total,
+		Page:     pageParams.Page,
+		PageSize: pageParams.PageSize,
+	})
 }
 
 func detailLog(c *gin.Context) {

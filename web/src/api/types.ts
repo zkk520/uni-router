@@ -20,8 +20,11 @@ export interface ApiError {
  * 分页请求参数
  */
 export interface PaginationParams {
-    page: number;
-    page_size: number;
+    page?: number;
+    page_size?: number;
+    keyword?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
 }
 
 /**
@@ -32,7 +35,6 @@ export interface PaginatedResponse<T> {
     total: number;
     page: number;
     page_size: number;
-    total_pages: number;
 }
 
 /**

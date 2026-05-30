@@ -26,6 +26,10 @@ func init() {
 				Handle(listAPIKey),
 		).
 		AddRoute(
+			router.NewRoute("/page", http.MethodGet).
+				Handle(pageAPIKey),
+		).
+		AddRoute(
 			router.NewRoute("/update", http.MethodPost).
 				Handle(updateAPIKey),
 		).
@@ -66,6 +70,25 @@ func listAPIKey(c *gin.Context) {
 		return
 	}
 	resp.Success(c, apiKeys)
+}
+
+func pageAPIKey(c *gin.Context) {
+	enabled, ok := parseOptionalBool(c.Query("enabled"))
+	if !ok {
+		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidParam)
+		return
+	}
+	routerID, _ := strconv.Atoi(c.Query("router_id"))
+	result, err := op.APIKeyPage(c.Request.Context(), op.APIKeyPageFilter{
+		PageParams: parsePageParams(c),
+		Enabled:    enabled,
+		RouterID:   routerID,
+	})
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	resp.Success(c, result)
 }
 
 func updateAPIKey(c *gin.Context) {

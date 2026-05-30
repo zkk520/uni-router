@@ -26,6 +26,10 @@ func init() {
 				Handle(listChannel),
 		).
 		AddRoute(
+			router.NewRoute("/page", http.MethodGet).
+				Handle(pageChannel),
+		).
+		AddRoute(
 			router.NewRoute("/create", http.MethodPost).
 				Handle(createChannel),
 		).
@@ -67,6 +71,32 @@ func listChannel(c *gin.Context) {
 		attachChannelStats(&channels[i])
 	}
 	resp.Success(c, channels)
+}
+
+func pageChannel(c *gin.Context) {
+	enabled, ok := parseOptionalBool(c.Query("enabled"))
+	if !ok {
+		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidParam)
+		return
+	}
+	channelType, ok := parseOptionalInt(c.Query("type"))
+	if !ok {
+		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidParam)
+		return
+	}
+	result, err := op.ChannelPage(c.Request.Context(), op.ChannelPageFilter{
+		PageParams: parsePageParams(c),
+		Enabled:    enabled,
+		Type:       channelType,
+	})
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	for i := range result.Items {
+		attachChannelStats(&result.Items[i])
+	}
+	resp.Success(c, result)
 }
 
 func createChannel(c *gin.Context) {
