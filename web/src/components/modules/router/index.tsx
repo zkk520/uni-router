@@ -637,11 +637,12 @@ export function Router() {
     };
 
     return (
-        <div className="grid h-full min-h-0 gap-4 md:grid-cols-[360px_1fr]">
+        <div className="grid h-full min-h-0 gap-4 overflow-auto lg:grid-cols-[360px_1fr] lg:overflow-hidden">
             <div className="flex min-h-0 flex-col gap-3">
                 <AdminToolbar
                     search={keyword}
                     searchPlaceholder="搜索路由..."
+                    compact
                     onSearchChange={(value) => {
                         setKeyword(value);
                         setPage(1);
@@ -663,14 +664,14 @@ export function Router() {
                         },
                     ]}
                     action={(
-                        <Button className="h-10 rounded-lg shadow-sm" onClick={create} disabled={createRouter.isPending}>
+                        <Button className="h-10 flex-1 rounded-lg shadow-sm sm:flex-none" onClick={create} disabled={createRouter.isPending}>
                             <Plus className="size-4" />
                             创建路由
                         </Button>
                     )}
                 />
-                <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card/95 p-4 shadow-sm">
-                <div className="min-h-0 flex-1 overflow-auto space-y-2">
+                <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card/95 shadow-sm lg:flex-1">
+                <div className="min-h-0 space-y-2 p-3 lg:flex-1 lg:overflow-auto">
                     {isLoading ? (
                         <div className="flex justify-center p-6"><Loader2 className="size-5 animate-spin" /></div>
                     ) : error ? (
@@ -695,10 +696,41 @@ export function Router() {
                                     }
                                 }}
                                 className={cn(
-                                    'w-full cursor-pointer rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                    selected === router.id ? 'border-primary bg-primary/5' : 'border-border bg-muted/20 hover:bg-muted/40'
+                                    'relative w-full cursor-pointer rounded-lg border p-3 pr-10 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                    selected === router.id ? 'border-primary bg-primary/[0.035]' : 'border-border bg-muted/20 hover:bg-muted/40'
                                 )}
                             >
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <button
+                                            type="button"
+                                            aria-label="删除路由"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                        >
+                                            <X className="size-4" />
+                                        </button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>删除路由？</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                将删除“{router.name}”及其所有端点。已绑定 API Key 的路由无法删除，系统会阻止该操作。
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>取消</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                className="bg-destructive text-white hover:bg-destructive/90"
+                                                onClick={() => deleteRouter.mutate(router.id, {
+                                                    onError: (error) => toast.error('删除失败', { description: String(error) }),
+                                                })}
+                                            >
+                                                删除路由
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="truncate text-sm font-semibold">{router.name}</span>
                                     <Badge variant="outline">{routeModeLabel(router.mode)}</Badge>
@@ -707,7 +739,7 @@ export function Router() {
                                     {router.endpoints?.length ?? 0} 个端点 / {boundKeyCount} 个密钥
                                 </div>
                                 {boundKey ? (
-                                    <div className="mt-3 rounded-lg border border-border/70 bg-background/80 p-2">
+                                    <div className="mt-3 rounded-lg border border-border/60 bg-background/70 p-2">
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex min-w-0 items-center gap-2">
                                                 <KeyRound className="size-4 shrink-0 text-muted-foreground" />
@@ -754,38 +786,6 @@ export function Router() {
                                         一键创建令牌
                                     </Button>
                                 )}
-                                <div className="mt-2 flex justify-end">
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <button
-                                                type="button"
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                            >
-                                                <X className="size-4" />
-                                            </button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>删除路由？</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    将删除“{router.name}”及其所有端点。已绑定 API Key 的路由无法删除，系统会阻止该操作。
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>取消</AlertDialogCancel>
-                                                <AlertDialogAction
-                                                    className="bg-destructive text-white hover:bg-destructive/90"
-                                                    onClick={() => deleteRouter.mutate(router.id, {
-                                                        onError: (error) => toast.error('删除失败', { description: String(error) }),
-                                                    })}
-                                                >
-                                                    删除路由
-                                                </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </div>
                             </div>
                         );
                     })}
@@ -799,10 +799,11 @@ export function Router() {
                         setPageSize(value);
                         setPage(1);
                     }}
+                    compact
                 />
                 </div>
             </div>
-            <div className="min-h-0 rounded-lg border border-border bg-card/95 p-4 shadow-sm">
+            <div className="min-h-[480px] rounded-lg border border-border bg-card/95 p-4 shadow-sm lg:min-h-0 lg:overflow-hidden">
                 {selected ? <RouterDetail routerId={selected} /> : (
                     <div className="flex h-full items-center justify-center text-muted-foreground">创建一个路由后开始使用。</div>
                 )}

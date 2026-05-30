@@ -25,6 +25,7 @@ export function AdminToolbar({
     filters = [],
     onRefresh,
     action,
+    compact = false,
 }: {
     search: string;
     searchPlaceholder: string;
@@ -32,7 +33,50 @@ export function AdminToolbar({
     filters?: FilterControl[];
     onRefresh?: () => void;
     action?: React.ReactNode;
+    compact?: boolean;
 }) {
+    if (compact) {
+        return (
+            <div className="rounded-lg border border-border bg-card/95 p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="relative min-w-0 lg:max-w-80 lg:flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            value={search}
+                            onChange={(event) => onSearchChange(event.target.value)}
+                            placeholder={searchPlaceholder}
+                            className="h-10 rounded-lg bg-background/80 pl-9 shadow-none"
+                        />
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                        {filters.map((filter) => (
+                            <Select key={filter.label} value={filter.value} onValueChange={filter.onChange}>
+                                <SelectTrigger className="h-10 min-w-0 flex-1 rounded-lg bg-background/80 shadow-none lg:w-44 lg:flex-none">
+                                    <SelectValue placeholder={filter.label} />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-lg">
+                                    {filter.options.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        ))}
+                        {onRefresh ? (
+                            <Button variant="outline" size="icon" className="size-10 shrink-0 rounded-lg bg-background/80 shadow-sm" onClick={onRefresh}>
+                                <RefreshCw className="size-4" />
+                            </Button>
+                        ) : null}
+                        <div className="flex min-w-0 flex-1 justify-end lg:flex-none">
+                            {action}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/95 p-4 shadow-sm md:flex-row md:flex-wrap md:items-center md:justify-between">
             <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
@@ -92,24 +136,40 @@ export function AdminPagination({
     total,
     onPageChange,
     onPageSizeChange,
+    compact = false,
 }: {
     page: number;
     pageSize: number;
     total: number;
     onPageChange: (page: number) => void;
     onPageSizeChange: (pageSize: number) => void;
+    compact?: boolean;
 }) {
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
     const end = Math.min(total, page * pageSize);
 
     return (
-        <div className="flex flex-col gap-3 border-t border-border bg-card/95 px-4 py-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-            <div>
-                显示 {start} 至 {end} 共 {total} 条结果
+        <div
+            className={cn(
+                'flex gap-3 border-t border-border bg-card/95 px-4 py-3 text-sm text-muted-foreground',
+                compact
+                    ? 'flex-col sm:flex-row sm:items-center sm:justify-between'
+                    : 'flex-col md:flex-row md:items-center md:justify-between'
+            )}
+        >
+            <div className={cn(compact && 'whitespace-nowrap')}>
+                {compact ? (
+                    <span>
+                        <span className="sm:hidden">{total} 条结果</span>
+                        <span className="hidden sm:inline">显示 {start} 至 {end} 共 {total} 条结果</span>
+                    </span>
+                ) : (
+                    <>显示 {start} 至 {end} 共 {total} 条结果</>
+                )}
             </div>
-            <div className="flex items-center justify-end gap-3">
-                <span>每页:</span>
+            <div className={cn('flex items-center gap-3', compact ? 'justify-between sm:justify-end' : 'justify-end')}>
+                <span className="shrink-0">每页:</span>
                 <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
                     <SelectTrigger className="h-9 w-20 rounded-lg bg-background/80 shadow-none">
                         <SelectValue />
