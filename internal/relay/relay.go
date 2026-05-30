@@ -136,7 +136,12 @@ func (ra *relayAttempt) copyHeaders(outboundRequest *http.Request) {
 
 // sendRequest 发送 HTTP 请求
 func (ra *relayAttempt) sendRequest(req *http.Request) (*http.Response, error) {
-	httpClient, err := helper.ChannelHttpClient(ra.channel)
+	stream := ra.internalRequest.Stream != nil && *ra.internalRequest.Stream
+	httpClientFn := helper.ChannelHttpClient
+	if stream {
+		httpClientFn = helper.ChannelStreamHttpClient
+	}
+	httpClient, err := httpClientFn(ra.channel)
 	if err != nil {
 		log.Warnf("failed to get http client: %v", err)
 		return nil, err

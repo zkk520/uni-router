@@ -15,16 +15,34 @@ import (
 )
 
 var (
-	systemDirectClient *http.Client
-	systemProxyClient  *http.Client
-	systemProxyURL     string
-	clientLock         sync.RWMutex
+	systemDirectClient       *http.Client
+	systemProxyClient        *http.Client
+	systemProxyURL           string
+	systemDirectStreamClient *http.Client
+	systemProxyStreamClient  *http.Client
+	systemProxyStreamURL     string
+	clientLock               sync.RWMutex
+)
+
+const (
+	defaultHTTPClientTimeout    = 30 * time.Second
+	streamResponseHeaderTimeout = 60 * time.Second
 )
 
 // GetHTTPClientSystemProxy returns a cached http.Client.
 // - useProxy=false: bypass proxy
 // - useProxy=true: use proxy settings from system/app settings (setting key: proxy_url)
 func GetHTTPClientSystemProxy(useProxy bool) (*http.Client, error) {
+	return getHTTPClientSystemProxy(useProxy, false)
+}
+
+// GetHTTPClientSystemProxyForStream 返回用于流式响应的缓存客户端。
+// 流式客户端不设置 http.Client.Timeout，避免整个响应体读取被总时限截断。
+func GetHTTPClientSystemProxyForStream(useProxy bool) (*http.Client, error) {
+	return getHTTPClientSystemProxy(useProxy, true)
+}
+
+func getHTTPClientSystemProxy(useProxy bool, stream bool) (*http.Client, error) {
 	if useProxy {
 		currentProxyURL, err := op.SettingGetString(model.SettingKeyProxyURL)
 		if err != nil {
@@ -35,9 +53,16 @@ func GetHTTPClientSystemProxy(useProxy bool) (*http.Client, error) {
 		}
 
 		clientLock.RLock()
-		if systemProxyClient != nil && systemProxyURL == currentProxyURL {
-			clientLock.RUnlock()
-			return systemProxyClient, nil
+		if stream {
+			if systemProxyStreamClient != nil && systemProxyStreamURL == currentProxyURL {
+				clientLock.RUnlock()
+				return systemProxyStreamClient, nil
+			}
+		} else {
+			if systemProxyClient != nil && systemProxyURL == currentProxyURL {
+				clientLock.RUnlock()
+				return systemProxyClient, nil
+			}
 		}
 		clientLock.RUnlock()
 
@@ -45,13 +70,24 @@ func GetHTTPClientSystemProxy(useProxy bool) (*http.Client, error) {
 		defer clientLock.Unlock()
 
 		// Re-check after acquiring write lock.
-		if systemProxyClient != nil && systemProxyURL == currentProxyURL {
-			return systemProxyClient, nil
+		if stream {
+			if systemProxyStreamClient != nil && systemProxyStreamURL == currentProxyURL {
+				return systemProxyStreamClient, nil
+			}
+		} else {
+			if systemProxyClient != nil && systemProxyURL == currentProxyURL {
+				return systemProxyClient, nil
+			}
 		}
 
-		client, err := newHTTPClientCustomProxy(currentProxyURL)
+		client, err := newHTTPClientCustomProxyWithStream(currentProxyURL, stream)
 		if err != nil {
 			return nil, err
+		}
+		if stream {
+			systemProxyStreamClient = client
+			systemProxyStreamURL = currentProxyURL
+			return systemProxyStreamClient, nil
 		}
 		systemProxyClient = client
 		systemProxyURL = currentProxyURL
@@ -59,21 +95,38 @@ func GetHTTPClientSystemProxy(useProxy bool) (*http.Client, error) {
 	}
 
 	clientLock.RLock()
-	if !useProxy && systemDirectClient != nil {
-		clientLock.RUnlock()
-		return systemDirectClient, nil
+	if stream {
+		if systemDirectStreamClient != nil {
+			clientLock.RUnlock()
+			return systemDirectStreamClient, nil
+		}
+	} else {
+		if systemDirectClient != nil {
+			clientLock.RUnlock()
+			return systemDirectClient, nil
+		}
 	}
 	clientLock.RUnlock()
 
 	clientLock.Lock()
 	defer clientLock.Unlock()
 
-	if systemDirectClient != nil {
-		return systemDirectClient, nil
+	if stream {
+		if systemDirectStreamClient != nil {
+			return systemDirectStreamClient, nil
+		}
+	} else {
+		if systemDirectClient != nil {
+			return systemDirectClient, nil
+		}
 	}
-	client, err := newHTTPClientNoProxy()
+	client, err := newHTTPClientNoProxyWithStream(stream)
 	if err != nil {
 		return nil, err
+	}
+	if stream {
+		systemDirectStreamClient = client
+		return systemDirectStreamClient, nil
 	}
 	systemDirectClient = client
 	return systemDirectClient, nil
@@ -88,6 +141,15 @@ func GetHTTPClientCustomProxy(proxyURL string) (*http.Client, error) {
 	return newHTTPClientCustomProxy(proxyURL)
 }
 
+// GetHTTPClientCustomProxyForStream 每次返回新的流式 http.Client（不复用）。
+// proxyURL 支持：http、https、socks、socks5。
+func GetHTTPClientCustomProxyForStream(proxyURL string) (*http.Client, error) {
+	if proxyURL == "" {
+		return nil, fmt.Errorf("proxy url is empty")
+	}
+	return newHTTPClientCustomProxyWithStream(proxyURL, true)
+}
+
 func clonedDefaultTransport() (*http.Transport, error) {
 	transport, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
@@ -97,15 +159,23 @@ func clonedDefaultTransport() (*http.Transport, error) {
 }
 
 func newHTTPClientNoProxy() (*http.Client, error) {
+	return newHTTPClientNoProxyWithStream(false)
+}
+
+func newHTTPClientNoProxyWithStream(stream bool) (*http.Client, error) {
 	cloned, err := clonedDefaultTransport()
 	if err != nil {
 		return nil, err
 	}
 	cloned.Proxy = nil
-	return &http.Client{Transport: cloned, Timeout: 30 * time.Second}, nil
+	return newHTTPClient(cloned, stream), nil
 }
 
 func newHTTPClientCustomProxy(proxyURLStr string) (*http.Client, error) {
+	return newHTTPClientCustomProxyWithStream(proxyURLStr, false)
+}
+
+func newHTTPClientCustomProxyWithStream(proxyURLStr string, stream bool) (*http.Client, error) {
 	cloned, err := clonedDefaultTransport()
 	if err != nil {
 		return nil, err
@@ -132,5 +202,13 @@ func newHTTPClientCustomProxy(proxyURLStr string) (*http.Client, error) {
 		return nil, fmt.Errorf("unsupported proxy scheme: %s", proxyURL.Scheme)
 	}
 
-	return &http.Client{Transport: cloned, Timeout: 30 * time.Second}, nil
+	return newHTTPClient(cloned, stream), nil
+}
+
+func newHTTPClient(transport *http.Transport, stream bool) *http.Client {
+	if stream {
+		transport.ResponseHeaderTimeout = streamResponseHeaderTimeout
+		return &http.Client{Transport: transport}
+	}
+	return &http.Client{Transport: transport, Timeout: defaultHTTPClientTimeout}
 }

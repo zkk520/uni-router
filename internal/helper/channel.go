@@ -13,15 +13,33 @@ import (
 )
 
 func ChannelHttpClient(channel *model.Channel) (*http.Client, error) {
+	return channelHTTPClient(channel, false)
+}
+
+func ChannelStreamHttpClient(channel *model.Channel) (*http.Client, error) {
+	return channelHTTPClient(channel, true)
+}
+
+func channelHTTPClient(channel *model.Channel, stream bool) (*http.Client, error) {
 	if channel == nil {
 		return nil, errors.New("channel is nil")
 	}
 	if !channel.Proxy {
+		if stream {
+			return client.GetHTTPClientSystemProxyForStream(false)
+		}
 		return client.GetHTTPClientSystemProxy(false)
 	} else if channel.ChannelProxy == nil || strings.TrimSpace(*channel.ChannelProxy) == "" {
+		if stream {
+			return client.GetHTTPClientSystemProxyForStream(true)
+		}
 		return client.GetHTTPClientSystemProxy(true)
 	} else {
-		return client.GetHTTPClientCustomProxy(strings.TrimSpace(*channel.ChannelProxy))
+		proxyURL := strings.TrimSpace(*channel.ChannelProxy)
+		if stream {
+			return client.GetHTTPClientCustomProxyForStream(proxyURL)
+		}
+		return client.GetHTTPClientCustomProxy(proxyURL)
 	}
 }
 
