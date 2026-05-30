@@ -34,9 +34,9 @@ export function AdminToolbar({
     action?: React.ReactNode;
 }) {
     return (
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/95 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
-                <div className="relative w-full md:max-w-80">
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/95 p-4 shadow-sm md:flex-row md:flex-wrap md:items-center md:justify-between">
+            <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
+                <div className="relative w-full min-w-0 md:min-w-48 md:flex-1 md:max-w-80">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         value={search}
@@ -47,7 +47,7 @@ export function AdminToolbar({
                 </div>
                 {filters.map((filter) => (
                     <Select key={filter.label} value={filter.value} onValueChange={filter.onChange}>
-                        <SelectTrigger className="h-10 w-full rounded-lg bg-background/80 shadow-none md:w-44">
+                        <SelectTrigger className="h-10 w-full min-w-0 rounded-lg bg-background/80 shadow-none md:w-44">
                             <SelectValue placeholder={filter.label} />
                         </SelectTrigger>
                         <SelectContent className="rounded-lg">
@@ -60,7 +60,7 @@ export function AdminToolbar({
                     </Select>
                 ))}
             </div>
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
                 {onRefresh ? (
                     <Button variant="outline" size="icon" className="rounded-lg bg-background/80 shadow-sm" onClick={onRefresh}>
                         <RefreshCw className="size-4" />
