@@ -230,7 +230,7 @@ export function AppContainer() {
                 <NavBar />
             </div>
             <div className="flex min-w-0 flex-1 flex-col">
-                <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card/90 px-4 shadow-sm backdrop-blur md:px-6">
+                <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border/70 bg-card px-4 shadow-sm md:px-6">
                     <Dialog open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
                         <DialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="md:hidden">
@@ -297,7 +297,7 @@ export function AppContainer() {
                     </div>
                 </header>
 
-                <main className="min-h-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_28%_10%,oklch(0.92_0.04_185)_0%,transparent_34%),linear-gradient(180deg,oklch(0.97_0.015_190)_0%,var(--background)_42%)] p-4 md:p-6">
+                <main className="min-h-0 flex-1 overflow-hidden bg-[linear-gradient(180deg,oklch(0.975_0.01_190)_0%,var(--background)_100%)] p-4 md:p-6">
                     <AnimatePresence mode="wait" initial={false}>
                         <motion.div
                             key={activeItem}

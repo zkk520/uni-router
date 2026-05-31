@@ -367,7 +367,11 @@ func RouteSelectCandidates(route model.RouteProfile) []model.RouteEndpoint {
 	}
 
 	if route.Mode == model.RouteModeWeighted {
-		return weightedEndpointOrder(enabled)
+		ordered := weightedEndpointOrder(enabled)
+		if !route.FailoverEnabled && len(ordered) > 1 {
+			return ordered[:1]
+		}
+		return ordered
 	}
 
 	sort.Slice(enabled, func(i, j int) bool {

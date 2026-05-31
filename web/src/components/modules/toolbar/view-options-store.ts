@@ -7,11 +7,13 @@ export type ToolbarSortField = 'name' | 'created';
 export type ToolbarCreatedSortablePage = 'channel';
 export const TOOLBAR_PAGES = ['channel', 'model'] as const;
 export type ToolbarPage = (typeof TOOLBAR_PAGES)[number];
+export type RouterPage = 'router';
 export type ChannelFilter = 'all' | 'enabled' | 'disabled';
 export type ModelFilter = 'all' | 'priced' | 'free';
 
 interface ToolbarViewOptionsState {
     layouts: Partial<Record<ToolbarPage, ToolbarLayout>>;
+    routerLayouts: Partial<Record<RouterPage, ToolbarLayout>>;
     sortFields: Partial<Record<ToolbarCreatedSortablePage, ToolbarSortField>>;
     sortOrders: Partial<Record<ToolbarPage, ToolbarSortOrder>>;
     channelFilter: ChannelFilter;
@@ -19,6 +21,9 @@ interface ToolbarViewOptionsState {
 
     getLayout: (item: ToolbarPage) => ToolbarLayout;
     setLayout: (item: ToolbarPage, value: ToolbarLayout) => void;
+
+    getRouterLayout: (item: RouterPage) => ToolbarLayout;
+    setRouterLayout: (item: RouterPage, value: ToolbarLayout) => void;
 
     getSortField: (item: ToolbarCreatedSortablePage) => ToolbarSortField;
     setSortConfig: (
@@ -38,6 +43,7 @@ export const useToolbarViewOptionsStore = create<ToolbarViewOptionsState>()(
     persist(
         (set, get) => ({
             layouts: {},
+            routerLayouts: {},
             sortFields: {},
             sortOrders: {},
             channelFilter: 'all',
@@ -46,6 +52,11 @@ export const useToolbarViewOptionsStore = create<ToolbarViewOptionsState>()(
             getLayout: (item) => get().layouts[item] || 'grid',
             setLayout: (item, value) => {
                 set((state) => ({ layouts: { ...state.layouts, [item]: value } }));
+            },
+
+            getRouterLayout: (item) => get().routerLayouts[item] || 'list',
+            setRouterLayout: (item, value) => {
+                set((state) => ({ routerLayouts: { ...state.routerLayouts, [item]: value } }));
             },
 
             getSortField: (item) => get().sortFields[item] || 'name',
@@ -68,6 +79,7 @@ export const useToolbarViewOptionsStore = create<ToolbarViewOptionsState>()(
             name: 'toolbar-view-options-storage',
             partialize: (state) => ({
                 layouts: state.layouts,
+                routerLayouts: state.routerLayouts,
                 sortFields: state.sortFields,
                 sortOrders: state.sortOrders,
                 channelFilter: state.channelFilter,
