@@ -37,6 +37,16 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { toast } from '@/components/common/Toast';
 import { CopyIconButton } from '@/components/common/CopyButton';
 import { useToolbarViewOptionsStore, type ToolbarLayout } from '@/components/modules/toolbar/view-options-store';
@@ -209,7 +219,7 @@ function EditableName({
     );
 }
 
-function AddEndpointForm({
+function AddEndpointDialog({
     options,
     endpoints,
     onAdd,
@@ -218,11 +228,38 @@ function AddEndpointForm({
     endpoints: RouteEndpoint[];
     onAdd: (endpoint: RouteEndpointAddRequest) => void;
 }) {
-    const [channelId, setChannelId] = useState<number>(options[0]?.id ?? 0);
+    const [open, setOpen] = useState(false);
+    const [channelId, setChannelId] = useState<number>(options.find((item) => item.keys.length > 0)?.id ?? options[0]?.id ?? 0);
+
+    useEffect(() => {
+        if (options.length === 0) {
+            if (channelId !== 0) setChannelId(0);
+            return;
+        }
+
+        const nextChannel = options.find((item) => item.id === channelId) ?? options.find((item) => item.keys.length > 0) ?? options[0];
+        if (nextChannel.id !== channelId) {
+            setChannelId(nextChannel.id);
+        }
+    }, [channelId, options]);
 
     const channel = options.find((item) => item.id === channelId) ?? options[0];
     const keys = channel?.keys ?? [];
     const [keyId, setKeyId] = useState<number>(keys[0]?.id ?? 0);
+
+    useEffect(() => {
+        if (!channel) {
+            if (keyId !== 0) setKeyId(0);
+            return;
+        }
+
+        const nextKey = channel.keys.find((item) => item.id === keyId) ?? channel.keys[0];
+        const nextKeyId = nextKey?.id ?? 0;
+        if (nextKeyId !== keyId) {
+            setKeyId(nextKeyId);
+        }
+    }, [channel, keyId]);
+
     const effectiveKeyId = keys.some((item) => item.id === keyId) ? keyId : keys[0]?.id ?? 0;
     const selectedKey = keys.find((item) => item.id === effectiveKeyId);
     const duplicate = !!channel && !!selectedKey && endpoints.some((item) =>
@@ -241,52 +278,84 @@ function AddEndpointForm({
             use_pricing_override: false,
             pricing_rule_override: DEFAULT_PRICING_RULE,
         });
+        setOpen(false);
     };
 
     return (
-        <div className="rounded-xl border border-border/70 bg-card/80 p-4 shadow-sm">
-            <SectionTitle
-                title="添加候选端点"
-                description="从已有供应商和密钥中选择一条上游路径，加入当前路由的端点池。"
-            />
-            <div className="grid gap-3">
-                <div className="grid gap-2 md:grid-cols-2">
-                    <select
-                        value={channel?.id ?? 0}
-                        onChange={(e) => {
-                            const nextChannel = options.find((item) => item.id === Number(e.target.value));
-                            setChannelId(nextChannel?.id ?? 0);
-                            setKeyId(nextChannel?.keys[0]?.id ?? 0);
-                        }}
-                        className="h-10 rounded-lg border border-border/70 bg-background px-3 text-sm shadow-none"
-                    >
-                        {options.map((item) => (
-                            <option key={item.id} value={item.id}>
-                                {item.name}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        value={effectiveKeyId}
-                        onChange={(e) => setKeyId(Number(e.target.value))}
-                        className="h-10 rounded-lg border border-border/70 bg-background px-3 text-sm shadow-none"
-                    >
-                        {keys.map((item) => (
-                            <option key={item.id} value={item.id}>
-                                {item.remark || '无备注'} ({item.masked_key}) · {channelTypeLabel(item.effective_type)} · {item.models?.length ?? 0} 模型
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                {duplicate ? (
-                    <div className="text-xs text-destructive">该端点已在此路由中。</div>
-                ) : null}
-                <Button type="button" onClick={submit} disabled={!channel || !selectedKey || duplicate} className="rounded-lg">
-                    <Plus className="size-4 mr-2" />
-                    添加端点
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button type="button" size="sm" className="rounded-lg">
+                    <Plus className="mr-2 size-4" />
+                    添加候选端点
                 </Button>
-            </div>
-        </div>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>添加候选端点</DialogTitle>
+                    <DialogDescription>
+                        从已有供应商和密钥中选择一条上游路径，加入当前路由的端点池。
+                    </DialogDescription>
+                </DialogHeader>
+
+                {options.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                        暂无可用供应商密钥，请先创建供应商和密钥。
+                    </div>
+                ) : (
+                    <div className="grid gap-3">
+                        <div className="grid gap-2 md:grid-cols-2">
+                            <select
+                                value={channel?.id ?? 0}
+                                onChange={(e) => {
+                                    const nextChannel = options.find((item) => item.id === Number(e.target.value));
+                                    setChannelId(nextChannel?.id ?? 0);
+                                    setKeyId(nextChannel?.keys.find((item) => item.id === keyId)?.id ?? nextChannel?.keys[0]?.id ?? 0);
+                                }}
+                                className="h-10 rounded-lg border border-border/70 bg-background px-3 text-sm shadow-none"
+                            >
+                                {options.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={effectiveKeyId}
+                                onChange={(e) => setKeyId(Number(e.target.value))}
+                                className="h-10 rounded-lg border border-border/70 bg-background px-3 text-sm shadow-none"
+                            >
+                                {keys.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.remark || '无备注'} ({item.masked_key}) · {channelTypeLabel(item.effective_type)} · {item.models?.length ?? 0} 模型
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        {keys.length === 0 ? (
+                            <div className="text-xs text-muted-foreground">当前供应商暂无可用密钥，请切换供应商或先创建密钥。</div>
+                        ) : null}
+                        {duplicate ? <div className="text-xs text-destructive">该端点已在此路由中。</div> : null}
+                    </div>
+                )}
+
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button type="button" variant="outline" className="rounded-lg">
+                            取消
+                        </Button>
+                    </DialogClose>
+                    <Button
+                        type="button"
+                        onClick={submit}
+                        disabled={!channel || !selectedKey || duplicate || options.length === 0}
+                        className="rounded-lg"
+                    >
+                        <Plus className="mr-2 size-4" />
+                        添加端点
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -476,10 +545,13 @@ function RouterDetail({ routerId }: { routerId: number }) {
     return (
         <div className="flex h-full min-h-0 flex-col gap-4">
             <div className="rounded-xl border border-border/70 bg-card p-4 shadow-sm">
-                <SectionTitle
-                    title="路由策略"
-                    description="定义这条路由的名称、路由模式，以及上游失败后是否继续尝试其他候选端点。"
-                />
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <SectionTitle
+                        title="路由策略"
+                        description="定义这条路由的名称、路由模式，以及上游失败后是否继续尝试其他候选端点。"
+                    />
+                    <AddEndpointDialog options={options} endpoints={endpoints} onAdd={addEndpoint} />
+                </div>
                 <div className="grid gap-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.75fr)_minmax(0,1.1fr)] lg:items-end">
                     <div className="min-w-0">
                         <div className="mb-1 text-xs font-medium text-muted-foreground">路由名称</div>
@@ -517,8 +589,6 @@ function RouterDetail({ routerId }: { routerId: number }) {
                     </label>
                 </div>
             </div>
-
-            <AddEndpointForm options={options} endpoints={endpoints} onAdd={addEndpoint} />
 
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-4 py-3">
