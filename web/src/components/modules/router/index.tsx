@@ -24,8 +24,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/animate-ui/components/animate/tooltip';
 import { AdminPagination, AdminToolbar } from '@/components/common/AdminTable';
+import { OverflowTooltipText } from '@/components/common/OverflowTooltipText';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -141,14 +141,7 @@ function TooltipText({
     className?: string;
     tooltipClassName?: string;
 }) {
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <span className={cn('block min-w-0 truncate', className)}>{text}</span>
-            </TooltipTrigger>
-            <TooltipContent className={cn('max-w-[min(28rem,80vw)]', tooltipClassName)}>{text}</TooltipContent>
-        </Tooltip>
-    );
+    return <OverflowTooltipText text={text} className={className} tooltipClassName={tooltipClassName} />;
 }
 
 function SectionTitle({ title, description }: { title: string; description: string }) {
