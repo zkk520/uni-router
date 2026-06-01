@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Clock, Cpu, DollarSign, Eye, KeyRound, Route, Waypoints, Zap } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAPIKeyList } from '@/api/endpoints/apikey';
@@ -93,6 +93,8 @@ export function Log() {
     const [apiKeyName, setAPIKeyName] = useState(ALL);
     const [routerID, setRouterID] = useState(ALL);
     const [endpointID, setEndpointID] = useState(ALL);
+    const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+    const pendingRefreshAfterPageResetRef = useRef(false);
 
     const { data: apiKeys = [] } = useAPIKeyList();
     const { data: routers = [] } = useRouterList();
@@ -122,11 +124,28 @@ export function Log() {
     const rows = data?.items ?? [];
 
     const handleRefresh = useCallback(async () => {
+        setIsManualRefreshing(true);
+
         if (page !== 1) {
+            pendingRefreshAfterPageResetRef.current = true;
             setPage(1);
             return;
         }
-        await refetch();
+
+        try {
+            await refetch();
+        } finally {
+            setIsManualRefreshing(false);
+        }
+    }, [page, refetch]);
+
+    useEffect(() => {
+        if (page !== 1 || !pendingRefreshAfterPageResetRef.current) return;
+
+        pendingRefreshAfterPageResetRef.current = false;
+        void refetch().finally(() => {
+            setIsManualRefreshing(false);
+        });
     }, [page, refetch]);
 
     const handleRouterChange = (value: string) => {
@@ -142,7 +161,9 @@ export function Log() {
                 searchPlaceholder={t('filters.title')}
                 onSearchChange={() => undefined}
                 onRefresh={handleRefresh}
-                isRefreshing={isFetching}
+                isRefreshing={isFetching || isManualRefreshing}
+                refreshLabel="刷新日志"
+                refreshingLabel="正在刷新日志"
                 filters={[
                     {
                         label: t('filters.statusAll'),

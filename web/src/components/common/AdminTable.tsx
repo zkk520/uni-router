@@ -25,6 +25,8 @@ export function AdminToolbar({
     filters = [],
     onRefresh,
     isRefreshing = false,
+    refreshLabel = '刷新',
+    refreshingLabel = '正在刷新',
     action,
     compact = false,
 }: {
@@ -34,9 +36,13 @@ export function AdminToolbar({
     filters?: FilterControl[];
     onRefresh?: () => void | Promise<unknown>;
     isRefreshing?: boolean;
+    refreshLabel?: string;
+    refreshingLabel?: string;
     action?: React.ReactNode;
     compact?: boolean;
 }) {
+    const refreshAriaLabel = isRefreshing ? refreshingLabel : refreshLabel;
+
     if (compact) {
         return (
             <div className="rounded-xl border border-border/70 bg-card p-4 shadow-sm">
@@ -74,7 +80,7 @@ export function AdminToolbar({
                                     void onRefresh();
                                 }}
                                 disabled={isRefreshing}
-                                aria-label="刷新"
+                                aria-label={refreshAriaLabel}
                             >
                                 <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
                             </Button>
@@ -125,7 +131,7 @@ export function AdminToolbar({
                             void onRefresh();
                         }}
                         disabled={isRefreshing}
-                        aria-label="刷新"
+                        aria-label={refreshAriaLabel}
                     >
                         <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
                     </Button>
