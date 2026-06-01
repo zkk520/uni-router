@@ -9,7 +9,10 @@ interface NavState {
     activeItem: NavItem
     prevItem: NavItem | null
     direction: number
+    sidebarCollapsed: boolean
     setActiveItem: (item: NavItem) => void
+    setSidebarCollapsed: (collapsed: boolean) => void
+    toggleSidebarCollapsed: () => void
 }
 
 export const useNavStore = create<NavState>()(
@@ -18,6 +21,7 @@ export const useNavStore = create<NavState>()(
             activeItem: 'home',
             prevItem: null,
             direction: 0,
+            sidebarCollapsed: false,
             setActiveItem: (item) => {
                 const { activeItem } = get()
                 const currentIndex = NAV_ORDER.indexOf(activeItem)
@@ -30,6 +34,8 @@ export const useNavStore = create<NavState>()(
                     direction
                 })
             },
+            setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+            toggleSidebarCollapsed: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
         }),
         {
             name: 'nav-storage',

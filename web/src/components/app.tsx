@@ -227,7 +227,7 @@ export function AppContainer() {
             className="flex h-dvh overflow-hidden bg-background text-foreground"
         >
             <div className="hidden shrink-0 md:block">
-                <NavBar />
+                <NavBar collapsible />
             </div>
             <div className="flex min-w-0 flex-1 flex-col">
                 <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border/70 bg-card px-4 shadow-sm md:px-6">
