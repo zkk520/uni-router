@@ -1,10 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertCircle, Clock, Cpu, DollarSign, Eye, KeyRound, Route, Zap } from 'lucide-react';
+import { AlertCircle, Clock, Cpu, DollarSign, Eye, KeyRound, Route, Waypoints, Zap } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAPIKeyList } from '@/api/endpoints/apikey';
-import { useLogPage, type RelayLog } from '@/api/endpoints/log';
+import { useLogPage, type ChannelAttempt, type RelayLog } from '@/api/endpoints/log';
 import { useRouterList } from '@/api/endpoints/router';
 import { AdminPagination, AdminTableShell, AdminToolbar } from '@/components/common/AdminTable';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,49 @@ function formatDuration(ms: number) {
 function formatCost(log: RelayLog) {
     const formatted = formatCurrencyCosts(log.total_cost_by_currency, log.cost);
     return `${formatted.formatted.value}${formatted.formatted.unit}`;
+}
+
+function formatEndpointName(endpointID?: number, endpointName?: string) {
+    const name = endpointName?.trim();
+    if (name) return name;
+    if (endpointID) return `Endpoint #${endpointID}`;
+    return '-';
+}
+
+function sortAttempts(attempts: ChannelAttempt[]) {
+    return [...attempts].sort((a, b) => a.attempt_num - b.attempt_num);
+}
+
+function sameEndpoint(a?: ChannelAttempt, endpointID?: number, endpointName?: string) {
+    if (!a) return false;
+    if (a.endpoint_id && endpointID) return a.endpoint_id === endpointID;
+    const attemptName = a.endpoint_name?.trim();
+    const name = endpointName?.trim();
+    return !!attemptName && !!name && attemptName === name;
+}
+
+function getEndpointDisplayMeta(log: RelayLog) {
+    const attempts = sortAttempts(log.attempts ?? []);
+    const primaryAttempt = attempts.find((attempt) => attempt.endpoint_id || attempt.endpoint_name?.trim());
+    const successAttempt = [...attempts].reverse().find((attempt) => attempt.status === 'success');
+    const finalEndpointID = successAttempt?.endpoint_id || log.endpoint_id;
+    const finalEndpointName = successAttempt?.endpoint_name || log.endpoint_name;
+    const label = formatEndpointName(finalEndpointID || log.endpoint_id, finalEndpointName || log.endpoint_name);
+    const hasEndpoint = label !== '-';
+
+    if (!hasEndpoint) {
+        return { label, isFailover: false, primaryName: '' };
+    }
+
+    const isFailover = primaryAttempt
+        ? !sameEndpoint(primaryAttempt, finalEndpointID, finalEndpointName)
+        : (log.total_attempts ?? 0) > 1;
+
+    return {
+        label,
+        isFailover,
+        primaryName: primaryAttempt ? formatEndpointName(primaryAttempt.endpoint_id, primaryAttempt.endpoint_name) : '',
+    };
 }
 
 export function Log() {
@@ -145,13 +188,14 @@ export function Log() {
             />
 
             <AdminTableShell>
-                <Table className="min-w-[1120px]">
+                <Table className="min-w-[1240px]">
                     <TableHeader className="sticky top-0 z-10 bg-muted/50">
                         <TableRow>
                             <TableHead>时间</TableHead>
                             <TableHead className="min-w-64">模型链路</TableHead>
                             <TableHead>令牌</TableHead>
                             <TableHead>路由</TableHead>
+                            <TableHead>端点</TableHead>
                             <TableHead>耗时</TableHead>
                             <TableHead>Token</TableHead>
                             <TableHead>成本</TableHead>
@@ -161,11 +205,15 @@ export function Log() {
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                            <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">加载中...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={10} className="h-32 text-center text-muted-foreground">加载中...</TableCell></TableRow>
                         ) : rows.length === 0 ? (
-                            <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">暂无日志</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={10} className="h-32 text-center text-muted-foreground">暂无日志</TableCell></TableRow>
                         ) : rows.map((log) => {
                             const failed = !!log.error;
+                            const endpointMeta = getEndpointDisplayMeta(log);
+                            const endpointTitle = endpointMeta.isFailover && endpointMeta.primaryName
+                                ? `主端点：${endpointMeta.primaryName}`
+                                : undefined;
                             return (
                                 <TableRow key={log.id}>
                                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
@@ -188,6 +236,24 @@ export function Log() {
                                         <div className="flex min-w-0 items-center gap-1 text-sm">
                                             <Route className="size-3.5 shrink-0 text-muted-foreground" />
                                             <span className="truncate">{log.router_name || (log.router_id ? `Router #${log.router_id}` : '-')}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="max-w-48">
+                                        <div className="grid min-w-0 gap-1" title={endpointTitle}>
+                                            <div className="flex min-w-0 items-center gap-1 text-sm">
+                                                <Waypoints className="size-3.5 shrink-0 text-muted-foreground" />
+                                                <span className="truncate">{endpointMeta.label}</span>
+                                            </div>
+                                            {endpointMeta.label !== '-' ? (
+                                                <Badge className={cn(
+                                                    'w-fit px-1.5 py-0 text-xs',
+                                                    endpointMeta.isFailover
+                                                        ? 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/15 dark:text-amber-400'
+                                                        : 'bg-muted text-muted-foreground hover:bg-muted'
+                                                )}>
+                                                    {endpointMeta.isFailover ? '故障转移' : '主端点'}
+                                                </Badge>
+                                            ) : null}
                                         </div>
                                     </TableCell>
                                     <TableCell>
