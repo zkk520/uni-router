@@ -60,6 +60,14 @@ export interface RouteOptionChannel {
 
 export type RouteEndpointAddRequest = Omit<RouteEndpoint, 'id' | 'router_id' | 'status' | 'last_checked_at' | 'last_error'>;
 
+export interface RouteProfileCreateRequest {
+    name: string;
+    mode: RouteMode;
+    preferred_endpoint_id?: number;
+    failover_enabled: boolean;
+    endpoints?: RouteEndpointAddRequest[];
+}
+
 export interface RouteProfileUpdateRequest {
     id: number;
     name?: string;
@@ -185,8 +193,11 @@ export function useRouterOptions() {
 export function useCreateRouter() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (data: Partial<RouteProfile>) => apiClient.post<RouteProfile>('/api/v1/router/create', data),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['routers'] }),
+        mutationFn: (data: RouteProfileCreateRequest) => apiClient.post<RouteProfile>('/api/v1/router/create', data),
+        onSuccess: (router) => {
+            applyRouteCache(queryClient, router);
+            queryClient.invalidateQueries({ queryKey: ['routers'] });
+        },
     });
 }
 
@@ -217,7 +228,10 @@ export function useDeleteRouter() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (id: number) => apiClient.delete<null>(`/api/v1/router/delete/${id}`),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['routers'] }),
+        onSuccess: (_, id) => {
+            queryClient.removeQueries({ queryKey: routerDetailQueryKey(id) });
+            queryClient.invalidateQueries({ queryKey: ['routers'] });
+        },
     });
 }
 

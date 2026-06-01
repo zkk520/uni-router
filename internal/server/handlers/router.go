@@ -64,16 +64,16 @@ func getRouter(c *gin.Context) {
 }
 
 func createRouter(c *gin.Context) {
-	var route model.RouteProfile
-	if err := c.ShouldBindJSON(&route); err != nil {
+	var req model.RouteProfileCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
 		return
 	}
-	if err := op.RouteProfileCreate(&route, c.Request.Context()); err != nil {
+	detail, err := op.RouteProfileCreateFromRequest(&req, c.Request.Context())
+	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	detail, _ := op.RouteProfileGet(route.ID, c.Request.Context())
 	resp.Success(c, detail)
 }
 

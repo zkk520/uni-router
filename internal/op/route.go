@@ -73,13 +73,47 @@ func RouteProfileGet(id int, ctx context.Context) (*RouteProfileDetail, error) {
 }
 
 func RouteProfileCreate(route *model.RouteProfile, ctx context.Context) error {
+	return routeProfileCreate(route, ctx, true)
+}
+
+func RouteProfileCreateFromRequest(req *model.RouteProfileCreateRequest, ctx context.Context) (*RouteProfileDetail, error) {
+	failoverEnabled := true
+	if req.FailoverEnabled != nil {
+		failoverEnabled = *req.FailoverEnabled
+	}
+	route := &model.RouteProfile{
+		Name:                req.Name,
+		Mode:                req.Mode,
+		PreferredEndpointID: req.PreferredEndpointID,
+		FailoverEnabled:     failoverEnabled,
+		Endpoints:           make([]model.RouteEndpoint, 0, len(req.Endpoints)),
+	}
+	for _, item := range req.Endpoints {
+		route.Endpoints = append(route.Endpoints, model.RouteEndpoint{
+			Name:                item.Name,
+			ChannelID:           item.ChannelID,
+			ChannelKeyID:        item.ChannelKeyID,
+			Priority:            item.Priority,
+			Weight:              item.Weight,
+			Enabled:             item.Enabled,
+			UsePricingOverride:  item.UsePricingOverride,
+			PricingRuleOverride: item.PricingRuleOverride,
+		})
+	}
+	if err := routeProfileCreate(route, ctx, req.FailoverEnabled == nil); err != nil {
+		return nil, err
+	}
+	return RouteProfileGet(route.ID, ctx)
+}
+
+func routeProfileCreate(route *model.RouteProfile, ctx context.Context, defaultFailover bool) error {
 	now := time.Now().Unix()
 	route.CreatedAt = now
 	route.UpdatedAt = now
 	if route.Mode == "" {
 		route.Mode = model.RouteModeManual
 	}
-	if !route.FailoverEnabled {
+	if defaultFailover && !route.FailoverEnabled {
 		route.FailoverEnabled = true
 	}
 	if err := ensureUniqueRouteEndpoints(route.Endpoints); err != nil {
@@ -88,8 +122,16 @@ func RouteProfileCreate(route *model.RouteProfile, ctx context.Context) error {
 	for i := range route.Endpoints {
 		normalizeEndpoint(&route.Endpoints[i], now)
 	}
+	preserveDisabledFailover := !defaultFailover && !route.FailoverEnabled
 	if err := db.GetDB().WithContext(ctx).Create(route).Error; err != nil {
 		return fmt.Errorf("failed to create router: %w", err)
+	}
+	if preserveDisabledFailover {
+		if err := db.GetDB().WithContext(ctx).Model(&model.RouteProfile{}).
+			Where("id = ?", route.ID).
+			Update("failover_enabled", false).Error; err != nil {
+			return fmt.Errorf("failed to preserve router failover setting: %w", err)
+		}
 	}
 	return routeRefreshCacheByID(route.ID, ctx)
 }

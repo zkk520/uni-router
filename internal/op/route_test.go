@@ -46,6 +46,38 @@ func TestEnsureUniqueRouteEndpointAddsAllowsDeletedExistingEndpoint(t *testing.T
 	}
 }
 
+func TestRouteProfileCreateFromRequestDefaultsFailoverEnabled(t *testing.T) {
+	ctx := setupTestDB(t)
+
+	detail, err := RouteProfileCreateFromRequest(&model.RouteProfileCreateRequest{
+		Name: "route-create-default-failover",
+	}, ctx)
+
+	if err != nil {
+		t.Fatalf("create route from request: %v", err)
+	}
+	if !detail.FailoverEnabled {
+		t.Fatal("expected omitted failover_enabled to default to true")
+	}
+}
+
+func TestRouteProfileCreateFromRequestPreservesDisabledFailover(t *testing.T) {
+	ctx := setupTestDB(t)
+	disabled := false
+
+	detail, err := RouteProfileCreateFromRequest(&model.RouteProfileCreateRequest{
+		Name:            "route-create-disabled-failover",
+		FailoverEnabled: &disabled,
+	}, ctx)
+
+	if err != nil {
+		t.Fatalf("create route from request: %v", err)
+	}
+	if detail.FailoverEnabled {
+		t.Fatal("expected explicit failover_enabled=false to be preserved")
+	}
+}
+
 func TestRouteSelectModelListEndpointPrefersPreferredEndpoint(t *testing.T) {
 	route := model.RouteProfile{
 		PreferredEndpointID: 2,

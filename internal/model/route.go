@@ -26,6 +26,14 @@ type RouteProfile struct {
 	UpdatedAt           int64           `json:"updated_at"`
 }
 
+type RouteProfileCreateRequest struct {
+	Name                string                    `json:"name" binding:"required"`
+	Mode                RouteMode                 `json:"mode"`
+	PreferredEndpointID int                       `json:"preferred_endpoint_id"`
+	FailoverEnabled     *bool                     `json:"failover_enabled,omitempty"`
+	Endpoints           []RouteEndpointAddRequest `json:"endpoints,omitempty"`
+}
+
 type RouteEndpoint struct {
 	ID                  int                 `json:"id" gorm:"primaryKey"`
 	RouterID            int                 `json:"router_id" gorm:"not null;index"`

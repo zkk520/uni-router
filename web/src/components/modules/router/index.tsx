@@ -16,6 +16,7 @@ import {
     type RouteMode,
     type RouteOptionChannel,
     type RouteProfile,
+    type RouteProfileCreateRequest,
 } from '@/api/endpoints/router';
 import { useCreateAPIKey } from '@/api/endpoints/apikey';
 import { useModelList } from '@/api/endpoints/model';
@@ -86,7 +87,7 @@ function channelTypeLabel(type?: ChannelType) {
     }
 }
 
-function endpointLabel(endpoint: RouteEndpoint, options: RouteOptionChannel[]) {
+function endpointLabel(endpoint: Pick<RouteEndpoint, 'channel_id' | 'channel_key_id'>, options: RouteOptionChannel[]) {
     const channel = options.find((item) => item.id === endpoint.channel_id);
     const key = channel?.keys.find((item) => item.id === endpoint.channel_key_id);
     return {
@@ -102,7 +103,7 @@ function maskAPIKey(apiKey: string) {
     return `${apiKey.slice(0, 6)}***${apiKey.slice(-4)}`;
 }
 
-function endpointOptionKey(endpoint: RouteEndpoint, options: RouteOptionChannel[]) {
+function endpointOptionKey(endpoint: Pick<RouteEndpoint, 'channel_id' | 'channel_key_id'>, options: RouteOptionChannel[]) {
     const channel = options.find((item) => item.id === endpoint.channel_id);
     return channel?.keys.find((item) => item.id === endpoint.channel_key_id);
 }
@@ -218,7 +219,7 @@ function AddEndpointDialog({
     onAdd,
 }: {
     options: RouteOptionChannel[];
-    endpoints: RouteEndpoint[];
+    endpoints: Array<Pick<RouteEndpoint, 'channel_id' | 'channel_key_id'>>;
     onAdd: (endpoint: RouteEndpointAddRequest) => void;
 }) {
     const [open, setOpen] = useState(false);
@@ -330,6 +331,273 @@ function AddEndpointDialog({
     );
 }
 
+function RouteStrategyForm({
+    name,
+    mode,
+    failoverEnabled,
+    onNameChange,
+    onModeChange,
+    onFailoverChange,
+}: {
+    name: string;
+    mode: RouteMode;
+    failoverEnabled: boolean;
+    onNameChange: (value: string) => void;
+    onModeChange: (value: RouteMode) => void;
+    onFailoverChange: (value: boolean) => void;
+}) {
+    return (
+        <div className="grid gap-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.75fr)_minmax(0,1.1fr)] lg:items-end">
+            <div className="min-w-0">
+                <div className="mb-1 text-xs font-medium text-muted-foreground">路由名称</div>
+                <Input
+                    value={name}
+                    onChange={(e) => onNameChange(e.target.value)}
+                    className="h-10 rounded-lg font-semibold shadow-none"
+                    placeholder="路由名称"
+                />
+            </div>
+            <label className="grid min-w-0 gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">路由模式</span>
+                <select
+                    value={mode}
+                    onChange={(e) => onModeChange(e.target.value as RouteMode)}
+                    className="h-10 w-full min-w-0 rounded-lg border border-border/70 bg-background px-3 text-sm shadow-none"
+                >
+                    <option value="manual">主备模式</option>
+                    <option value="weighted">加权分流</option>
+                </select>
+            </label>
+            <label className="flex h-10 min-w-0 items-center gap-1.5 self-end whitespace-nowrap rounded-lg border border-border/70 bg-background px-2.5 text-sm">
+                <Switch checked={failoverEnabled} onCheckedChange={onFailoverChange} />
+                <span className="shrink-0">故障转移</span>
+            </label>
+        </div>
+    );
+}
+
+function CreateRouterDialog({
+    open,
+    onOpenChange,
+    defaultName,
+    onCreate,
+    isPending,
+}: {
+    open: boolean;
+    onOpenChange: (value: boolean) => void;
+    defaultName: string;
+    onCreate: (data: RouteProfileCreateRequest, options: { preferredEndpointKey?: string }) => void;
+    isPending: boolean;
+}) {
+    const { data: options = [] } = useRouterOptions();
+    const [name, setName] = useState(defaultName);
+    const [mode, setMode] = useState<RouteMode>('manual');
+    const [failoverEnabled, setFailoverEnabled] = useState(true);
+    const [endpoints, setEndpoints] = useState<RouteEndpointAddRequest[]>([]);
+    const [preferredIndex, setPreferredIndex] = useState(0);
+    const safePreferredIndex = endpoints.length === 0 ? 0 : Math.min(preferredIndex, endpoints.length - 1);
+
+    const totalWeight = useMemo(() => endpoints.reduce((sum, item) => sum + Math.max(1, item.weight || 1), 0), [endpoints]);
+    const duplicateEndpointKeys = useMemo(() => {
+        const firstByKey = new Map<string, number>();
+        const duplicates = new Set<number>();
+        endpoints.forEach((endpoint, index) => {
+            const key = endpointKey(endpoint);
+            const first = firstByKey.get(key);
+            if (first == null) {
+                firstByKey.set(key, index);
+            } else {
+                duplicates.add(first);
+                duplicates.add(index);
+            }
+        });
+        return duplicates;
+    }, [endpoints]);
+    const hasDuplicates = duplicateEndpointKeys.size > 0;
+
+    const addEndpoint = (endpoint: RouteEndpointAddRequest) => {
+        setEndpoints((current) => [...current, { ...endpoint, priority: current.length + 1 }]);
+    };
+
+    const updateEndpoint = (index: number, patch: Partial<RouteEndpointAddRequest>) => {
+        setEndpoints((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
+    };
+
+    const removeEndpoint = (index: number) => {
+        setEndpoints((current) => current
+            .filter((_, itemIndex) => itemIndex !== index)
+            .map((item, itemIndex) => ({ ...item, priority: itemIndex + 1 }))
+        );
+        setPreferredIndex((current) => {
+            if (endpoints.length <= 1) return 0;
+            if (current === index) return Math.min(index, endpoints.length - 2);
+            if (current > index) return current - 1;
+            return current;
+        });
+    };
+
+    const moveEndpoint = (index: number, direction: -1 | 1) => {
+        setEndpoints((current) => {
+            const target = index + direction;
+            if (target < 0 || target >= current.length) return current;
+            const next = [...current];
+            const [item] = next.splice(index, 1);
+            next.splice(target, 0, item);
+            return next.map((endpoint, itemIndex) => ({ ...endpoint, priority: itemIndex + 1 }));
+        });
+        setPreferredIndex((current) => {
+            const target = index + direction;
+            if (current === index) return target;
+            if (current === target) return index;
+            return current;
+        });
+    };
+
+    const submit = () => {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+            toast.error('请填写路由名称');
+            return;
+        }
+        if (hasDuplicates) {
+            toast.error('请先删除重复的候选端点');
+            return;
+        }
+        const orderedEndpoints = endpoints.map((endpoint, index) => ({ ...endpoint, priority: index + 1 }));
+        const preferredEndpoint = mode === 'manual' ? orderedEndpoints[safePreferredIndex] : undefined;
+        onCreate(
+            {
+                name: trimmedName,
+                mode,
+                failover_enabled: failoverEnabled,
+                endpoints: orderedEndpoints,
+            },
+            { preferredEndpointKey: preferredEndpoint ? endpointKey(preferredEndpoint) : undefined }
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={(value) => !isPending && onOpenChange(value)}>
+            <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle>创建路由</DialogTitle>
+                    <DialogDescription>
+                        先在弹窗中配置路由草稿；点击创建成功后，才会加入左侧列表并进入右侧编辑。
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="min-h-0 space-y-4 overflow-auto pr-1">
+                    <div className="rounded-xl border border-border/70 bg-card p-4">
+                        <SectionTitle
+                            title="路由策略"
+                            description="创建时先设置名称、路由模式，以及上游失败后是否继续尝试其他候选端点。"
+                        />
+                        <RouteStrategyForm
+                            name={name}
+                            mode={mode}
+                            failoverEnabled={failoverEnabled}
+                            onNameChange={setName}
+                            onModeChange={setMode}
+                            onFailoverChange={setFailoverEnabled}
+                        />
+                    </div>
+
+                    <div className="rounded-xl border border-border/70 bg-card">
+                        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-4 py-3">
+                            <SectionTitle
+                                title="端点池草稿"
+                                description="提交前端点只保存在本地草稿中，不会写入真实路由。"
+                            />
+                            <AddEndpointDialog options={options} endpoints={endpoints} onAdd={addEndpoint} />
+                        </div>
+                        {endpoints.length === 0 ? (
+                            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                                可先不添加端点，创建后再在右侧编辑区维护端点池。
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-border/60">
+                                {endpoints.map((endpoint, index) => {
+                                    const label = endpointLabel(endpoint, options);
+                                    const duplicate = duplicateEndpointKeys.has(index);
+                                    const percent = Math.round((Math.max(1, endpoint.weight || 1) / totalWeight) * 100);
+                                    return (
+                                        <div key={`${endpoint.channel_id}:${endpoint.channel_key_id}:${index}`} className={cn('space-y-3 px-4 py-3', duplicate && 'bg-amber-500/[0.06]')}>
+                                            <div className="grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                                                <Input
+                                                    value={endpoint.name}
+                                                    onChange={(e) => updateEndpoint(index, { name: e.target.value })}
+                                                    className="h-9 rounded-lg font-semibold shadow-none"
+                                                    placeholder="端点名称"
+                                                />
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <label className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background px-2 py-1 text-xs text-muted-foreground">
+                                                        <Switch checked={endpoint.enabled} onCheckedChange={(checked) => updateEndpoint(index, { enabled: checked })} />
+                                                        <span>{endpoint.enabled ? '启用' : '停用'}</span>
+                                                    </label>
+                                                    {mode === 'manual' ? (
+                                                        <Button
+                                                            type="button"
+                                                            variant={safePreferredIndex === index ? 'secondary' : 'outline'}
+                                                            size="sm"
+                                                            onClick={() => setPreferredIndex(index)}
+                                                        >
+                                                            {safePreferredIndex === index ? '主端点' : '设为主端点'}
+                                                        </Button>
+                                                    ) : (
+                                                        <Badge variant="outline">预计占比 {percent}%</Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="grid gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-3">
+                                                <TooltipText text={`供应商：${label.channelName}`} />
+                                                <TooltipText text={`密钥：${label.keyName}`} />
+                                                <TooltipText text={`优先级：${index + 1}`} />
+                                            </div>
+                                            {duplicate ? <div className="text-xs text-amber-700">同一供应商和密钥已被重复添加，请删除多余端点。</div> : null}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    权重
+                                                    <Input
+                                                        type="number"
+                                                        min={1}
+                                                        value={endpoint.weight}
+                                                        onChange={(e) => updateEndpoint(index, { weight: Math.max(1, Number(e.target.value) || 1) })}
+                                                        className="h-8 w-20 rounded-lg shadow-none"
+                                                    />
+                                                </label>
+                                                <Button type="button" variant="secondary" size="sm" disabled={index === 0} onClick={() => moveEndpoint(index, -1)}>
+                                                    上移
+                                                </Button>
+                                                <Button type="button" variant="secondary" size="sm" disabled={index === endpoints.length - 1} onClick={() => moveEndpoint(index, 1)}>
+                                                    下移
+                                                </Button>
+                                                <Button type="button" variant="destructive" size="sm" onClick={() => removeEndpoint(index)}>
+                                                    <Trash2 className="size-4" />
+                                                    删除
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button type="button" variant="outline" className="rounded-lg" disabled={isPending} onClick={() => onOpenChange(false)}>
+                        取消
+                    </Button>
+                    <Button type="button" className="rounded-lg" disabled={isPending || !name.trim() || hasDuplicates} onClick={submit}>
+                        {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Plus className="mr-2 size-4" />}
+                        创建路由
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function RouterViewModeToggle({
     value,
     onChange,
@@ -370,7 +638,7 @@ function RouterViewModeToggle({
 }
 
 function RouterDetail({ routerId }: { routerId: number }) {
-    const { data: router } = useRouterDetail(routerId);
+    const { data: router, error: detailError, isError } = useRouterDetail(routerId);
     const { data: options = [] } = useRouterOptions();
     const { data: models = [] } = useModelList();
     const updateRouter = useUpdateRouter();
@@ -413,6 +681,14 @@ function RouterDetail({ routerId }: { routerId: number }) {
         }
         return duplicates;
     }, [endpoints]);
+
+    if (isError) {
+        return (
+            <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                当前路由已不存在或加载失败，请从左侧重新选择路由。{detailError ? ` ${String(detailError)}` : ''}
+            </div>
+        );
+    }
 
     if (!router) {
         return (
@@ -776,9 +1052,11 @@ function RouterDetail({ routerId }: { routerId: number }) {
 
 export function Router() {
     const createRouter = useCreateRouter();
+    const updateRouter = useUpdateRouter();
     const deleteRouter = useDeleteRouter();
     const createAPIKey = useCreateAPIKey();
     const [selectedId, setSelectedId] = useState<number | null>(null);
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [keyword, setKeyword] = useState('');
@@ -791,25 +1069,28 @@ export function Router() {
         sort_by: 'id',
         sort_order: 'desc',
     });
-    const routers = data?.items ?? [];
+    const routers = useMemo(() => data?.items ?? [], [data?.items]);
 
-    const selected = selectedId ?? routers[0]?.id ?? null;
+    const selected = selectedId && routers.some((router) => router.id === selectedId) ? selectedId : routers[0]?.id ?? null;
+    const defaultCreateName = `路由 ${(data?.total ?? routers.length) + 1}`;
 
-    const create = () => {
-        createRouter.mutate(
-            {
-                name: `路由 ${routers.length + 1}`,
-                mode: 'manual',
-                failover_enabled: true,
+    const create = (data: RouteProfileCreateRequest, options: { preferredEndpointKey?: string }) => {
+        createRouter.mutate(data, {
+            onSuccess: (router) => {
+                const preferredEndpoint = router.endpoints?.find((endpoint) => options.preferredEndpointKey === endpointKey(endpoint));
+                if (preferredEndpoint && router.preferred_endpoint_id !== preferredEndpoint.id) {
+                    // Creation returns real endpoint IDs, so set the preferred endpoint after the route exists.
+                    updateRouter.mutate(
+                        { id: router.id, preferred_endpoint_id: preferredEndpoint.id },
+                        { onError: (error) => toast.error('主端点设置失败', { description: String(error) }) }
+                    );
+                }
+                toast.success('路由已创建');
+                setSelectedId(router.id);
+                setCreateDialogOpen(false);
             },
-            {
-                onSuccess: (router) => {
-                    toast.success('路由已创建');
-                    setSelectedId(router.id);
-                },
-                onError: (error) => toast.error('创建路由失败', { description: String(error) }),
-            }
-        );
+            onError: (error) => toast.error('创建路由失败', { description: String(error) }),
+        });
     };
 
     const createBoundAPIKey = (router: RouteProfile) => {
@@ -830,6 +1111,16 @@ export function Router() {
     };
 
     return (
+        <>
+        {createDialogOpen ? (
+            <CreateRouterDialog
+                open={createDialogOpen}
+                onOpenChange={setCreateDialogOpen}
+                defaultName={defaultCreateName}
+                onCreate={create}
+                isPending={createRouter.isPending}
+            />
+        ) : null}
         <div className="grid h-full min-h-0 gap-4 overflow-auto lg:grid-cols-[360px_1fr] lg:overflow-hidden">
             <div className="flex min-h-0 flex-col gap-3">
                 <AdminToolbar
@@ -857,7 +1148,7 @@ export function Router() {
                         },
                     ]}
                     action={(
-                        <Button className="h-10 min-w-[6.5rem] rounded-lg px-3 shadow-sm" onClick={create} disabled={createRouter.isPending}>
+                        <Button className="h-10 min-w-[6.5rem] rounded-lg px-3 shadow-sm" onClick={() => setCreateDialogOpen(true)} disabled={createRouter.isPending}>
                             <Plus className="size-4" />
                             创建路由
                         </Button>
@@ -919,6 +1210,13 @@ export function Router() {
                                                             className="bg-destructive text-white hover:bg-destructive/90"
                                                             onClick={() =>
                                                                 deleteRouter.mutate(router.id, {
+                                                                    onSuccess: () => {
+                                                                        toast.success('路由已删除');
+                                                                        if (selected === router.id) {
+                                                                            const remaining = routers.filter((item) => item.id !== router.id);
+                                                                            setSelectedId(remaining[0]?.id ?? null);
+                                                                        }
+                                                                    },
                                                                     onError: (error) => toast.error('删除失败', { description: String(error) }),
                                                                 })
                                                             }
@@ -1006,9 +1304,10 @@ export function Router() {
                 {selected ? (
                     <RouterDetail routerId={selected} />
                 ) : (
-                    <div className="flex h-full items-center justify-center text-muted-foreground">创建一个路由后开始使用。</div>
+                    <div className="flex h-full items-center justify-center text-muted-foreground">请先创建或选择一个路由进行编辑。</div>
                 )}
             </div>
         </div>
+        </>
     );
 }
