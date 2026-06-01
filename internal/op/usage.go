@@ -339,7 +339,7 @@ func usageChartAggregates(ctx context.Context, start, end time.Time, granularity
 		return agg, err
 	}
 	if enabled {
-		if err := usageAddSQLChartRows(ctx, agg, start, end, granularity, dimension); err != nil {
+		if err := usageAddSQLChartRows(ctx, &agg, start, end, granularity, dimension); err != nil {
 			return agg, err
 		}
 	}
@@ -351,7 +351,7 @@ func usageChartAggregates(ctx context.Context, start, end time.Time, granularity
 	relayLogCacheLock.Lock()
 	for _, item := range relayLogCache {
 		if relayLogMatchFilter(item, filter, true) {
-			usageAddLogToChartAggregates(agg, item, granularity, dimension)
+			usageAddLogToChartAggregates(&agg, item, granularity, dimension)
 		}
 	}
 	relayLogCacheLock.Unlock()
@@ -367,7 +367,7 @@ func usageNewChartAggregateSet() usageChartAggregateSet {
 	}
 }
 
-func usageAddSQLChartRows(ctx context.Context, agg usageChartAggregateSet, start, end time.Time, granularity, dimension string) error {
+func usageAddSQLChartRows(ctx context.Context, agg *usageChartAggregateSet, start, end time.Time, granularity, dimension string) error {
 	rows, err := usageQueryChartDistributionRows(ctx, start, end, dimension)
 	if err != nil {
 		return err
@@ -403,7 +403,7 @@ func usageAddSQLChartRows(ctx context.Context, agg usageChartAggregateSet, start
 	return nil
 }
 
-func usageAddLogToChartAggregates(agg usageChartAggregateSet, log model.RelayLog, granularity, dimension string) {
+func usageAddLogToChartAggregates(agg *usageChartAggregateSet, log model.RelayLog, granularity, dimension string) {
 	key, label := usageRankLabel(log, dimension)
 	metrics := usageLogMetrics(log)
 	agg.summary.Add(metrics)

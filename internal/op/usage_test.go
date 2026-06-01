@@ -62,6 +62,35 @@ func TestUsageBuildReliabilityChartFillsEmptyBuckets(t *testing.T) {
 	}
 }
 
+func TestUsageAddLogToChartAggregatesUpdatesSummaryAndCharts(t *testing.T) {
+	start := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	agg := usageNewChartAggregateSet()
+
+	usageAddLogToChartAggregates(&agg, model.RelayLog{
+		Time:            start.Unix(),
+		ChannelId:       1,
+		ChannelName:     "test-channel",
+		ActualModelName: "gpt-test",
+		InputTokens:     10,
+		OutputTokens:    20,
+		UseTime:         300,
+		Cost:            0.42,
+	}, usageBucketHour, usageDimModel)
+
+	if agg.summary.OutputCost != 0.42 {
+		t.Fatalf("summary output cost = %v, want 0.42", agg.summary.OutputCost)
+	}
+	if agg.summary.RequestSuccess != 1 {
+		t.Fatalf("summary request success = %d, want 1", agg.summary.RequestSuccess)
+	}
+	if len(agg.distribution) != 1 {
+		t.Fatalf("distribution groups = %d, want 1", len(agg.distribution))
+	}
+	if len(agg.buckets[start.Unix()]) != 1 {
+		t.Fatalf("bucket groups = %d, want 1", len(agg.buckets[start.Unix()]))
+	}
+}
+
 func TestUsageNormalizeChartDimensionDefaultsToModel(t *testing.T) {
 	dimension, err := usageNormalizeChartDimension("")
 	if err != nil {
