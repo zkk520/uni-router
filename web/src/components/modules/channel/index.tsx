@@ -119,7 +119,7 @@ export function Channel() {
                             创建供应商
                         </MorphingDialogTrigger>
                         <MorphingDialogContainer>
-                            <MorphingDialogContent className="max-h-[calc(100vh-2rem)] w-fit max-w-full overflow-hidden rounded-lg bg-card px-6 py-4 text-card-foreground shadow-xl">
+                            <MorphingDialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] min-h-0 w-fit max-w-full overflow-hidden rounded-lg bg-card px-6 py-4 text-card-foreground shadow-xl">
                                 <CreateDialogContent />
                             </MorphingDialogContent>
                         </MorphingDialogContainer>
