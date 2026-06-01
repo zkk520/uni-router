@@ -268,7 +268,7 @@ export function Usage() {
                                 <YAxis tickLine={false} axisLine={false} tickFormatter={formatMoneyLabel} />
                                 <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={moneyTooltip} />} />
                                 <ChartLegend content={<ChartLegendContent />} />
-                                {costSeries.fields.map((field) => <Bar key={field.key} dataKey={field.field} stackId="cost" fill={field.color} radius={[4, 4, 0, 0]} />)}
+                                {costSeries.fields.map((field) => <Bar key={field.key} dataKey={field.field} name={field.label} stackId="cost" fill={field.color} radius={[4, 4, 0, 0]} />)}
                             </BarChart>
                         </ChartContainer>
                     )}
@@ -283,7 +283,7 @@ export function Usage() {
                                 <YAxis tickLine={false} axisLine={false} tickFormatter={formatCountLabel} />
                                 <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" formatter={countTooltip} />} />
                                 <ChartLegend content={<ChartLegendContent />} />
-                                {callSeries.fields.map((field) => <Line key={field.key} type="monotone" dataKey={field.field} stroke={field.color} strokeWidth={2} dot={false} />)}
+                                {callSeries.fields.map((field) => <Line key={field.key} type="monotone" dataKey={field.field} name={field.label} stroke={field.color} strokeWidth={2} dot={false} />)}
                             </LineChart>
                         </ChartContainer>
                     )}
@@ -320,7 +320,7 @@ export function Usage() {
                                 <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={formatCountLabel} />
                                 <YAxis type="category" dataKey="label" tickLine={false} axisLine={false} width={96} />
                                 <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={countTooltip} />} />
-                                <Bar dataKey="value" radius={[0, 6, 6, 0]}>{callBarData.map((item) => <Cell key={item.key} fill={item.fill} />)}</Bar>
+                                <Bar dataKey="value" name={t('charts.callBars.value')} radius={[0, 6, 6, 0]}>{callBarData.map((item) => <Cell key={item.key} fill={item.fill} />)}</Bar>
                             </BarChart>
                         </ChartContainer>
                     )}
@@ -336,9 +336,9 @@ export function Usage() {
                                 <YAxis yAxisId="rate" orientation="right" tickLine={false} axisLine={false} tickFormatter={formatPercentLabel} />
                                 <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={reliabilityTooltip} />} />
                                 <ChartLegend content={<ChartLegendContent />} />
-                                <Bar yAxisId="count" dataKey="success" stackId="requests" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
-                                <Bar yAxisId="count" dataKey="failed" stackId="requests" fill="var(--chart-5)" radius={[4, 4, 0, 0]} />
-                                <Line yAxisId="rate" type="monotone" dataKey="successRate" stroke="var(--chart-4)" strokeWidth={2} dot={false} />
+                                <Bar yAxisId="count" dataKey="success" name={t('charts.success')} stackId="requests" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                                <Bar yAxisId="count" dataKey="failed" name={t('charts.failed')} stackId="requests" fill="var(--chart-5)" radius={[4, 4, 0, 0]} />
+                                <Line yAxisId="rate" type="monotone" dataKey="successRate" name={t('charts.successRate')} stroke="var(--chart-4)" strokeWidth={2} dot={false} />
                             </ComposedChart>
                         </ChartContainer>
                     )}
