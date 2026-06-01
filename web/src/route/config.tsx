@@ -1,7 +1,7 @@
 import { lazyWithPreload } from './lazy-with-preload';
 import { lazy, ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Home, Radio, Sparkles, Cable, Settings, Logs, KeyRound } from 'lucide-react';
+import { Home, Radio, Sparkles, Cable, Settings, Logs, KeyRound, DollarSign } from 'lucide-react';
 
 export type LazyComponent = ReturnType<typeof lazy> & {
     preload: () => Promise<{ default: ComponentType<Record<string, never>> }>
@@ -19,12 +19,14 @@ const Channel_Module = lazyWithPreload(() => import('@/components/modules/channe
 const Model_Module = lazyWithPreload(() => import('@/components/modules/model').then(m => ({ default: m.Model })));
 const Router_Module = lazyWithPreload(() => import('@/components/modules/router').then(m => ({ default: m.Router })));
 const Log_Module = lazyWithPreload(() => import('@/components/modules/log').then(m => ({ default: m.Log })));
+const Usage_Module = lazyWithPreload(() => import('@/components/modules/usage').then(m => ({ default: m.Usage })));
 const Token_Module = lazyWithPreload(() => import('@/components/modules/setting/APIKey').then(m => ({ default: m.TokenManagement })));
 const Setting_Module = lazyWithPreload(() => import('@/components/modules/setting').then(m => ({ default: m.Setting })));
 
 export const ROUTES: RouteConfig[] = [
     { id: 'home', label: '主页', icon: Home, component: Home_Module },
     { id: 'channel', label: '供应商', icon: Radio, component: Channel_Module },
+    { id: 'usage', label: '用量/费用', icon: DollarSign, component: Usage_Module },
     { id: 'router', label: '路由', icon: Cable, component: Router_Module },
     { id: 'model', label: '价格', icon: Sparkles, component: Model_Module },
     { id: 'log', label: '日志', icon: Logs, component: Log_Module },

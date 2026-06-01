@@ -33,6 +33,7 @@ function timeout(ms: number) {
 const pageDescriptions: Record<string, string> = {
     home: '查看请求、Token、成本与供应商表现。',
     channel: '管理供应商、协议、上游密钥和模型能力。',
+    usage: '查看费用、趋势与排行。',
     router: '配置路由策略、候选端点和绑定令牌。',
     model: '维护模型价格与计费配置。',
     log: '检索请求日志、路由尝试和响应详情。',
@@ -129,6 +130,27 @@ export function AppContainer() {
                                 queryClient.prefetchQuery({
                                     queryKey: ['channels', 'page', { page: 1, page_size: 20 }],
                                     queryFn: async () => apiClient.get('/api/v1/channel/page', { page: 1, page_size: 20 }),
+                                })
+                            );
+                            break;
+                        }
+                        case 'usage': {
+                            prefetches.push(
+                                queryClient.prefetchQuery({
+                                    queryKey: ['usage', 'summary', 'today'],
+                                    queryFn: async () => apiClient.get('/api/v1/usage/summary', { period: 'today' }),
+                                })
+                            );
+                            prefetches.push(
+                                queryClient.prefetchQuery({
+                                    queryKey: ['usage', 'trend', 'today', 'hour'],
+                                    queryFn: async () => apiClient.get('/api/v1/usage/trend', { period: 'today', granularity: 'hour' }),
+                                })
+                            );
+                            prefetches.push(
+                                queryClient.prefetchQuery({
+                                    queryKey: ['usage', 'rank', 'today', 'channel', 'cost'],
+                                    queryFn: async () => apiClient.get('/api/v1/usage/rank', { period: 'today', dimension: 'channel', sort: 'cost' }),
                                 })
                             );
                             break;

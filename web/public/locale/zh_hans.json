@@ -45,6 +45,7 @@
     "navbar": {
         "home": "主页",
         "channel": "供应商",
+        "usage": "用量/费用",
         "router": "路由",
         "key": "密钥",
         "model": "价格",
@@ -86,6 +87,60 @@
             "success": "复制成功",
             "failed": "复制失败",
             "noContent": "无可复制内容"
+        }
+    },
+    "usage": {
+        "eyebrow": "日志统计",
+        "title": "用量 / 费用",
+        "description": "从日志中聚合费用、请求与 Token，用于查看总体趋势和排行。",
+        "period": {
+            "today": "今天",
+            "week": "本周",
+            "month": "本月"
+        },
+        "granularity": {
+            "hour": "每小时",
+            "day": "每天",
+            "week": "每周"
+        },
+        "summary": {
+            "totalCost": "总费用",
+            "requestCount": "请求次数",
+            "totalToken": "Token 总量",
+            "successRate": "成功率",
+            "avgWaitTime": "平均耗时",
+            "inputCost": "输入费用",
+            "outputCost": "输出费用"
+        },
+        "trend": {
+            "title": "趋势",
+            "description": "按时间周期查看费用、请求与 Token 变化。",
+            "metric": {
+                "cost": "金额",
+                "count": "次数",
+                "tokens": "Tokens"
+            }
+        },
+        "rank": {
+            "title": "排行榜",
+            "description": "按供应商、端点、模型或 API Key 汇总排行。",
+            "dimension": {
+                "channel": "供应商",
+                "endpoint": "端点",
+                "model": "模型",
+                "apikey": "API Key"
+            },
+            "sort": {
+                "cost": "金额",
+                "count": "次数",
+                "tokens": "Tokens"
+            },
+            "empty": "暂无排行数据",
+            "meta": {
+                "requests": "请求",
+                "tokens": "Tokens",
+                "successRate": "成功率"
+            }
         }
     },
     "home": {

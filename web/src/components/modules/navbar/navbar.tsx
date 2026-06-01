@@ -15,7 +15,7 @@ type NavBarProps = {
 }
 
 const groups = [
-    { label: "管理后台", ids: ["home", "channel", "router", "model", "log"] },
+    { label: "管理后台", ids: ["home", "channel", "usage", "router", "model", "log"] },
     { label: "账户", ids: ["token", "setting"] },
 ] as const
 

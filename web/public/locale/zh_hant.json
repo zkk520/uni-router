@@ -45,6 +45,7 @@
     "navbar": {
         "home": "主頁",
         "channel": "供應源",
+        "usage": "用量/費用",
         "router": "路由",
         "key": "金鑰",
         "model": "價格",
@@ -86,6 +87,60 @@
             "success": "複製成功",
             "failed": "複製失敗",
             "noContent": "無可複製內容"
+        }
+    },
+    "usage": {
+        "eyebrow": "日誌統計",
+        "title": "用量 / 費用",
+        "description": "從日誌中彙總費用、請求與 Token，用於查看整體趨勢和排行。",
+        "period": {
+            "today": "今天",
+            "week": "本週",
+            "month": "本月"
+        },
+        "granularity": {
+            "hour": "每小時",
+            "day": "每天",
+            "week": "每週"
+        },
+        "summary": {
+            "totalCost": "總費用",
+            "requestCount": "請求次數",
+            "totalToken": "Token 總量",
+            "successRate": "成功率",
+            "avgWaitTime": "平均耗時",
+            "inputCost": "輸入費用",
+            "outputCost": "輸出費用"
+        },
+        "trend": {
+            "title": "趨勢",
+            "description": "按時間週期查看費用、請求與 Token 變化。",
+            "metric": {
+                "cost": "金額",
+                "count": "次數",
+                "tokens": "Tokens"
+            }
+        },
+        "rank": {
+            "title": "排行榜",
+            "description": "按供應源、端點、模型或 API Key 彙總排行。",
+            "dimension": {
+                "channel": "供應源",
+                "endpoint": "端點",
+                "model": "模型",
+                "apikey": "API Key"
+            },
+            "sort": {
+                "cost": "金額",
+                "count": "次數",
+                "tokens": "Tokens"
+            },
+            "empty": "暫無排行數據",
+            "meta": {
+                "requests": "請求",
+                "tokens": "Tokens",
+                "successRate": "成功率"
+            }
         }
     },
     "home": {

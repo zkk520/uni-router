@@ -45,6 +45,7 @@
     "navbar": {
         "home": "Home",
         "channel": "Channel",
+        "usage": "Usage / Cost",
         "router": "Router",
         "key": "Key",
         "model": "Price",
@@ -86,6 +87,60 @@
             "success": "Copied",
             "failed": "Copy failed",
             "noContent": "Nothing to copy"
+        }
+    },
+    "usage": {
+        "eyebrow": "Log Analytics",
+        "title": "Usage / Cost",
+        "description": "Aggregate cost, requests, and tokens from logs to review overall trends and rankings.",
+        "period": {
+            "today": "Today",
+            "week": "This Week",
+            "month": "This Month"
+        },
+        "granularity": {
+            "hour": "Per Hour",
+            "day": "Per Day",
+            "week": "Per Week"
+        },
+        "summary": {
+            "totalCost": "Total Cost",
+            "requestCount": "Request Count",
+            "totalToken": "Total Tokens",
+            "successRate": "Success Rate",
+            "avgWaitTime": "Average Latency",
+            "inputCost": "Input Cost",
+            "outputCost": "Output Cost"
+        },
+        "trend": {
+            "title": "Trend",
+            "description": "View cost, requests, and token changes over time.",
+            "metric": {
+                "cost": "Cost",
+                "count": "Count",
+                "tokens": "Tokens"
+            }
+        },
+        "rank": {
+            "title": "Ranking",
+            "description": "Rank by channel, endpoint, model, or API Key totals.",
+            "dimension": {
+                "channel": "Channel",
+                "endpoint": "Endpoint",
+                "model": "Model",
+                "apikey": "API Key"
+            },
+            "sort": {
+                "cost": "Cost",
+                "count": "Count",
+                "tokens": "Tokens"
+            },
+            "empty": "No ranking data",
+            "meta": {
+                "requests": "Requests",
+                "tokens": "Tokens",
+                "successRate": "Success Rate"
+            }
         }
     },
     "home": {
