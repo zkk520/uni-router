@@ -32,7 +32,7 @@ export function AdminToolbar({
     searchPlaceholder: string;
     onSearchChange: (value: string) => void;
     filters?: FilterControl[];
-    onRefresh?: () => void | Promise<void>;
+    onRefresh?: () => void | Promise<unknown>;
     isRefreshing?: boolean;
     action?: React.ReactNode;
     compact?: boolean;
@@ -70,7 +70,9 @@ export function AdminToolbar({
                                 variant="outline"
                                 size="icon"
                                 className="size-10 shrink-0 rounded-lg bg-background shadow-sm"
-                                onClick={onRefresh}
+                                onClick={() => {
+                                    void onRefresh();
+                                }}
                                 disabled={isRefreshing}
                                 aria-label="刷新"
                             >
@@ -119,7 +121,9 @@ export function AdminToolbar({
                         variant="outline"
                         size="icon"
                         className="rounded-lg bg-background shadow-sm"
-                        onClick={onRefresh}
+                        onClick={() => {
+                            void onRefresh();
+                        }}
                         disabled={isRefreshing}
                         aria-label="刷新"
                     >
