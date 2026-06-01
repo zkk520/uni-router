@@ -160,7 +160,11 @@
             "waitTime": "Wait Time",
             "totalToken": "Tokens Used",
             "totalCost": "Total Cost",
-            "noData": "No Data"
+            "noData": "No Data",
+            "title": "Activity in the past year",
+            "description": "Daily request counts for the last 54 weeks. Darker colors indicate higher activity.",
+            "less": "Less",
+            "more": "More"
         },
         "total": {
             "requestStats": "Request Stats",

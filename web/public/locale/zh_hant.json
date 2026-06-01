@@ -160,7 +160,11 @@
             "waitTime": "等待時間",
             "totalToken": "消耗 Token",
             "totalCost": "消耗費用",
-            "noData": "無數據"
+            "noData": "無數據",
+            "title": "近一年活躍度",
+            "description": "按天展示最近 54 週的請求次數，顏色越深表示當天越活躍。",
+            "less": "少",
+            "more": "多"
         },
         "total": {
             "requestStats": "請求統計",

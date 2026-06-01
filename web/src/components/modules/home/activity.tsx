@@ -1,10 +1,9 @@
 'use client';
 
 import { useStatsDaily, type StatsDailyFormatted } from '@/api/endpoints/stats';
-import { useMemo, useRef, useLayoutEffect, useState, useCallback } from 'react';
+import { useMemo, useRef, useLayoutEffect, useState, useCallback, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
-import { Fragment } from 'react';
 import dayjs from 'dayjs';
 
 interface StatsDailyData {
@@ -23,6 +22,11 @@ const ACTIVITY_LEVELS = [
 function getActivityLevel(value: number): number {
     if (value === 0) return 0;
     return ACTIVITY_LEVELS.find(level => value >= level.min)?.level || 1;
+}
+
+function getLevelColor(level: number) {
+    if (level === 0) return 'var(--muted)';
+    return `color-mix(in oklch, var(--primary) ${level * 25}%, var(--muted))`;
 }
 
 export function Activity() {
@@ -86,42 +90,69 @@ export function Activity() {
         return () => window.removeEventListener('resize', scrollToRight);
     }, [days, isLoading, checkScroll]);
 
+    const legendLevels = [0, 1, 2, 3, 4];
+
     return (
         <div className="rounded-lg bg-card border-card-border border text-card-foreground custom-shadow">
-            <div
-                ref={scrollRef}
-                onScroll={checkScroll}
-                className="overflow-x-auto p-4"
-                style={{ maskImage, WebkitMaskImage: maskImage }}
-            >
-                <div className="ml-auto w-fit">
-                    <div className="grid gap-1"
-                        style={{
-                            gridTemplateColumns: 'repeat(54, 0.875rem)',
-                            gridTemplateRows: 'repeat(7, 0.875rem)',
-                            gridAutoFlow: 'column'
-                        }}
-                    >
-                        {days.map((day) => {
-                            if (day.isFuture) {
-                                return <div key={day.dateStr} />;
-                            }
-
-                            const level = getActivityLevel(day.formatted?.request_count.raw ?? 0);
-
-                            return (
-                                <div
-                                    key={day.dateStr}
-                                    className="rounded-sm transition-all cursor-pointer hover:scale-150"
-                                    onMouseEnter={(e) => {
-                                        const rect = e.currentTarget.getBoundingClientRect();
-                                        setTooltip({ day, x: rect.left + rect.width / 2, y: rect.top, visible: true });
-                                    }}
-                                    onMouseLeave={() => setTooltip(prev => prev ? { ...prev, visible: false } : null)}
-                                    style={{ backgroundColor: level === 0 ? 'var(--muted)' : `color-mix(in oklch, var(--primary) ${level * 25}%, var(--muted))` }}
+            <div className="flex flex-col gap-5 p-4 xl:flex-row xl:items-start xl:gap-6">
+                <div className="space-y-3 xl:w-56 xl:shrink-0">
+                    <div className="space-y-1">
+                        <div className="text-sm font-semibold text-foreground">{t('title')}</div>
+                        <p className="text-xs leading-5 text-muted-foreground">{t('description')}</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="shrink-0">{t('less')}</span>
+                        <div className="flex items-center gap-1" aria-hidden="true">
+                            {legendLevels.map((level) => (
+                                <span
+                                    key={level}
+                                    className="h-2.5 w-2.5 rounded-sm border border-border/60"
+                                    style={{ backgroundColor: getLevelColor(level) }}
                                 />
-                            );
-                        })}
+                            ))}
+                        </div>
+                        <span className="shrink-0">{t('more')}</span>
+                    </div>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                    <div
+                        ref={scrollRef}
+                        onScroll={checkScroll}
+                        className="overflow-x-auto pb-1"
+                        style={{ maskImage, WebkitMaskImage: maskImage }}
+                    >
+                        <div className="min-w-max">
+                            <div
+                                className="grid gap-1"
+                                style={{
+                                    gridTemplateColumns: 'repeat(54, 0.875rem)',
+                                    gridTemplateRows: 'repeat(7, 0.875rem)',
+                                    gridAutoFlow: 'column'
+                                }}
+                            >
+                                {days.map((day) => {
+                                    if (day.isFuture) {
+                                        return <div key={day.dateStr} />;
+                                    }
+
+                                    const level = getActivityLevel(day.formatted?.request_count.raw ?? 0);
+
+                                    return (
+                                        <div
+                                            key={day.dateStr}
+                                            className="rounded-sm transition-all cursor-pointer hover:scale-150"
+                                            onMouseEnter={(e) => {
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                setTooltip({ day, x: rect.left + rect.width / 2, y: rect.top, visible: true });
+                                            }}
+                                            onMouseLeave={() => setTooltip(prev => prev ? { ...prev, visible: false } : null)}
+                                            style={{ backgroundColor: getLevelColor(level) }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -160,7 +160,11 @@
             "waitTime": "等待时间",
             "totalToken": "消耗 Token",
             "totalCost": "消耗费用",
-            "noData": "无数据"
+            "noData": "无数据",
+            "title": "近一年活跃度",
+            "description": "按天展示最近 54 周的请求次数，颜色越深表示当天越活跃。",
+            "less": "少",
+            "more": "多"
         },
         "total": {
             "requestStats": "请求统计",
