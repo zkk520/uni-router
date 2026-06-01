@@ -24,6 +24,7 @@ export function AdminToolbar({
     onSearchChange,
     filters = [],
     onRefresh,
+    isRefreshing = false,
     action,
     compact = false,
 }: {
@@ -31,7 +32,8 @@ export function AdminToolbar({
     searchPlaceholder: string;
     onSearchChange: (value: string) => void;
     filters?: FilterControl[];
-    onRefresh?: () => void;
+    onRefresh?: () => void | Promise<void>;
+    isRefreshing?: boolean;
     action?: React.ReactNode;
     compact?: boolean;
 }) {
@@ -64,8 +66,15 @@ export function AdminToolbar({
                             </Select>
                         ))}
                         {onRefresh ? (
-                            <Button variant="outline" size="icon" className="size-10 shrink-0 rounded-lg bg-background shadow-sm" onClick={onRefresh}>
-                                <RefreshCw className="size-4" />
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="size-10 shrink-0 rounded-lg bg-background shadow-sm"
+                                onClick={onRefresh}
+                                disabled={isRefreshing}
+                                aria-label="刷新"
+                            >
+                                <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
                             </Button>
                         ) : null}
                         <div className="flex min-w-0 justify-end">
@@ -106,8 +115,15 @@ export function AdminToolbar({
             </div>
             <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
                 {onRefresh ? (
-                    <Button variant="outline" size="icon" className="rounded-lg bg-background shadow-sm" onClick={onRefresh}>
-                        <RefreshCw className="size-4" />
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-lg bg-background shadow-sm"
+                        onClick={onRefresh}
+                        disabled={isRefreshing}
+                        aria-label="刷新"
+                    >
+                        <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
                     </Button>
                 ) : null}
                 {action}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { AlertCircle, Clock, Cpu, DollarSign, Eye, KeyRound, Route, Waypoints, Zap } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAPIKeyList } from '@/api/endpoints/apikey';
@@ -118,8 +118,16 @@ export function Log() {
         endpoint_id: endpointID === ALL ? undefined : Number(endpointID),
     }), [apiKeyName, endpointID, page, pageSize, routerID, status]);
 
-    const { data, isLoading, refetch } = useLogPage(params);
+    const { data, isLoading, isFetching, refetch } = useLogPage(params);
     const rows = data?.items ?? [];
+
+    const handleRefresh = useCallback(async () => {
+        if (page !== 1) {
+            setPage(1);
+            return;
+        }
+        await refetch();
+    }, [page, refetch]);
 
     const handleRouterChange = (value: string) => {
         setRouterID(value);
@@ -133,7 +141,8 @@ export function Log() {
                 search=""
                 searchPlaceholder={t('filters.title')}
                 onSearchChange={() => undefined}
-                onRefresh={() => refetch()}
+                onRefresh={handleRefresh}
+                isRefreshing={isFetching}
                 filters={[
                     {
                         label: t('filters.statusAll'),
