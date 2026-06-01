@@ -90,9 +90,9 @@
         }
     },
     "usage": {
-        "eyebrow": "日誌統計",
+        "eyebrow": "用量分析",
         "title": "用量 / 費用",
-        "description": "從日誌中彙總費用、請求與 Token，用於查看整體趨勢和排行。",
+        "description": "預設按模型展示消耗、調用與穩定性圖表，也可切換到供應源、路由、端點或 API Key 維度分析。",
         "period": {
             "today": "今天",
             "week": "本週",
@@ -103,6 +103,18 @@
             "day": "每天",
             "week": "每週"
         },
+        "controls": {
+            "period": "時間範圍",
+            "dimension": "分析維度",
+            "granularity": "時間粒度"
+        },
+        "dimension": {
+            "model": "模型",
+            "channel": "供應源",
+            "router": "路由",
+            "endpoint": "端點",
+            "apikey": "API Key"
+        },
         "summary": {
             "totalCost": "總費用",
             "requestCount": "請求次數",
@@ -112,34 +124,33 @@
             "inputCost": "輸入費用",
             "outputCost": "輸出費用"
         },
-        "trend": {
-            "title": "趨勢",
-            "description": "按時間週期查看費用、請求與 Token 變化。",
-            "metric": {
-                "cost": "金額",
-                "count": "次數",
-                "tokens": "Tokens"
-            }
-        },
-        "rank": {
-            "title": "排行榜",
-            "description": "按供應源、端點、模型或 API Key 彙總排行。",
-            "dimension": {
-                "channel": "供應源",
-                "endpoint": "端點",
-                "model": "模型",
-                "apikey": "API Key"
+        "charts": {
+            "empty": "暫無圖表數據",
+            "other": "其他",
+            "success": "成功請求",
+            "failed": "失敗請求",
+            "successRate": "成功率",
+            "costDistribution": {
+                "title": "消耗分布圖",
+                "description": "按所選維度拆分費用消耗，觀察不同對象在各時間段的成本佔用。"
             },
-            "sort": {
-                "cost": "金額",
-                "count": "次數",
-                "tokens": "Tokens"
+            "callTrend": {
+                "title": "調用趨勢圖",
+                "description": "展示所選維度下各對象的請求量隨時間變化。"
             },
-            "empty": "暫無排行數據",
-            "meta": {
-                "requests": "請求",
-                "tokens": "Tokens",
-                "successRate": "成功率"
+            "callShare": {
+                "title": "調用次數佔比圖",
+                "description": "對比目前時間範圍內各對象的調用份額。",
+                "value": "調用次數"
+            },
+            "callBars": {
+                "title": "調用次數柱狀圖",
+                "description": "以柱狀圖展示各對象的總調用次數，便於橫向對比。",
+                "value": "調用次數"
+            },
+            "reliability": {
+                "title": "成功率 / 失敗趨勢圖",
+                "description": "同時展示成功、失敗請求量與成功率變化，用於定位穩定性波動。"
             }
         }
     },

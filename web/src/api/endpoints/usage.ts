@@ -4,7 +4,7 @@ import { formatCount, formatCurrencyCosts, formatTime, type CostCurrencyMetrics 
 
 export type UsagePeriod = 'today' | 'week' | 'month';
 export type UsageGranularity = 'hour' | 'day' | 'week';
-export type UsageDimension = 'channel' | 'endpoint' | 'model' | 'apikey';
+export type UsageDimension = 'channel' | 'router' | 'endpoint' | 'model' | 'apikey';
 export type UsageSort = 'cost' | 'count' | 'tokens';
 
 export interface UsageMetrics {
@@ -78,6 +78,101 @@ export interface UsageRankItemFormatted extends UsageMetricsFormatted {
     dimension: UsageDimension;
 }
 
+export interface UsageChartKey {
+    key: string;
+    label: string;
+}
+
+export interface UsageSeriesPoint {
+    bucket_start: number;
+    bucket_end: number;
+    label: string;
+    values: Record<string, number>;
+}
+
+export interface UsageSeriesChart {
+    keys: UsageChartKey[];
+    points: UsageSeriesPoint[];
+}
+
+export interface UsageDistributionItem extends UsageMetrics {
+    key: string;
+    label: string;
+    value: number;
+    percent: number;
+}
+
+export interface UsageDistributionItemFormatted extends UsageMetricsFormatted {
+    key: string;
+    label: string;
+    value: ReturnType<typeof formatCount>;
+    percent: ReturnType<typeof formatPercent>;
+}
+
+export interface UsageDistributionChart {
+    items: UsageDistributionItem[];
+    total: number;
+}
+
+export interface UsageDistributionChartFormatted {
+    items: UsageDistributionItemFormatted[];
+    total: ReturnType<typeof formatCount>;
+}
+
+export interface UsageReliabilityPoint {
+    bucket_start: number;
+    bucket_end: number;
+    label: string;
+    request_success: number;
+    request_failed: number;
+    success_rate: number;
+}
+
+export interface UsageReliabilityPointFormatted {
+    bucket_start: number;
+    bucket_end: number;
+    label: string;
+    request_success: ReturnType<typeof formatCount>;
+    request_failed: ReturnType<typeof formatCount>;
+    success_rate: ReturnType<typeof formatPercent>;
+}
+
+export interface UsageReliabilityChart {
+    points: UsageReliabilityPoint[];
+}
+
+export interface UsageReliabilityChartFormatted {
+    points: UsageReliabilityPointFormatted[];
+}
+
+export interface UsageChartsResponse {
+    period: UsagePeriod;
+    dimension: UsageDimension;
+    granularity: UsageGranularity;
+    start_time: number;
+    end_time: number;
+    summary: UsageSummary;
+    cost_distribution: UsageSeriesChart;
+    call_trend: UsageSeriesChart;
+    call_distribution: UsageDistributionChart;
+    call_bars: UsageDistributionChart;
+    reliability_trend: UsageReliabilityChart;
+}
+
+export interface UsageChartsResponseFormatted {
+    period: UsagePeriod;
+    dimension: UsageDimension;
+    granularity: UsageGranularity;
+    start_time: number;
+    end_time: number;
+    summary: UsageSummaryFormatted;
+    cost_distribution: UsageSeriesChart;
+    call_trend: UsageSeriesChart;
+    call_distribution: UsageDistributionChartFormatted;
+    call_bars: UsageDistributionChartFormatted;
+    reliability_trend: UsageReliabilityChartFormatted;
+}
+
 function toQuery(params: Record<string, string | number | boolean | undefined>) {
     const query: Record<string, string | number | boolean> = {};
     for (const [key, value] of Object.entries(params)) {
@@ -143,6 +238,51 @@ function selectUsageRankItem(data: UsageRankItem): UsageRankItemFormatted {
     };
 }
 
+function selectUsageDistributionItem(data: UsageDistributionItem): UsageDistributionItemFormatted {
+    return {
+        ...formatUsageMetrics(data),
+        key: data.key,
+        label: data.label,
+        value: formatCount(data.value),
+        percent: formatPercent(data.percent),
+    };
+}
+
+function selectUsageReliabilityPoint(data: UsageReliabilityPoint): UsageReliabilityPointFormatted {
+    return {
+        bucket_start: data.bucket_start,
+        bucket_end: data.bucket_end,
+        label: data.label,
+        request_success: formatCount(data.request_success),
+        request_failed: formatCount(data.request_failed),
+        success_rate: formatPercent(data.success_rate),
+    };
+}
+
+function selectUsageCharts(data: UsageChartsResponse): UsageChartsResponseFormatted {
+    return {
+        period: data.period,
+        dimension: data.dimension,
+        granularity: data.granularity,
+        start_time: data.start_time,
+        end_time: data.end_time,
+        summary: selectUsageSummary(data.summary),
+        cost_distribution: data.cost_distribution,
+        call_trend: data.call_trend,
+        call_distribution: {
+            items: data.call_distribution.items.map(selectUsageDistributionItem),
+            total: formatCount(data.call_distribution.total),
+        },
+        call_bars: {
+            items: data.call_bars.items.map(selectUsageDistributionItem),
+            total: formatCount(data.call_bars.total),
+        },
+        reliability_trend: {
+            points: data.reliability_trend.points.map(selectUsageReliabilityPoint),
+        },
+    };
+}
+
 export function useUsageSummary(period: UsagePeriod = 'today') {
     return useQuery({
         queryKey: ['usage', 'summary', period],
@@ -172,6 +312,20 @@ export function useUsageRank(
         queryKey: ['usage', 'rank', period, dimension, sort],
         queryFn: async () => apiClient.get<UsageRankItem[]>('/api/v1/usage/rank', toQuery({ period, dimension, sort })),
         select: (data) => data.map(selectUsageRankItem),
+        refetchInterval: 30000,
+        refetchOnMount: 'always',
+    });
+}
+
+export function useUsageCharts(
+    period: UsagePeriod = 'today',
+    dimension: UsageDimension = 'model',
+    granularity?: UsageGranularity
+) {
+    return useQuery({
+        queryKey: ['usage', 'charts', period, dimension, granularity],
+        queryFn: async () => apiClient.get<UsageChartsResponse>('/api/v1/usage/charts', toQuery({ period, dimension, granularity })),
+        select: selectUsageCharts,
         refetchInterval: 30000,
         refetchOnMount: 'always',
     });

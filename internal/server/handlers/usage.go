@@ -24,6 +24,10 @@ func init() {
 		AddRoute(
 			router.NewRoute("/rank", http.MethodGet).
 				Handle(getUsageRank),
+		).
+		AddRoute(
+			router.NewRoute("/charts", http.MethodGet).
+				Handle(getUsageCharts),
 		)
 }
 
@@ -63,3 +67,16 @@ func getUsageRank(c *gin.Context) {
 	resp.Success(c, items)
 }
 
+func getUsageCharts(c *gin.Context) {
+	items, err := op.UsageChartsGet(
+		c.Request.Context(),
+		c.DefaultQuery("period", "today"),
+		c.Query("dimension"),
+		c.Query("granularity"),
+	)
+	if err != nil {
+		resp.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	resp.Success(c, items)
+}

@@ -90,9 +90,9 @@
         }
     },
     "usage": {
-        "eyebrow": "日志统计",
+        "eyebrow": "用量分析",
         "title": "用量 / 费用",
-        "description": "从日志中聚合费用、请求与 Token，用于查看总体趋势和排行。",
+        "description": "默认按模型展示消耗、调用与稳定性图表，也可切换到供应商、路由、端点或 API Key 维度分析。",
         "period": {
             "today": "今天",
             "week": "本周",
@@ -103,6 +103,18 @@
             "day": "每天",
             "week": "每周"
         },
+        "controls": {
+            "period": "时间范围",
+            "dimension": "分析维度",
+            "granularity": "时间粒度"
+        },
+        "dimension": {
+            "model": "模型",
+            "channel": "供应商",
+            "router": "路由",
+            "endpoint": "端点",
+            "apikey": "API Key"
+        },
         "summary": {
             "totalCost": "总费用",
             "requestCount": "请求次数",
@@ -112,34 +124,33 @@
             "inputCost": "输入费用",
             "outputCost": "输出费用"
         },
-        "trend": {
-            "title": "趋势",
-            "description": "按时间周期查看费用、请求与 Token 变化。",
-            "metric": {
-                "cost": "金额",
-                "count": "次数",
-                "tokens": "Tokens"
-            }
-        },
-        "rank": {
-            "title": "排行榜",
-            "description": "按供应商、端点、模型或 API Key 汇总排行。",
-            "dimension": {
-                "channel": "供应商",
-                "endpoint": "端点",
-                "model": "模型",
-                "apikey": "API Key"
+        "charts": {
+            "empty": "暂无图表数据",
+            "other": "其他",
+            "success": "成功请求",
+            "failed": "失败请求",
+            "successRate": "成功率",
+            "costDistribution": {
+                "title": "消耗分布图",
+                "description": "按所选维度拆分费用消耗，观察不同对象在各时间段的成本占用。"
             },
-            "sort": {
-                "cost": "金额",
-                "count": "次数",
-                "tokens": "Tokens"
+            "callTrend": {
+                "title": "调用趋势图",
+                "description": "展示所选维度下各对象的请求量随时间变化。"
             },
-            "empty": "暂无排行数据",
-            "meta": {
-                "requests": "请求",
-                "tokens": "Tokens",
-                "successRate": "成功率"
+            "callShare": {
+                "title": "调用次数占比图",
+                "description": "对比当前时间范围内各对象的调用份额。",
+                "value": "调用次数"
+            },
+            "callBars": {
+                "title": "调用次数柱状图",
+                "description": "以柱状图展示各对象的总调用次数，便于横向对比。",
+                "value": "调用次数"
+            },
+            "reliability": {
+                "title": "成功率 / 失败趋势图",
+                "description": "同时展示成功、失败请求量与成功率变化，用于定位稳定性波动。"
             }
         }
     },

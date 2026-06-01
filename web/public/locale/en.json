@@ -90,9 +90,9 @@
         }
     },
     "usage": {
-        "eyebrow": "Log Analytics",
+        "eyebrow": "Usage Analytics",
         "title": "Usage / Cost",
-        "description": "Aggregate cost, requests, and tokens from logs to review overall trends and rankings.",
+        "description": "Show model-first charts for cost, calls, and reliability. Switch to channel, router, endpoint, or API Key dimensions when needed.",
         "period": {
             "today": "Today",
             "week": "This Week",
@@ -103,6 +103,18 @@
             "day": "Per Day",
             "week": "Per Week"
         },
+        "controls": {
+            "period": "Time Range",
+            "dimension": "Dimension",
+            "granularity": "Granularity"
+        },
+        "dimension": {
+            "model": "Model",
+            "channel": "Channel",
+            "router": "Router",
+            "endpoint": "Endpoint",
+            "apikey": "API Key"
+        },
         "summary": {
             "totalCost": "Total Cost",
             "requestCount": "Request Count",
@@ -112,34 +124,33 @@
             "inputCost": "Input Cost",
             "outputCost": "Output Cost"
         },
-        "trend": {
-            "title": "Trend",
-            "description": "View cost, requests, and token changes over time.",
-            "metric": {
-                "cost": "Cost",
-                "count": "Count",
-                "tokens": "Tokens"
-            }
-        },
-        "rank": {
-            "title": "Ranking",
-            "description": "Rank by channel, endpoint, model, or API Key totals.",
-            "dimension": {
-                "channel": "Channel",
-                "endpoint": "Endpoint",
-                "model": "Model",
-                "apikey": "API Key"
+        "charts": {
+            "empty": "No chart data",
+            "other": "Other",
+            "success": "Successful Requests",
+            "failed": "Failed Requests",
+            "successRate": "Success Rate",
+            "costDistribution": {
+                "title": "Cost Distribution",
+                "description": "Break down cost by the selected dimension to see cost share across time buckets."
             },
-            "sort": {
-                "cost": "Cost",
-                "count": "Count",
-                "tokens": "Tokens"
+            "callTrend": {
+                "title": "Call Trend",
+                "description": "Track request volume over time for each item in the selected dimension."
             },
-            "empty": "No ranking data",
-            "meta": {
-                "requests": "Requests",
-                "tokens": "Tokens",
-                "successRate": "Success Rate"
+            "callShare": {
+                "title": "Call Share",
+                "description": "Compare request share within the current time range.",
+                "value": "Requests"
+            },
+            "callBars": {
+                "title": "Call Count Bars",
+                "description": "Compare total request counts across items with a bar chart.",
+                "value": "Requests"
+            },
+            "reliability": {
+                "title": "Success Rate / Failure Trend",
+                "description": "Show successful requests, failed requests, and success rate changes to spot reliability shifts."
             }
         }
     },
