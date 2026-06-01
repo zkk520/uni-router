@@ -634,6 +634,17 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                                         )}
                                                     />
                                                     <div className="flex shrink-0 items-center gap-1.5">
+                                                        <label
+                                                            className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background px-2 py-1 text-xs text-muted-foreground"
+                                                            title={endpoint.enabled ? '停用端点' : '启用端点'}
+                                                        >
+                                                            <Switch
+                                                                checked={endpoint.enabled}
+                                                                onCheckedChange={(checked) => updateEndpoint(endpoint, { enabled: checked })}
+                                                                disabled={updateRouter.isPending}
+                                                            />
+                                                            <span className="whitespace-nowrap">{endpoint.enabled ? '启用' : '停用'}</span>
+                                                        </label>
                                                         {isPrimary ? <Badge>主端点</Badge> : null}
                                                         {showManualRank ? <Badge variant="outline">#{manualDisplayRank}</Badge> : null}
                                                         {duplicate ? <Badge variant="outline" className="border-amber-500/70 text-amber-700">重复</Badge> : null}
