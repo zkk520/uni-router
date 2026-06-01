@@ -223,35 +223,13 @@ function AddEndpointDialog({
 }) {
     const [open, setOpen] = useState(false);
     const [channelId, setChannelId] = useState<number>(options.find((item) => item.keys.length > 0)?.id ?? options[0]?.id ?? 0);
-
-    useEffect(() => {
-        if (options.length === 0) {
-            if (channelId !== 0) setChannelId(0);
-            return;
-        }
-
-        const nextChannel = options.find((item) => item.id === channelId) ?? options.find((item) => item.keys.length > 0) ?? options[0];
-        if (nextChannel.id !== channelId) {
-            setChannelId(nextChannel.id);
-        }
+    const selectedChannelId = useMemo(() => {
+        if (options.length === 0) return 0;
+        return (options.find((item) => item.id === channelId) ?? options.find((item) => item.keys.length > 0) ?? options[0]).id;
     }, [channelId, options]);
-
-    const channel = options.find((item) => item.id === channelId) ?? options[0];
+    const channel = options.find((item) => item.id === selectedChannelId) ?? options[0];
     const keys = channel?.keys ?? [];
     const [keyId, setKeyId] = useState<number>(keys[0]?.id ?? 0);
-
-    useEffect(() => {
-        if (!channel) {
-            if (keyId !== 0) setKeyId(0);
-            return;
-        }
-
-        const nextKey = channel.keys.find((item) => item.id === keyId) ?? channel.keys[0];
-        const nextKeyId = nextKey?.id ?? 0;
-        if (nextKeyId !== keyId) {
-            setKeyId(nextKeyId);
-        }
-    }, [channel, keyId]);
 
     const effectiveKeyId = keys.some((item) => item.id === keyId) ? keyId : keys[0]?.id ?? 0;
     const selectedKey = keys.find((item) => item.id === effectiveKeyId);
@@ -298,7 +276,7 @@ function AddEndpointDialog({
                     <div className="grid gap-3">
                         <div className="grid gap-2 md:grid-cols-2">
                             <select
-                                value={channel?.id ?? 0}
+                                value={selectedChannelId}
                                 onChange={(e) => {
                                     const nextChannel = options.find((item) => item.id === Number(e.target.value));
                                     setChannelId(nextChannel?.id ?? 0);
@@ -352,28 +330,6 @@ function AddEndpointDialog({
     );
 }
 
-function PricingRulePreview({
-    source,
-    preview,
-}: {
-    source: string;
-    preview: string;
-}) {
-    return (
-        <div className="mt-3 rounded-xl border border-border/70 bg-muted/20 p-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <div className="text-xs font-medium text-card-foreground">计费规则</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                        {source} · {preview}
-                    </div>
-                </div>
-                <Badge variant="outline" className="shrink-0">按实际上游密钥计费</Badge>
-            </div>
-        </div>
-    );
-}
-
 function RouterViewModeToggle({
     value,
     onChange,
@@ -424,20 +380,22 @@ function RouterDetail({ routerId }: { routerId: number }) {
     const setRouterLayout = useToolbarViewOptionsStore((s) => s.setRouterLayout);
     const [draggingEndpointId, setDraggingEndpointId] = useState<number | null>(null);
 
-    const endpoints = useMemo(() => [...(router?.endpoints ?? [])].sort((a, b) => a.priority - b.priority), [router]);
+    const routerEndpoints = router?.endpoints;
+    const routerMode = router?.mode;
+    const preferredEndpointId = router?.preferred_endpoint_id ?? 0;
+    const endpoints = useMemo(() => [...(routerEndpoints ?? [])].sort((a, b) => a.priority - b.priority), [routerEndpoints]);
     const manualDisplayRanks = useMemo(() => {
-        if (router?.mode !== 'manual') return new Map<number, number>();
+        if (routerMode !== 'manual') return new Map<number, number>();
         const ordered = [...endpoints];
-        const preferredId = router.preferred_endpoint_id;
-        if (preferredId > 0) {
-            const preferredIndex = ordered.findIndex((item) => item.id === preferredId);
+        if (preferredEndpointId > 0) {
+            const preferredIndex = ordered.findIndex((item) => item.id === preferredEndpointId);
             if (preferredIndex > 0) {
                 const [preferred] = ordered.splice(preferredIndex, 1);
                 ordered.unshift(preferred);
             }
         }
         return new Map(ordered.map((item, index) => [item.id, index + 1]));
-    }, [endpoints, router?.mode, router?.preferred_endpoint_id]);
+    }, [endpoints, routerMode, preferredEndpointId]);
     const modelPriceByName = useMemo(() => new Map(models.map((item) => [item.name, item])), [models]);
     const totalWeight = useMemo(() => endpoints.reduce((sum, item) => sum + Math.max(1, item.weight || 1), 0), [endpoints]);
     const duplicateEndpointIds = useMemo(() => {
