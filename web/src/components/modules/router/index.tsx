@@ -1,11 +1,12 @@
 'use client';
 
 import { type DragEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, GripVertical, KeyRound, LayoutGrid, List, Loader2, Plus, Trash2, X, TestTube2 } from 'lucide-react';
+import { Check, Copy, GripVertical, KeyRound, LayoutGrid, List, Loader2, Plus, Trash2, X, TestTube2 } from 'lucide-react';
 import {
     useCreateRouter,
     useDeleteRouter,
     useRouterDetail,
+    useRouterList,
     useRouterPage,
     useRouterOptions,
     useSwitchRouterEndpoint,
@@ -110,6 +111,43 @@ function endpointOptionKey(endpoint: Pick<RouteEndpoint, 'channel_id' | 'channel
 
 function endpointKey(endpoint: Pick<RouteEndpoint, 'channel_id' | 'channel_key_id'>) {
     return `${endpoint.channel_id}:${endpoint.channel_key_id}`;
+}
+
+function duplicateRouteName(sourceName: string, routes: RouteProfile[]) {
+    const names = new Set(routes.map((route) => route.name));
+    const base = `${sourceName.trim() || '路由'} - 副本`;
+    if (!names.has(base)) return base;
+    for (let index = 2; index < 1000; index += 1) {
+        const candidate = `${base} ${index}`;
+        if (!names.has(candidate)) return candidate;
+    }
+    return `${base} ${Date.now()}`;
+}
+
+function routeToCreateRequest(route: RouteProfile, name: string): { data: RouteProfileCreateRequest; preferredEndpointKey?: string } {
+    const orderedEndpoints = [...(route.endpoints ?? [])].sort((a, b) => a.priority - b.priority);
+    const preferredEndpoint = route.mode === 'manual'
+        ? orderedEndpoints.find((endpoint) => endpoint.id === route.preferred_endpoint_id)
+        : undefined;
+
+    return {
+        data: {
+            name,
+            mode: route.mode,
+            failover_enabled: route.failover_enabled,
+            endpoints: orderedEndpoints.map((endpoint) => ({
+                name: endpoint.name,
+                channel_id: endpoint.channel_id,
+                channel_key_id: endpoint.channel_key_id,
+                priority: endpoint.priority,
+                weight: endpoint.weight,
+                enabled: endpoint.enabled,
+                use_pricing_override: endpoint.use_pricing_override,
+                pricing_rule_override: normalizePricingRule(endpoint.pricing_rule_override),
+            })),
+        },
+        preferredEndpointKey: preferredEndpoint ? endpointKey(preferredEndpoint) : undefined,
+    };
 }
 
 function effectivePricingRule(endpoint: RouteEndpoint, channel?: RouteOptionChannel): { rule: PricingRule; source: string } {
@@ -1052,15 +1090,17 @@ function RouterDetail({ routerId }: { routerId: number }) {
 
 export function Router() {
     const createRouter = useCreateRouter();
-    const updateRouter = useUpdateRouter();
+    const switchEndpoint = useSwitchRouterEndpoint();
     const deleteRouter = useDeleteRouter();
     const createAPIKey = useCreateAPIKey();
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [copyingRouteId, setCopyingRouteId] = useState<number | null>(null);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [keyword, setKeyword] = useState('');
     const [mode, setMode] = useState<string>('all');
+    const { data: routeList = [] } = useRouterList();
     const { data, error, isLoading, refetch } = useRouterPage({
         page,
         page_size: pageSize,
@@ -1074,22 +1114,45 @@ export function Router() {
     const selected = selectedId && routers.some((router) => router.id === selectedId) ? selectedId : routers[0]?.id ?? null;
     const defaultCreateName = `路由 ${(data?.total ?? routers.length) + 1}`;
 
-    const create = (data: RouteProfileCreateRequest, options: { preferredEndpointKey?: string }) => {
+    const create = (data: RouteProfileCreateRequest, options: {
+        preferredEndpointKey?: string;
+        successMessage?: string;
+        errorMessage?: string;
+        warnPreferredEndpointMissing?: boolean;
+        onSettled?: () => void;
+    }) => {
         createRouter.mutate(data, {
             onSuccess: (router) => {
                 const preferredEndpoint = router.endpoints?.find((endpoint) => options.preferredEndpointKey === endpointKey(endpoint));
                 if (preferredEndpoint && router.preferred_endpoint_id !== preferredEndpoint.id) {
                     // Creation returns real endpoint IDs, so set the preferred endpoint after the route exists.
-                    updateRouter.mutate(
-                        { id: router.id, preferred_endpoint_id: preferredEndpoint.id },
+                    switchEndpoint.mutate(
+                        { router_id: router.id, endpoint_id: preferredEndpoint.id },
                         { onError: (error) => toast.error('主端点设置失败', { description: String(error) }) }
                     );
+                } else if (options.warnPreferredEndpointMissing && options.preferredEndpointKey) {
+                    toast.warning('主端点未精确继承', { description: '新路由已创建，请在右侧确认主端点。' });
                 }
-                toast.success('路由已创建');
+                toast.success(options.successMessage ?? '路由已创建');
                 setSelectedId(router.id);
                 setCreateDialogOpen(false);
             },
-            onError: (error) => toast.error('创建路由失败', { description: String(error) }),
+            onError: (error) => toast.error(options.errorMessage ?? '创建路由失败', { description: String(error) }),
+            onSettled: options.onSettled,
+        });
+    };
+
+    const duplicateRoute = (router: RouteProfile) => {
+        if (createRouter.isPending) return;
+        const name = duplicateRouteName(router.name, routeList.length > 0 ? routeList : routers);
+        const request = routeToCreateRequest(router, name);
+        setCopyingRouteId(router.id);
+        create(request.data, {
+            preferredEndpointKey: request.preferredEndpointKey,
+            successMessage: `已复制路由：${name}`,
+            errorMessage: '路由复制失败',
+            warnPreferredEndpointMissing: true,
+            onSettled: () => setCopyingRouteId(null),
         });
     };
 
@@ -1182,10 +1245,23 @@ export function Router() {
                                                 }
                                             }}
                                             className={cn(
-                                                'relative w-full cursor-pointer border-0 border-b border-border/60 px-4 py-4 pr-12 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring last:border-b-0',
+                                                'relative w-full cursor-pointer border-0 border-b border-border/60 px-4 py-4 pr-20 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring last:border-b-0',
                                                 selected === router.id ? 'bg-primary/[0.04]' : 'bg-background/80 hover:bg-muted/40'
                                             )}
                                         >
+                                            <button
+                                                type="button"
+                                                aria-label="复制路由"
+                                                title="复制路由"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    duplicateRoute(router);
+                                                }}
+                                                disabled={createRouter.isPending || copyingRouteId === router.id}
+                                                className="absolute right-10 top-2 rounded-md p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {copyingRouteId === router.id && createRouter.isPending ? <Loader2 className="size-4 animate-spin" /> : <Copy className="size-4" />}
+                                            </button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
                                                     <button
