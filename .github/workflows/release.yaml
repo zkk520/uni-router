@@ -114,10 +114,50 @@ jobs:
           script: |
             set -e
             cd /opt/1panel/apps/uni-router
-            for i in 1 2 3; do
-              docker compose pull && break
-              echo "第 $i 次拉取失败，10s 后重试..."
-              sleep 10
+            pull_success=false
+            for delay in 10 20 30 60 90; do
+              if docker compose pull; then
+                pull_success=true
+                break
+              fi
+              echo "镜像拉取失败，${delay}s 后重试..."
+              sleep "${delay}"
             done
+
+            if [ "${pull_success}" != "true" ]; then
+              echo "镜像拉取失败，停止部署，避免使用旧镜像假成功。"
+              exit 1
+            fi
+
+            echo "拉取后的镜像信息："
+            docker image inspect ghcr.io/zkk520/uni-router:latest --format 'image={{.RepoTags}} id={{.Id}} created={{.Created}}'
+            pulled_image_id=$(docker image inspect ghcr.io/zkk520/uni-router:latest --format '{{.Id}}')
+
             docker compose up -d
+
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              health_status=$(docker inspect uni-router --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}')
+              echo "uni-router 健康状态：${health_status}"
+              if [ "${health_status}" = "healthy" ]; then
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "${health_status}" != "healthy" ]; then
+              echo "uni-router 未达到 healthy 状态。"
+              docker logs uni-router --tail 100
+              exit 1
+            fi
+
+            echo "运行中的容器镜像信息："
+            docker inspect uni-router --format 'image={{.Config.Image}} id={{.Image}} started={{.State.StartedAt}} health={{.State.Health.Status}}'
+            running_image_id=$(docker inspect uni-router --format '{{.Image}}')
+            if [ "${running_image_id}" != "${pulled_image_id}" ]; then
+              echo "运行中的容器镜像与拉取后的镜像不一致。"
+              echo "pulled=${pulled_image_id}"
+              echo "running=${running_image_id}"
+              exit 1
+            fi
+
             docker image prune -f
