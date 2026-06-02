@@ -5,7 +5,7 @@ import { AlertCircle, Clock, Cpu, DollarSign, Eye, KeyRound, Route, Waypoints, Z
 import { useTranslations } from 'next-intl';
 import { useAPIKeyList } from '@/api/endpoints/apikey';
 import { useLogPage, type ChannelAttempt, type RelayLog } from '@/api/endpoints/log';
-import { useRouterList } from '@/api/endpoints/router';
+import { useRouterList, type RouteProfile } from '@/api/endpoints/router';
 import { AdminPagination, AdminTableShell, AdminToolbar } from '@/components/common/AdminTable';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -53,17 +53,19 @@ function sortAttempts(attempts: ChannelAttempt[]) {
     return [...attempts].sort((a, b) => a.attempt_num - b.attempt_num);
 }
 
-function sameEndpoint(a?: ChannelAttempt, endpointID?: number, endpointName?: string) {
-    if (!a) return false;
-    if (a.endpoint_id && endpointID) return a.endpoint_id === endpointID;
-    const attemptName = a.endpoint_name?.trim();
-    const name = endpointName?.trim();
-    return !!attemptName && !!name && attemptName === name;
+function hasFailoverAttempt(log: RelayLog) {
+    const attempts = sortAttempts(log.attempts ?? []);
+
+    if (attempts.length > 0) {
+        const successIndex = attempts.findIndex((attempt) => attempt.status === 'success');
+        return successIndex > 0 || (successIndex === -1 && attempts.length > 1);
+    }
+
+    return (log.total_attempts ?? 0) > 1;
 }
 
-function getEndpointDisplayMeta(log: RelayLog) {
+function getEndpointDisplayMeta(log: RelayLog, routers: RouteProfile[]) {
     const attempts = sortAttempts(log.attempts ?? []);
-    const primaryAttempt = attempts.find((attempt) => attempt.endpoint_id || attempt.endpoint_name?.trim());
     const successAttempt = [...attempts].reverse().find((attempt) => attempt.status === 'success');
     const finalEndpointID = successAttempt?.endpoint_id || log.endpoint_id;
     const finalEndpointName = successAttempt?.endpoint_name || log.endpoint_name;
@@ -71,18 +73,41 @@ function getEndpointDisplayMeta(log: RelayLog) {
     const hasEndpoint = label !== '-';
 
     if (!hasEndpoint) {
-        return { label, isFailover: false, primaryName: '' };
+        return { label, roleLabel: '', role: 'unknown' as const };
     }
 
-    const isFailover = primaryAttempt
-        ? !sameEndpoint(primaryAttempt, finalEndpointID, finalEndpointName)
-        : (log.total_attempts ?? 0) > 1;
+    const router = routers.find((item) => item.id === log.router_id);
+    if (!router) {
+        return { label, roleLabel: '', role: 'unknown' as const };
+    }
+
+    if (router.mode === 'weighted') {
+        return { label, roleLabel: '加权端点', role: 'weighted' as const };
+    }
+
+    const matchedEndpoint = finalEndpointID
+        ? router.endpoints?.find((endpoint) => endpoint.id === finalEndpointID)
+        : router.endpoints?.find((endpoint) => endpoint.name.trim() === finalEndpointName?.trim());
+    const endpointID = finalEndpointID || matchedEndpoint?.id;
+
+    if (!endpointID || !router.preferred_endpoint_id) {
+        return { label, roleLabel: '', role: 'unknown' as const };
+    }
+
+    const isPrimary = endpointID === router.preferred_endpoint_id;
 
     return {
         label,
-        isFailover,
-        primaryName: primaryAttempt ? formatEndpointName(primaryAttempt.endpoint_id, primaryAttempt.endpoint_name) : '',
+        roleLabel: isPrimary ? '主端点' : '备用端点',
+        role: isPrimary ? 'primary' as const : 'standby' as const,
     };
+}
+
+function endpointRoleBadgeClass(role: ReturnType<typeof getEndpointDisplayMeta>['role']) {
+    if (role === 'primary') return 'bg-muted text-muted-foreground hover:bg-muted';
+    if (role === 'standby') return 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/15 dark:text-amber-400';
+    if (role === 'weighted') return 'bg-sky-500/15 text-sky-700 hover:bg-sky-500/15 dark:text-sky-400';
+    return 'bg-muted text-muted-foreground hover:bg-muted';
 }
 
 export function Log() {
@@ -240,9 +265,10 @@ export function Log() {
                             <TableRow><TableCell colSpan={10} className="h-32 text-center text-muted-foreground">暂无日志</TableCell></TableRow>
                         ) : rows.map((log) => {
                             const failed = !!log.error;
-                            const endpointMeta = getEndpointDisplayMeta(log);
-                            const endpointTitle = endpointMeta.isFailover && endpointMeta.primaryName
-                                ? `主端点：${endpointMeta.primaryName}`
+                            const requestFailover = hasFailoverAttempt(log);
+                            const endpointMeta = getEndpointDisplayMeta(log, routers);
+                            const endpointTitle = endpointMeta.roleLabel
+                                ? `${endpointMeta.roleLabel}：${endpointMeta.label}`
                                 : undefined;
                             return (
                                 <TableRow key={log.id}>
@@ -277,11 +303,9 @@ export function Log() {
                                             {endpointMeta.label !== '-' ? (
                                                 <Badge className={cn(
                                                     'w-fit px-1.5 py-0 text-xs',
-                                                    endpointMeta.isFailover
-                                                        ? 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/15 dark:text-amber-400'
-                                                        : 'bg-muted text-muted-foreground hover:bg-muted'
+                                                    endpointRoleBadgeClass(endpointMeta.role)
                                                 )}>
-                                                    {endpointMeta.isFailover ? '故障转移' : '主端点'}
+                                                    {endpointMeta.roleLabel || '端点'}
                                                 </Badge>
                                             ) : null}
                                         </div>
@@ -305,7 +329,7 @@ export function Log() {
                                                 ? 'bg-destructive/15 text-destructive hover:bg-destructive/15'
                                                 : 'bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15'
                                         )}>
-                                            {failed ? '失败' : '成功'}
+                                            {failed ? '失败' : requestFailover ? '成功 · 已故障转移' : '成功'}
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
