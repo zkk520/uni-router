@@ -123,24 +123,11 @@ func getModelList(c *gin.Context) {
 }
 
 func collectRouteModelList(ctx context.Context, route model.RouteProfile) []string {
-	candidates := make([]model.RouteEndpoint, 0, len(route.Endpoints))
-	for _, ep := range route.Endpoints {
-		if !ep.Enabled || ep.Status == model.RouteEndpointStatusError {
-			continue
-		}
-		candidates = append(candidates, ep)
-	}
-	if len(candidates) == 0 {
-		for _, ep := range route.Endpoints {
-			if ep.Enabled {
-				candidates = append(candidates, ep)
-			}
-		}
-	}
+	candidates := op.RouteSelectModelListCandidates(route)
 	seen := map[string]struct{}{}
 	models := make([]string, 0)
 	for _, ep := range candidates {
-		channel, usedKey, err := op.RouteEndpointValidate(ep, ctx)
+		channel, usedKey, err := op.RouteCandidateValidate(ep, ctx)
 		if err != nil {
 			continue
 		}

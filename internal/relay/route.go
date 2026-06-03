@@ -54,7 +54,7 @@ func handleRoute(internalRequest *model.InternalLLMRequest, inAdapter model.Inbo
 		default:
 		}
 
-		channel, usedKey, err := op.RouteEndpointValidate(ep, c.Request.Context())
+		channel, usedKey, err := op.RouteCandidateValidate(ep, c.Request.Context())
 		if err != nil {
 			req.addRouteAttempt(ep, nil, dbmodel.AttemptSkipped, 0, err.Error())
 			lastErr = err
@@ -121,8 +121,13 @@ func handleRoute(internalRequest *model.InternalLLMRequest, inAdapter model.Inbo
 		if shouldTripRouteEndpoint(statusCode, fwdErr) {
 			_ = op.RouteEndpointMarkStatus(ep.ID, dbmodel.RouteEndpointStatusError, fwdErr.Error(), c.Request.Context())
 		}
-		if written || !route.FailoverEnabled {
+		if written {
 			metrics.Save(c.Request.Context(), false, lastErr, req.routeAttempts)
+			return
+		}
+		if !route.FailoverEnabled {
+			metrics.Save(c.Request.Context(), false, lastErr, req.routeAttempts)
+			resp.Error(c, http.StatusBadGateway, lastErr.Error())
 			return
 		}
 	}

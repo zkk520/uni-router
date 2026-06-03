@@ -128,7 +128,7 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 		default:
 		}
 
-		channel, usedKey, err := op.RouteEndpointValidate(ep, ctx)
+		channel, usedKey, err := op.RouteCandidateValidate(ep, ctx)
 		if err != nil {
 			attemptNum++
 			attempts = append(attempts, model.ChannelAttempt{
@@ -227,6 +227,7 @@ func ImagesHandler(endpoint string, c *gin.Context) {
 		}
 		if !route.FailoverEnabled {
 			metrics.Save(ctx, false, fwdErr, attempts)
+			resp.Error(c, http.StatusBadGateway, fwdErr.Error())
 			return
 		}
 

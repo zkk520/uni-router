@@ -389,21 +389,15 @@ func RouteEndpointValidate(ep model.RouteEndpoint, ctx context.Context) (*model.
 	return nil, model.ChannelKey{}, fmt.Errorf("channel key not found")
 }
 
+func RouteCandidateValidate(ep model.RouteEndpoint, ctx context.Context) (*model.Channel, model.ChannelKey, error) {
+	if !ep.Enabled {
+		return nil, model.ChannelKey{}, fmt.Errorf("endpoint disabled")
+	}
+	return RouteEndpointValidate(ep, ctx)
+}
+
 func RouteSelectCandidates(route model.RouteProfile) []model.RouteEndpoint {
-	enabled := make([]model.RouteEndpoint, 0, len(route.Endpoints))
-	for _, ep := range route.Endpoints {
-		if !ep.Enabled || ep.Status == model.RouteEndpointStatusError {
-			continue
-		}
-		enabled = append(enabled, ep)
-	}
-	if len(enabled) == 0 {
-		for _, ep := range route.Endpoints {
-			if ep.Enabled {
-				enabled = append(enabled, ep)
-			}
-		}
-	}
+	enabled := routeSelectableEndpoints(route.Endpoints)
 	if len(enabled) == 0 {
 		return nil
 	}
@@ -416,18 +410,7 @@ func RouteSelectCandidates(route model.RouteProfile) []model.RouteEndpoint {
 		return ordered
 	}
 
-	sort.Slice(enabled, func(i, j int) bool {
-		return enabled[i].Priority < enabled[j].Priority
-	})
-	if route.PreferredEndpointID > 0 {
-		for i, ep := range enabled {
-			if ep.ID == route.PreferredEndpointID {
-				copy(enabled[1:i+1], enabled[0:i])
-				enabled[0] = ep
-				break
-			}
-		}
-	}
+	orderManualRouteEndpoints(enabled, route.PreferredEndpointID)
 	if !route.FailoverEnabled && len(enabled) > 1 {
 		return enabled[:1]
 	}
@@ -435,34 +418,27 @@ func RouteSelectCandidates(route model.RouteProfile) []model.RouteEndpoint {
 }
 
 func RouteSelectModelListEndpoint(route model.RouteProfile) (model.RouteEndpoint, bool) {
-	enabled := make([]model.RouteEndpoint, 0, len(route.Endpoints))
-	for _, ep := range route.Endpoints {
-		if !ep.Enabled || ep.Status == model.RouteEndpointStatusError {
-			continue
-		}
-		enabled = append(enabled, ep)
-	}
-	if len(enabled) == 0 {
-		for _, ep := range route.Endpoints {
-			if ep.Enabled {
-				enabled = append(enabled, ep)
-			}
-		}
-	}
-	if len(enabled) == 0 {
+	candidates := RouteSelectModelListCandidates(route)
+	if len(candidates) == 0 {
 		return model.RouteEndpoint{}, false
 	}
-	sort.Slice(enabled, func(i, j int) bool {
-		return enabled[i].Priority < enabled[j].Priority
-	})
 	if route.PreferredEndpointID > 0 {
-		for _, ep := range enabled {
+		for _, ep := range candidates {
 			if ep.ID == route.PreferredEndpointID {
 				return ep, true
 			}
 		}
 	}
-	return enabled[0], true
+	return candidates[0], true
+}
+
+func RouteSelectModelListCandidates(route model.RouteProfile) []model.RouteEndpoint {
+	candidates := routeSelectableEndpoints(route.Endpoints)
+	if len(candidates) == 0 {
+		return nil
+	}
+	orderManualRouteEndpoints(candidates, route.PreferredEndpointID)
+	return candidates
 }
 
 func RouteRequestModel(requestModel string) string {
@@ -504,8 +480,54 @@ func routeRefreshCacheByEndpointID(endpointID int, ctx context.Context) error {
 
 func sortRouteEndpoints(route *model.RouteProfile) {
 	sort.Slice(route.Endpoints, func(i, j int) bool {
+		if route.Endpoints[i].Enabled != route.Endpoints[j].Enabled {
+			return route.Endpoints[i].Enabled
+		}
+		if route.Mode == model.RouteModeManual && route.PreferredEndpointID > 0 {
+			if route.Endpoints[i].ID == route.PreferredEndpointID {
+				return true
+			}
+			if route.Endpoints[j].ID == route.PreferredEndpointID {
+				return false
+			}
+		}
 		return route.Endpoints[i].Priority < route.Endpoints[j].Priority
 	})
+}
+
+func routeSelectableEndpoints(endpoints []model.RouteEndpoint) []model.RouteEndpoint {
+	enabled := make([]model.RouteEndpoint, 0, len(endpoints))
+	for _, ep := range endpoints {
+		if !ep.Enabled || ep.Status == model.RouteEndpointStatusError {
+			continue
+		}
+		enabled = append(enabled, ep)
+	}
+	if len(enabled) > 0 {
+		return enabled
+	}
+	for _, ep := range endpoints {
+		if ep.Enabled {
+			enabled = append(enabled, ep)
+		}
+	}
+	return enabled
+}
+
+func orderManualRouteEndpoints(endpoints []model.RouteEndpoint, preferredEndpointID int) {
+	sort.Slice(endpoints, func(i, j int) bool {
+		return endpoints[i].Priority < endpoints[j].Priority
+	})
+	if preferredEndpointID <= 0 {
+		return
+	}
+	for i, ep := range endpoints {
+		if ep.ID == preferredEndpointID {
+			copy(endpoints[1:i+1], endpoints[0:i])
+			endpoints[0] = ep
+			break
+		}
+	}
 }
 
 func normalizeEndpoint(ep *model.RouteEndpoint, now int64) {

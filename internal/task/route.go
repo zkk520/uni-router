@@ -20,6 +20,9 @@ func RouteHealthCheckTask() {
 	}
 	for _, route := range routes {
 		for _, ep := range route.Endpoints {
+			if !ep.Enabled {
+				continue
+			}
 			if ep.Status != model.RouteEndpointStatusError {
 				continue
 			}

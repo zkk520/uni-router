@@ -433,9 +433,12 @@ function CreateRouterDialog({
     const [failoverEnabled, setFailoverEnabled] = useState(true);
     const [endpoints, setEndpoints] = useState<RouteEndpointAddRequest[]>([]);
     const [preferredIndex, setPreferredIndex] = useState(0);
-    const safePreferredIndex = endpoints.length === 0 ? 0 : Math.min(preferredIndex, endpoints.length - 1);
+    const preferredEndpointIndex = useMemo(() => {
+        if (endpoints[preferredIndex]?.enabled) return preferredIndex;
+        return endpoints.findIndex((endpoint) => endpoint.enabled);
+    }, [endpoints, preferredIndex]);
 
-    const totalWeight = useMemo(() => endpoints.reduce((sum, item) => sum + Math.max(1, item.weight || 1), 0), [endpoints]);
+    const totalWeight = useMemo(() => endpoints.reduce((sum, item) => item.enabled ? sum + Math.max(1, item.weight || 1) : sum, 0), [endpoints]);
     const duplicateEndpointKeys = useMemo(() => {
         const firstByKey = new Map<string, number>();
         const duplicates = new Set<number>();
@@ -453,19 +456,24 @@ function CreateRouterDialog({
     }, [endpoints]);
     const hasDuplicates = duplicateEndpointKeys.size > 0;
 
+    const orderDraftEndpoints = (items: RouteEndpointAddRequest[]) => [
+        ...items.filter((item) => item.enabled),
+        ...items.filter((item) => !item.enabled),
+    ].map((item, itemIndex) => ({ ...item, priority: itemIndex + 1 }));
+
     const addEndpoint = (endpoint: RouteEndpointAddRequest) => {
-        setEndpoints((current) => [...current, { ...endpoint, priority: current.length + 1 }]);
+        setEndpoints((current) => orderDraftEndpoints([...current, endpoint]));
     };
 
     const updateEndpoint = (index: number, patch: Partial<RouteEndpointAddRequest>) => {
-        setEndpoints((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
+        setEndpoints((current) => {
+            const next = current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item);
+            return patch.enabled === undefined ? next : orderDraftEndpoints(next);
+        });
     };
 
     const removeEndpoint = (index: number) => {
-        setEndpoints((current) => current
-            .filter((_, itemIndex) => itemIndex !== index)
-            .map((item, itemIndex) => ({ ...item, priority: itemIndex + 1 }))
-        );
+        setEndpoints((current) => orderDraftEndpoints(current.filter((_, itemIndex) => itemIndex !== index)));
         setPreferredIndex((current) => {
             if (endpoints.length <= 1) return 0;
             if (current === index) return Math.min(index, endpoints.length - 2);
@@ -481,7 +489,7 @@ function CreateRouterDialog({
             const next = [...current];
             const [item] = next.splice(index, 1);
             next.splice(target, 0, item);
-            return next.map((endpoint, itemIndex) => ({ ...endpoint, priority: itemIndex + 1 }));
+            return orderDraftEndpoints(next);
         });
         setPreferredIndex((current) => {
             const target = index + direction;
@@ -501,8 +509,8 @@ function CreateRouterDialog({
             toast.error('请先删除重复的候选端点');
             return;
         }
-        const orderedEndpoints = endpoints.map((endpoint, index) => ({ ...endpoint, priority: index + 1 }));
-        const preferredEndpoint = mode === 'manual' ? orderedEndpoints[safePreferredIndex] : undefined;
+        const orderedEndpoints = orderDraftEndpoints(endpoints);
+        const preferredEndpoint = mode === 'manual' && preferredEndpointIndex >= 0 ? endpoints[preferredEndpointIndex] : undefined;
         onCreate(
             {
                 name: trimmedName,
@@ -557,7 +565,9 @@ function CreateRouterDialog({
                                 {endpoints.map((endpoint, index) => {
                                     const label = endpointLabel(endpoint, options);
                                     const duplicate = duplicateEndpointKeys.has(index);
-                                    const percent = Math.round((Math.max(1, endpoint.weight || 1) / totalWeight) * 100);
+                                    const percent = endpoint.enabled && totalWeight > 0
+                                        ? Math.round((Math.max(1, endpoint.weight || 1) / totalWeight) * 100)
+                                        : 0;
                                     return (
                                         <div key={`${endpoint.channel_id}:${endpoint.channel_key_id}:${index}`} className={cn('space-y-3 px-4 py-3', duplicate && 'bg-amber-500/[0.06]')}>
                                             <div className="grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
@@ -575,14 +585,18 @@ function CreateRouterDialog({
                                                     {mode === 'manual' ? (
                                                         <Button
                                                             type="button"
-                                                            variant={safePreferredIndex === index ? 'secondary' : 'outline'}
+                                                            variant={preferredEndpointIndex === index ? 'secondary' : 'outline'}
                                                             size="sm"
+                                                            disabled={!endpoint.enabled}
+                                                            title={endpoint.enabled ? undefined : '请先启用端点'}
                                                             onClick={() => setPreferredIndex(index)}
                                                         >
-                                                            {safePreferredIndex === index ? '主端点' : '设为主端点'}
+                                                            {preferredEndpointIndex === index ? '主端点' : '设为主端点'}
                                                         </Button>
-                                                    ) : (
+                                                    ) : endpoint.enabled ? (
                                                         <Badge variant="outline">预计占比 {percent}%</Badge>
+                                                    ) : (
+                                                        <Badge variant="outline">不参与分流</Badge>
                                                     )}
                                                 </div>
                                             </div>
@@ -603,10 +617,10 @@ function CreateRouterDialog({
                                                         className="h-8 w-20 rounded-lg shadow-none"
                                                     />
                                                 </label>
-                                                <Button type="button" variant="secondary" size="sm" disabled={index === 0} onClick={() => moveEndpoint(index, -1)}>
+                                                <Button type="button" variant="secondary" size="sm" disabled={!endpoint.enabled || index === 0} onClick={() => moveEndpoint(index, -1)}>
                                                     上移
                                                 </Button>
-                                                <Button type="button" variant="secondary" size="sm" disabled={index === endpoints.length - 1} onClick={() => moveEndpoint(index, 1)}>
+                                                <Button type="button" variant="secondary" size="sm" disabled={!endpoint.enabled || index === endpoints.length - 1 || !endpoints[index + 1]?.enabled} onClick={() => moveEndpoint(index, 1)}>
                                                     下移
                                                 </Button>
                                                 <Button type="button" variant="destructive" size="sm" onClick={() => removeEndpoint(index)}>
@@ -689,21 +703,25 @@ function RouterDetail({ routerId }: { routerId: number }) {
     const routerEndpoints = router?.endpoints;
     const routerMode = router?.mode;
     const preferredEndpointId = router?.preferred_endpoint_id ?? 0;
-    const endpoints = useMemo(() => [...(routerEndpoints ?? [])].sort((a, b) => a.priority - b.priority), [routerEndpoints]);
+    const baseEndpoints = useMemo(() => [...(routerEndpoints ?? [])].sort((a, b) => a.priority - b.priority), [routerEndpoints]);
+    const enabledEndpoints = useMemo(() => {
+        const enabled = baseEndpoints.filter((endpoint) => endpoint.enabled);
+        if (routerMode !== 'manual' || preferredEndpointId <= 0) return enabled;
+        const preferredIndex = enabled.findIndex((item) => item.id === preferredEndpointId);
+        if (preferredIndex <= 0) return enabled;
+        const ordered = [...enabled];
+        const [preferred] = ordered.splice(preferredIndex, 1);
+        ordered.unshift(preferred);
+        return ordered;
+    }, [baseEndpoints, routerMode, preferredEndpointId]);
+    const disabledEndpoints = useMemo(() => baseEndpoints.filter((endpoint) => !endpoint.enabled), [baseEndpoints]);
+    const endpoints = useMemo(() => [...enabledEndpoints, ...disabledEndpoints], [enabledEndpoints, disabledEndpoints]);
     const manualDisplayRanks = useMemo(() => {
         if (routerMode !== 'manual') return new Map<number, number>();
-        const ordered = [...endpoints];
-        if (preferredEndpointId > 0) {
-            const preferredIndex = ordered.findIndex((item) => item.id === preferredEndpointId);
-            if (preferredIndex > 0) {
-                const [preferred] = ordered.splice(preferredIndex, 1);
-                ordered.unshift(preferred);
-            }
-        }
-        return new Map(ordered.map((item, index) => [item.id, index + 1]));
-    }, [endpoints, routerMode, preferredEndpointId]);
+        return new Map(enabledEndpoints.map((item, index) => [item.id, index + 1]));
+    }, [enabledEndpoints, routerMode]);
     const modelPriceByName = useMemo(() => new Map(models.map((item) => [item.name, item])), [models]);
-    const totalWeight = useMemo(() => endpoints.reduce((sum, item) => sum + Math.max(1, item.weight || 1), 0), [endpoints]);
+    const totalWeight = useMemo(() => enabledEndpoints.reduce((sum, item) => sum + Math.max(1, item.weight || 1), 0), [enabledEndpoints]);
     const duplicateEndpointIds = useMemo(() => {
         const firstByKey = new Map<string, number>();
         const duplicates = new Set<number>();
@@ -743,7 +761,36 @@ function RouterDetail({ routerId }: { routerId: number }) {
         );
     };
 
+    const endpointPriorityUpdates = (items: RouteEndpoint[]) => [
+        ...items.filter((item) => item.enabled),
+        ...items.filter((item) => !item.enabled),
+    ].map((item, index) => ({ id: item.id, priority: index + 1 }));
+
     const updateEndpoint = (endpoint: RouteEndpoint, patch: Partial<RouteEndpoint>, options?: { onError?: () => void }) => {
+        if (patch.enabled !== undefined) {
+            const nextEndpoints = endpoints.map((item) => item.id === endpoint.id ? { ...item, ...patch } : item);
+            const enabled = nextEndpoints.filter((item) => item.enabled);
+            const preferredStillEnabled = enabled.some((item) => item.id === router.preferred_endpoint_id);
+            const nextPreferredEndpointID = router.mode === 'manual' && !preferredStillEnabled
+                ? enabled[0]?.id ?? 0
+                : undefined;
+            updateRouter.mutate(
+                {
+                    id: router.id,
+                    ...(nextPreferredEndpointID !== undefined ? { preferred_endpoint_id: nextPreferredEndpointID } : {}),
+                    endpoints_to_update: endpointPriorityUpdates(nextEndpoints).map((item) => (
+                        item.id === endpoint.id ? { ...item, ...patch } : item
+                    )),
+                },
+                {
+                    onError: (error) => {
+                        options?.onError?.();
+                        toast.error('端点保存失败', { description: String(error) });
+                    },
+                }
+            );
+            return;
+        }
         updateRouter.mutate(
             {
                 id: router.id,
@@ -760,26 +807,33 @@ function RouterDetail({ routerId }: { routerId: number }) {
 
     const reorderEndpoint = (sourceId: number, targetId: number) => {
         if (sourceId === targetId) return;
-        const sourceIndex = endpoints.findIndex((item) => item.id === sourceId);
-        const targetIndex = endpoints.findIndex((item) => item.id === targetId);
-        if (sourceIndex < 0 || targetIndex < 0) return;
+        const source = endpoints.find((item) => item.id === sourceId);
+        const target = endpoints.find((item) => item.id === targetId);
+        if (!source || !target || !source.enabled) return;
 
-        const nextEndpoints = [...endpoints];
-        const [moved] = nextEndpoints.splice(sourceIndex, 1);
-        nextEndpoints.splice(targetIndex, 0, moved);
+        const nextEnabledEndpoints = endpoints.filter((item) => item.enabled);
+        const sourceIndex = nextEnabledEndpoints.findIndex((item) => item.id === sourceId);
+        const [moved] = nextEnabledEndpoints.splice(sourceIndex, 1);
+        const targetIndex = target.enabled
+            ? nextEnabledEndpoints.findIndex((item) => item.id === targetId)
+            : nextEnabledEndpoints.length;
+        nextEnabledEndpoints.splice(targetIndex < 0 ? nextEnabledEndpoints.length : targetIndex, 0, moved);
+        const nextEndpoints = [...nextEnabledEndpoints, ...endpoints.filter((item) => !item.enabled)];
         updateRouter.mutate(
             {
                 id: router.id,
-                endpoints_to_update: nextEndpoints.map((item, index) => ({
-                    id: item.id,
-                    priority: index + 1,
-                })),
+                endpoints_to_update: endpointPriorityUpdates(nextEndpoints),
             },
             { onError: (error) => toast.error('端点排序失败', { description: String(error) }) }
         );
     };
 
-    const handleEndpointDragStart = (event: DragEvent<HTMLSpanElement>, endpointId: number) => {
+    const handleEndpointDragStart = (event: DragEvent<HTMLSpanElement>, endpoint: RouteEndpoint) => {
+        if (!endpoint.enabled) {
+            event.preventDefault();
+            return;
+        }
+        const endpointId = endpoint.id;
         setDraggingEndpointId(endpointId);
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', String(endpointId));
@@ -890,7 +944,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                 const current = router.preferred_endpoint_id === endpoint.id;
                                 const isPrimary = router.mode === 'manual' && current;
                                 const manualDisplayRank = manualDisplayRanks.get(endpoint.id) ?? 0;
-                                const showManualRank = router.mode === 'manual' && router.failover_enabled && manualDisplayRank > 1;
+                                const showManualRank = router.mode === 'manual' && endpoint.enabled && manualDisplayRank > 0;
                                 const invalid = !label.keyEnabled;
                                 const duplicate = duplicateEndpointIds.has(endpoint.id);
                                 const isSwitchingEndpoint = switchEndpoint.isPending && switchEndpoint.variables?.endpoint_id === endpoint.id;
@@ -903,7 +957,9 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                             : endpoint.status === 'error'
                                                 ? '端点状态异常，请先测试或修复'
                                                 : undefined;
-                                const percent = Math.round((Math.max(1, endpoint.weight || 1) / totalWeight) * 100);
+                                const percent = endpoint.enabled && totalWeight > 0
+                                    ? Math.round((Math.max(1, endpoint.weight || 1) / totalWeight) * 100)
+                                    : 0;
                                 const isGrid = routerLayout === 'grid';
 
                                 return (
@@ -929,11 +985,18 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                                 <div className="grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center justify-start gap-2">
                                                     <span className={cn('size-2 rounded-full', statusClass(endpoint.status))} />
                                                     <span
-                                                        draggable
-                                                        title={router.mode === 'weighted' ? '拖动调整显示顺序' : '拖动调整主备顺序'}
-                                                        onDragStart={(event) => handleEndpointDragStart(event, endpoint.id)}
+                                                        draggable={endpoint.enabled}
+                                                        title={
+                                                            endpoint.enabled
+                                                                ? router.mode === 'weighted' ? '拖动调整显示顺序' : '拖动调整主备顺序'
+                                                                : '停用端点不参与排序'
+                                                        }
+                                                        onDragStart={(event) => handleEndpointDragStart(event, endpoint)}
                                                         onDragEnd={() => setDraggingEndpointId(null)}
-                                                        className="inline-flex size-7 cursor-grab items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground active:cursor-grabbing"
+                                                        className={cn(
+                                                            'inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground',
+                                                            endpoint.enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-50'
+                                                        )}
                                                     >
                                                         <GripVertical className="size-4" />
                                                         <span className="sr-only">{router.mode === 'weighted' ? '拖动调整显示顺序' : '拖动调整主备顺序'}</span>
@@ -961,6 +1024,8 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                                         </label>
                                                         {isPrimary ? <Badge>主端点</Badge> : null}
                                                         {showManualRank ? <Badge variant="outline">#{manualDisplayRank}</Badge> : null}
+                                                        {!endpoint.enabled && router.mode === 'manual' ? <Badge variant="outline">不参与故障转移</Badge> : null}
+                                                        {!endpoint.enabled && router.mode === 'weighted' ? <Badge variant="outline">不参与分流</Badge> : null}
                                                         {duplicate ? <Badge variant="outline" className="border-amber-500/70 text-amber-700">重复</Badge> : null}
                                                     </div>
                                                 </div>
@@ -1021,8 +1086,10 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                                         {isSwitchingEndpoint ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Check className="size-4 mr-1" />}
                                                         {current ? '主端点' : '设为主端点'}
                                                     </Button>
-                                                ) : (
+                                                ) : endpoint.enabled ? (
                                                     <Badge variant="outline">预计占比 {percent}%</Badge>
+                                                ) : (
+                                                    <Badge variant="outline">不参与分流</Badge>
                                                 )}
                                                 <Button
                                                     variant="secondary"

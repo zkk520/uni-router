@@ -235,3 +235,96 @@ func TestRouteSelectCandidatesWeightedWithFailoverReturnsAllCandidates(t *testin
 		}
 	}
 }
+
+func TestRouteSelectCandidatesManualIgnoresDisabledAndUsesPreferredFirst(t *testing.T) {
+	route := model.RouteProfile{
+		Mode:                model.RouteModeManual,
+		PreferredEndpointID: 3,
+		FailoverEnabled:     true,
+		Endpoints: []model.RouteEndpoint{
+			{ID: 1, Priority: 1, Enabled: false, Status: model.RouteEndpointStatusNormal},
+			{ID: 2, Priority: 2, Enabled: true, Status: model.RouteEndpointStatusNormal},
+			{ID: 3, Priority: 3, Enabled: true, Status: model.RouteEndpointStatusNormal},
+			{ID: 4, Priority: 4, Enabled: false, Status: model.RouteEndpointStatusNormal},
+			{ID: 5, Priority: 5, Enabled: true, Status: model.RouteEndpointStatusNormal},
+		},
+	}
+
+	candidates := RouteSelectCandidates(route)
+
+	if len(candidates) != 3 {
+		t.Fatalf("expected 3 candidates, got %d", len(candidates))
+	}
+	if candidates[0].ID != 3 || candidates[1].ID != 2 || candidates[2].ID != 5 {
+		t.Fatalf("expected order 3,2,5; got %d,%d,%d", candidates[0].ID, candidates[1].ID, candidates[2].ID)
+	}
+}
+
+func TestRouteSelectCandidatesFallsBackToErroredEnabledEndpoints(t *testing.T) {
+	route := model.RouteProfile{
+		Mode:            model.RouteModeManual,
+		FailoverEnabled: true,
+		Endpoints: []model.RouteEndpoint{
+			{ID: 1, Priority: 1, Enabled: false, Status: model.RouteEndpointStatusNormal},
+			{ID: 2, Priority: 2, Enabled: true, Status: model.RouteEndpointStatusError},
+			{ID: 3, Priority: 1, Enabled: true, Status: model.RouteEndpointStatusError},
+		},
+	}
+
+	candidates := RouteSelectCandidates(route)
+
+	if len(candidates) != 2 {
+		t.Fatalf("expected 2 fallback candidates, got %d", len(candidates))
+	}
+	if candidates[0].ID != 3 || candidates[1].ID != 2 {
+		t.Fatalf("expected fallback order 3,2; got %d,%d", candidates[0].ID, candidates[1].ID)
+	}
+}
+
+func TestRouteSelectCandidatesWeightedIgnoresDisabledEndpoints(t *testing.T) {
+	route := model.RouteProfile{
+		Mode:            model.RouteModeWeighted,
+		FailoverEnabled: true,
+		Endpoints: []model.RouteEndpoint{
+			{ID: 1, Weight: 80, Enabled: true, Status: model.RouteEndpointStatusNormal},
+			{ID: 2, Weight: 20, Enabled: false, Status: model.RouteEndpointStatusNormal},
+			{ID: 3, Weight: 10, Enabled: true, Status: model.RouteEndpointStatusNormal},
+		},
+	}
+
+	candidates := RouteSelectCandidates(route)
+
+	if len(candidates) != 2 {
+		t.Fatalf("expected 2 candidates, got %d", len(candidates))
+	}
+	for _, candidate := range candidates {
+		if candidate.ID == 2 {
+			t.Fatal("expected disabled endpoint to be ignored")
+		}
+	}
+}
+
+func TestSortRouteEndpointsGroupsEnabledAndHoistsPreferred(t *testing.T) {
+	route := model.RouteProfile{
+		Mode:                model.RouteModeManual,
+		PreferredEndpointID: 3,
+		Endpoints: []model.RouteEndpoint{
+			{ID: 1, Priority: 1, Enabled: false},
+			{ID: 2, Priority: 2, Enabled: true},
+			{ID: 3, Priority: 3, Enabled: true},
+			{ID: 4, Priority: 4, Enabled: false},
+		},
+	}
+
+	sortRouteEndpoints(&route)
+
+	if route.Endpoints[0].ID != 3 || route.Endpoints[1].ID != 2 || route.Endpoints[2].ID != 1 || route.Endpoints[3].ID != 4 {
+		t.Fatalf(
+			"expected sorted order 3,2,1,4; got %d,%d,%d,%d",
+			route.Endpoints[0].ID,
+			route.Endpoints[1].ID,
+			route.Endpoints[2].ID,
+			route.Endpoints[3].ID,
+		)
+	}
+}
