@@ -1024,7 +1024,6 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                                         </label>
                                                         {isPrimary ? <Badge>主端点</Badge> : null}
                                                         {showManualRank ? <Badge variant="outline">#{manualDisplayRank}</Badge> : null}
-                                                        {!endpoint.enabled && router.mode === 'manual' ? <Badge variant="outline">不参与故障转移</Badge> : null}
                                                         {!endpoint.enabled && router.mode === 'weighted' ? <Badge variant="outline">不参与分流</Badge> : null}
                                                         {duplicate ? <Badge variant="outline" className="border-amber-500/70 text-amber-700">重复</Badge> : null}
                                                     </div>
