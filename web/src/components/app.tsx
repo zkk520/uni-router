@@ -12,8 +12,7 @@ import { useTranslations } from 'next-intl'
 import Logo, { LOGO_DRAW_END_MS } from '@/components/modules/logo';
 import { ENTRANCE_VARIANTS } from '@/lib/animations/fluid-transitions';
 import { useQueryClient } from '@tanstack/react-query';
-import { CONTENT_MAP } from '@/route';
-import { ROUTES } from '@/route/config';
+import { CONTENT_MAP, ROUTES } from '@/route/config';
 import { apiClient } from '@/api/client';
 import { logger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';

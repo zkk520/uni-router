@@ -944,7 +944,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                 const current = router.preferred_endpoint_id === endpoint.id;
                                 const isPrimary = router.mode === 'manual' && current;
                                 const manualDisplayRank = manualDisplayRanks.get(endpoint.id) ?? 0;
-                                const showManualRank = router.mode === 'manual' && endpoint.enabled && manualDisplayRank > 0;
+                                const showManualRank = router.mode === 'manual' && endpoint.enabled && manualDisplayRank > 1;
                                 const invalid = !label.keyEnabled;
                                 const duplicate = duplicateEndpointIds.has(endpoint.id);
                                 const isSwitchingEndpoint = switchEndpoint.isPending && switchEndpoint.variables?.endpoint_id === endpoint.id;
