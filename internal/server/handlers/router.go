@@ -25,6 +25,7 @@ func init() {
 		AddRoute(router.NewRoute("/delete/:id", http.MethodDelete).Handle(deleteRouter)).
 		AddRoute(router.NewRoute("/switch", http.MethodPost).Handle(switchRouter)).
 		AddRoute(router.NewRoute("/test-endpoint", http.MethodPost).Handle(testRouterEndpoint)).
+		AddRoute(router.NewRoute("/reorder", http.MethodPost).Handle(reorderRouter)).
 		AddRoute(router.NewRoute("/:id", http.MethodGet).Handle(getRouter))
 }
 
@@ -89,6 +90,20 @@ func updateRouter(c *gin.Context) {
 		return
 	}
 	resp.Success(c, route)
+}
+
+func reorderRouter(c *gin.Context) {
+	var req model.RouteProfileReorderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
+		return
+	}
+	routes, err := op.RouteProfileReorder(req.IDs, c.Request.Context())
+	if err != nil {
+		resp.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	resp.Success(c, routes)
 }
 
 func deleteRouter(c *gin.Context) {

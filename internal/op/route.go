@@ -55,7 +55,12 @@ func RouteProfileList(ctx context.Context) ([]RouteProfileDetail, error) {
 			BoundAPIKey:      boundKey,
 		})
 	}
-	sort.Slice(routes, func(i, j int) bool { return routes[i].ID < routes[j].ID })
+	sort.SliceStable(routes, func(i, j int) bool {
+		if routes[i].SortOrder != routes[j].SortOrder {
+			return routes[i].SortOrder < routes[j].SortOrder
+		}
+		return routes[i].ID < routes[j].ID
+	})
 	return routes, nil
 }
 
@@ -115,6 +120,13 @@ func routeProfileCreate(route *model.RouteProfile, ctx context.Context, defaultF
 	}
 	if defaultFailover && !route.FailoverEnabled {
 		route.FailoverEnabled = true
+	}
+	if route.SortOrder <= 0 {
+		nextSortOrder, err := nextRouteSortOrder(ctx)
+		if err != nil {
+			return err
+		}
+		route.SortOrder = nextSortOrder
 	}
 	if err := ensureUniqueRouteEndpoints(route.Endpoints); err != nil {
 		return err
@@ -262,6 +274,59 @@ func RouteProfileUpdate(req *model.RouteProfileUpdateRequest, ctx context.Contex
 		routeCache.Del(oldRoute.ID)
 	}
 	return RouteProfileGetFresh(req.ID, ctx)
+}
+
+func RouteProfileReorder(ids []int, ctx context.Context) ([]RouteProfileDetail, error) {
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("router ids are required")
+	}
+
+	seen := make(map[int]bool, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			return nil, fmt.Errorf("invalid router id: %d", id)
+		}
+		if seen[id] {
+			return nil, fmt.Errorf("duplicated router id: %d", id)
+		}
+		seen[id] = true
+	}
+
+	existingIDs := make([]int, 0)
+	if err := db.GetDB().WithContext(ctx).Model(&model.RouteProfile{}).Pluck("id", &existingIDs).Error; err != nil {
+		return nil, fmt.Errorf("failed to list routers: %w", err)
+	}
+	if len(ids) != len(existingIDs) {
+		return nil, fmt.Errorf("router reorder ids must include all routers")
+	}
+	for _, id := range existingIDs {
+		if !seen[id] {
+			return nil, fmt.Errorf("router not found in reorder ids: %d", id)
+		}
+	}
+
+	now := time.Now().Unix()
+	tx := db.GetDB().WithContext(ctx).Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+	for index, id := range ids {
+		if err := tx.Model(&model.RouteProfile{}).
+			Where("id = ?", id).
+			Updates(map[string]any{"sort_order": (index + 1) * 10, "updated_at": now}).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to update router sort order: %w", err)
+		}
+	}
+	if err := tx.Commit().Error; err != nil {
+		return nil, fmt.Errorf("failed to commit router reorder: %w", err)
+	}
+	if err := routeRefreshCache(ctx); err != nil {
+		return nil, err
+	}
+	return RouteProfileList(ctx)
 }
 
 func RouteProfileGetFresh(id int, ctx context.Context) (*RouteProfileDetail, error) {
@@ -447,9 +512,10 @@ func RouteRequestModel(requestModel string) string {
 
 func routeRefreshCache(ctx context.Context) error {
 	routes := []model.RouteProfile{}
-	if err := db.GetDB().WithContext(ctx).Preload("Endpoints").Find(&routes).Error; err != nil {
+	if err := db.GetDB().WithContext(ctx).Preload("Endpoints").Order("sort_order ASC, id ASC").Find(&routes).Error; err != nil {
 		return err
 	}
+	routeCache.Clear()
 	for _, route := range routes {
 		sortRouteEndpoints(&route)
 		routeCache.Set(route.ID, route)
@@ -476,6 +542,14 @@ func routeRefreshCacheByEndpointID(endpointID int, ctx context.Context) error {
 		return err
 	}
 	return routeRefreshCacheByID(ep.RouterID, ctx)
+}
+
+func nextRouteSortOrder(ctx context.Context) (int, error) {
+	var maxSortOrder int
+	if err := db.GetDB().WithContext(ctx).Model(&model.RouteProfile{}).Select("COALESCE(MAX(sort_order), 0)").Scan(&maxSortOrder).Error; err != nil {
+		return 0, fmt.Errorf("failed to calculate router sort order: %w", err)
+	}
+	return maxSortOrder + 10, nil
 }
 
 func sortRouteEndpoints(route *model.RouteProfile) {

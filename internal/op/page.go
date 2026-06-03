@@ -176,6 +176,12 @@ func LLMPage(ctx context.Context, filter LLMPageFilter) (PageResult[model.LLMInf
 
 func RouteProfilePage(ctx context.Context, filter RoutePageFilter) (PageResult[RouteProfileDetail], error) {
 	params := NormalizePageParams(filter.PageParams)
+	if filter.PageParams.SortBy == "" {
+		params.SortBy = "sort_order"
+	}
+	if filter.PageParams.SortOrder == "" {
+		params.SortOrder = "asc"
+	}
 	routes, err := RouteProfileList(ctx)
 	if err != nil {
 		return PageResult[RouteProfileDetail]{}, err
@@ -191,23 +197,53 @@ func RouteProfilePage(ctx context.Context, filter RoutePageFilter) (PageResult[R
 		items = append(items, route)
 	}
 	sort.SliceStable(items, func(i, j int) bool {
-		less := items[i].ID < items[j].ID
+		compare := 0
 		switch params.SortBy {
 		case "name":
-			less = strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
+			compare = strings.Compare(strings.ToLower(items[i].Name), strings.ToLower(items[j].Name))
 		case "mode":
-			less = items[i].Mode < items[j].Mode
+			compare = strings.Compare(string(items[i].Mode), string(items[j].Mode))
 		case "created_at":
-			less = items[i].CreatedAt < items[j].CreatedAt
+			compare = compareInt64(items[i].CreatedAt, items[j].CreatedAt)
 		case "updated_at":
-			less = items[i].UpdatedAt < items[j].UpdatedAt
+			compare = compareInt64(items[i].UpdatedAt, items[j].UpdatedAt)
+		case "sort_order":
+			compare = compareInt(items[i].SortOrder, items[j].SortOrder)
+		default:
+			compare = compareInt(items[i].ID, items[j].ID)
+		}
+		if compare == 0 {
+			compare = compareInt(items[i].ID, items[j].ID)
+		}
+		if compare == 0 {
+			return false
 		}
 		if params.SortOrder == "desc" {
-			return !less
+			return compare > 0
 		}
-		return less
+		return compare < 0
 	})
 	return PageSlice(items, params), nil
+}
+
+func compareInt(left, right int) int {
+	if left < right {
+		return -1
+	}
+	if left > right {
+		return 1
+	}
+	return 0
+}
+
+func compareInt64(left, right int64) int {
+	if left < right {
+		return -1
+	}
+	if left > right {
+		return 1
+	}
+	return 0
 }
 
 func APIKeyPage(ctx context.Context, filter APIKeyPageFilter) (PageResult[model.APIKey], error) {

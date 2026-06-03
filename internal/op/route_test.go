@@ -78,6 +78,76 @@ func TestRouteProfileCreateFromRequestPreservesDisabledFailover(t *testing.T) {
 	}
 }
 
+func TestRouteProfileCreateAssignsIncreasingSortOrder(t *testing.T) {
+	ctx := setupTestDB(t)
+
+	first := &model.RouteProfile{Name: "route-sort-create-first"}
+	second := &model.RouteProfile{Name: "route-sort-create-second"}
+	if err := RouteProfileCreate(first, ctx); err != nil {
+		t.Fatalf("create first route: %v", err)
+	}
+	if err := RouteProfileCreate(second, ctx); err != nil {
+		t.Fatalf("create second route: %v", err)
+	}
+
+	if first.SortOrder != 10 || second.SortOrder != 20 {
+		t.Fatalf("sort orders = %d,%d; want 10,20", first.SortOrder, second.SortOrder)
+	}
+}
+
+func TestRouteProfileReorderPersistsListOrder(t *testing.T) {
+	ctx := setupTestDB(t)
+	routes := []*model.RouteProfile{
+		{Name: "route-reorder-first"},
+		{Name: "route-reorder-second"},
+		{Name: "route-reorder-third"},
+	}
+	for _, route := range routes {
+		if err := RouteProfileCreate(route, ctx); err != nil {
+			t.Fatalf("create route %s: %v", route.Name, err)
+		}
+	}
+
+	reordered, err := RouteProfileReorder([]int{routes[2].ID, routes[0].ID, routes[1].ID}, ctx)
+	if err != nil {
+		t.Fatalf("reorder routes: %v", err)
+	}
+
+	wantNames := []string{"route-reorder-third", "route-reorder-first", "route-reorder-second"}
+	for index, wantName := range wantNames {
+		if reordered[index].Name != wantName {
+			t.Fatalf("route %d name = %q, want %q", index, reordered[index].Name, wantName)
+		}
+		wantSortOrder := (index + 1) * 10
+		if reordered[index].SortOrder != wantSortOrder {
+			t.Fatalf("route %d sort_order = %d, want %d", index, reordered[index].SortOrder, wantSortOrder)
+		}
+	}
+}
+
+func TestRouteProfileReorderRejectsInvalidIDs(t *testing.T) {
+	ctx := setupTestDB(t)
+	first := &model.RouteProfile{Name: "route-reorder-invalid-first"}
+	second := &model.RouteProfile{Name: "route-reorder-invalid-second"}
+	if err := RouteProfileCreate(first, ctx); err != nil {
+		t.Fatalf("create first route: %v", err)
+	}
+	if err := RouteProfileCreate(second, ctx); err != nil {
+		t.Fatalf("create second route: %v", err)
+	}
+
+	for name, ids := range map[string][]int{
+		"empty":      {},
+		"duplicate":  {first.ID, first.ID},
+		"invalid":    {first.ID, -1},
+		"incomplete": {first.ID},
+	} {
+		if _, err := RouteProfileReorder(ids, ctx); err == nil {
+			t.Fatalf("%s ids should be rejected", name)
+		}
+	}
+}
+
 func TestRouteSelectModelListEndpointPrefersPreferredEndpoint(t *testing.T) {
 	route := model.RouteProfile{
 		PreferredEndpointID: 2,

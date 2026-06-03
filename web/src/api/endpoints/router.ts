@@ -29,6 +29,7 @@ export interface RouteProfile {
     mode: RouteMode;
     preferred_endpoint_id: number;
     failover_enabled: boolean;
+    sort_order: number;
     endpoints?: RouteEndpoint[];
     bound_api_key_count?: number;
     bound_api_key?: APIKey;
@@ -77,6 +78,10 @@ export interface RouteProfileUpdateRequest {
     endpoints_to_add?: RouteEndpointAddRequest[];
     endpoints_to_update?: Array<Partial<RouteEndpoint> & { id: number }>;
     endpoints_to_delete?: number[];
+}
+
+export interface RouteProfileReorderRequest {
+    ids: number[];
 }
 
 const routerListQueryKey = ['routers', 'list'] as const;
@@ -196,6 +201,31 @@ export function useCreateRouter() {
         mutationFn: (data: RouteProfileCreateRequest) => apiClient.post<RouteProfile>('/api/v1/router/create', data),
         onSuccess: (router) => {
             applyRouteCache(queryClient, router);
+            queryClient.invalidateQueries({ queryKey: ['routers'] });
+        },
+    });
+}
+
+export function useReorderRouters() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: RouteProfileReorderRequest) =>
+            apiClient.post<RouteProfile[]>('/api/v1/router/reorder', data),
+        onMutate: async (variables) => {
+            await queryClient.cancelQueries({ queryKey: ['routers'] });
+            const previousList = queryClient.getQueryData<RouteProfile[]>(routerListQueryKey);
+            queryClient.setQueryData<RouteProfile[]>(routerListQueryKey, (current) => {
+                if (!current) return current;
+                const rank = new Map(variables.ids.map((id, index) => [id, index]));
+                return [...current].sort((a, b) => (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+            });
+            return { previousList };
+        },
+        onError: (_, __, context) => {
+            queryClient.setQueryData(routerListQueryKey, context?.previousList);
+        },
+        onSuccess: (routes) => {
+            queryClient.setQueryData(routerListQueryKey, routes);
             queryClient.invalidateQueries({ queryKey: ['routers'] });
         },
     });

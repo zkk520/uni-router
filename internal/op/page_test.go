@@ -113,6 +113,34 @@ func TestRouteAndAPIKeyPages(t *testing.T) {
 	}
 }
 
+func TestRouteProfilePageDefaultsToSortOrder(t *testing.T) {
+	ctx := setupTestDB(t)
+	routes := []*model.RouteProfile{
+		{Name: "route-page-order-first"},
+		{Name: "route-page-order-second"},
+		{Name: "route-page-order-third"},
+	}
+	for _, route := range routes {
+		if err := RouteProfileCreate(route, ctx); err != nil {
+			t.Fatalf("create route %s: %v", route.Name, err)
+		}
+	}
+	if _, err := RouteProfileReorder([]int{routes[2].ID, routes[0].ID, routes[1].ID}, ctx); err != nil {
+		t.Fatalf("reorder routes: %v", err)
+	}
+
+	result, err := RouteProfilePage(ctx, RoutePageFilter{PageParams: PageParams{Page: 1, PageSize: 20}})
+	if err != nil {
+		t.Fatalf("route page: %v", err)
+	}
+	wantNames := []string{"route-page-order-third", "route-page-order-first", "route-page-order-second"}
+	for index, wantName := range wantNames {
+		if result.Items[index].Name != wantName {
+			t.Fatalf("route page item %d = %q, want %q", index, result.Items[index].Name, wantName)
+		}
+	}
+}
+
 func TestRelayLogCountWithFilterIncludesCacheAndDB(t *testing.T) {
 	ctx := setupTestLogDB(t)
 	for _, item := range []model.RelayLog{

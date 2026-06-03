@@ -5,9 +5,9 @@ import { Check, Copy, GripVertical, KeyRound, LayoutGrid, List, Loader2, Plus, T
 import {
     useCreateRouter,
     useDeleteRouter,
+    useReorderRouters,
     useRouterDetail,
     useRouterList,
-    useRouterPage,
     useRouterOptions,
     useSwitchRouterEndpoint,
     useTestRouterEndpoint,
@@ -561,7 +561,7 @@ function CreateRouterDialog({
                                 可先不添加端点，创建后再在右侧编辑区维护端点池。
                             </div>
                         ) : (
-                            <div className="divide-y divide-border/60">
+                            <div className="grid gap-2 p-3">
                                 {endpoints.map((endpoint, index) => {
                                     const label = endpointLabel(endpoint, options);
                                     const duplicate = duplicateEndpointKeys.has(index);
@@ -1156,6 +1156,7 @@ function RouterDetail({ routerId }: { routerId: number }) {
 
 export function Router() {
     const createRouter = useCreateRouter();
+    const reorderRouters = useReorderRouters();
     const switchEndpoint = useSwitchRouterEndpoint();
     const deleteRouter = useDeleteRouter();
     const createAPIKey = useCreateAPIKey();
@@ -1166,19 +1167,24 @@ export function Router() {
     const [pageSize, setPageSize] = useState(20);
     const [keyword, setKeyword] = useState('');
     const [mode, setMode] = useState<string>('all');
-    const { data: routeList = [] } = useRouterList();
-    const { data, error, isLoading, refetch } = useRouterPage({
-        page,
-        page_size: pageSize,
-        keyword,
-        mode: mode === 'all' ? 'all' : (mode as RouteMode),
-        sort_by: 'id',
-        sort_order: 'desc',
-    });
-    const routers = useMemo(() => data?.items ?? [], [data?.items]);
+    const [draggingRouterId, setDraggingRouterId] = useState<number | null>(null);
+    const { data: routeList = [], error, isLoading, refetch } = useRouterList();
+    const normalizedKeyword = keyword.trim().toLowerCase();
+    const filteredRouters = useMemo(() => routeList.filter((router) => {
+        if (normalizedKeyword && !router.name.toLowerCase().includes(normalizedKeyword)) return false;
+        if (mode !== 'all' && router.mode !== mode) return false;
+        return true;
+    }), [routeList, normalizedKeyword, mode]);
+    const totalPages = Math.max(1, Math.ceil(filteredRouters.length / pageSize));
+    const currentPage = Math.min(page, totalPages);
+    const routers = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredRouters.slice(start, start + pageSize);
+    }, [filteredRouters, currentPage, pageSize]);
 
-    const selected = selectedId && routers.some((router) => router.id === selectedId) ? selectedId : routers[0]?.id ?? null;
-    const defaultCreateName = `路由 ${(data?.total ?? routers.length) + 1}`;
+    const selected = selectedId && routeList.some((router) => router.id === selectedId) ? selectedId : routers[0]?.id ?? null;
+    const defaultCreateName = `路由 ${routeList.length + 1}`;
+    const canReorderRoutes = normalizedKeyword === '' && mode === 'all' && routeList.length > 1 && !reorderRouters.isPending;
 
     const create = (data: RouteProfileCreateRequest, options: {
         preferredEndpointKey?: string;
@@ -1239,6 +1245,38 @@ export function Router() {
         );
     };
 
+    const handleRouterDragStart = (event: DragEvent<HTMLSpanElement>, router: RouteProfile) => {
+        if (!canReorderRoutes) {
+            event.preventDefault();
+            return;
+        }
+        setDraggingRouterId(router.id);
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(router.id));
+    };
+
+    const handleRouterDrop = (event: DragEvent<HTMLDivElement>, targetId: number) => {
+        event.preventDefault();
+        const sourceId = Number(event.dataTransfer.getData('text/plain') || draggingRouterId);
+        setDraggingRouterId(null);
+        if (!canReorderRoutes || !Number.isFinite(sourceId) || sourceId === targetId) return;
+
+        const sourceIndex = routeList.findIndex((item) => item.id === sourceId);
+        const targetIndex = routeList.findIndex((item) => item.id === targetId);
+        if (sourceIndex < 0 || targetIndex < 0) return;
+
+        const nextRoutes = [...routeList];
+        const [moved] = nextRoutes.splice(sourceIndex, 1);
+        nextRoutes.splice(targetIndex, 0, moved);
+        reorderRouters.mutate(
+            { ids: nextRoutes.map((item) => item.id) },
+            {
+                onSuccess: () => toast.success('路由顺序已保存'),
+                onError: (error) => toast.error('路由排序失败', { description: String(error) }),
+            }
+        );
+    };
+
     return (
         <>
         {createDialogOpen ? (
@@ -1294,7 +1332,7 @@ export function Router() {
                         ) : routers.length === 0 ? (
                             <div className="p-6 text-center text-sm text-muted-foreground">暂无路由。</div>
                         ) : (
-                            <div className="divide-y divide-border/60">
+                            <div className="grid gap-2 p-3">
                                 {routers.map((router) => {
                                     const boundKey = router.bound_api_key;
                                     const boundKeyCount = router.bound_api_key_count ?? 0;
@@ -1310,11 +1348,32 @@ export function Router() {
                                                     setSelectedId(router.id);
                                                 }
                                             }}
+                                            onDragOver={(event) => {
+                                                if (!canReorderRoutes) return;
+                                                event.preventDefault();
+                                                event.dataTransfer.dropEffect = 'move';
+                                            }}
+                                            onDrop={(event) => handleRouterDrop(event, router.id)}
                                             className={cn(
-                                                'relative w-full cursor-pointer border-0 border-b border-border/60 px-4 py-4 pr-20 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring last:border-b-0',
-                                                selected === router.id ? 'bg-primary/[0.04]' : 'bg-background/80 hover:bg-muted/40'
+                                                'relative w-full cursor-pointer rounded-xl border px-3 py-3 text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                                selected === router.id ? 'border-primary/35 bg-primary/[0.05] shadow-primary/5' : 'border-border/70 bg-background/80 hover:border-primary/25 hover:bg-muted/30',
+                                                draggingRouterId === router.id && 'opacity-60 ring-2 ring-primary/30'
                                             )}
                                         >
+                                            <span
+                                                draggable={canReorderRoutes}
+                                                title={canReorderRoutes ? '拖动调整路由顺序' : '仅在未搜索且未筛选时可拖动排序'}
+                                                onClick={(e) => e.stopPropagation()}
+                                                onDragStart={(event) => handleRouterDragStart(event, router)}
+                                                onDragEnd={() => setDraggingRouterId(null)}
+                                                className={cn(
+                                                    'absolute left-2 top-2 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground',
+                                                    canReorderRoutes ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-45'
+                                                )}
+                                            >
+                                                <GripVertical className="size-4" />
+                                                <span className="sr-only">拖动调整路由顺序</span>
+                                            </span>
                                             <button
                                                 type="button"
                                                 aria-label="复制路由"
@@ -1368,7 +1427,7 @@ export function Router() {
                                                     </AlertDialogFooter>
                                                 </AlertDialogContent>
                                             </AlertDialog>
-                                            <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center justify-between gap-2 pl-8 pr-14">
                                                 <span className="truncate text-sm font-semibold">{router.name}</span>
                                                 <Badge variant="outline">{routeModeLabel(router.mode)}</Badge>
                                             </div>
@@ -1430,9 +1489,9 @@ export function Router() {
                         )}
                     </div>
                     <AdminPagination
-                        page={data?.page ?? page}
-                        pageSize={data?.page_size ?? pageSize}
-                        total={data?.total ?? 0}
+                        page={page}
+                        pageSize={pageSize}
+                        total={filteredRouters.length}
                         onPageChange={setPage}
                         onPageSizeChange={(value) => {
                             setPageSize(value);

@@ -21,6 +21,7 @@ type RouteProfile struct {
 	Mode                RouteMode       `json:"mode" gorm:"not null;default:manual"`
 	PreferredEndpointID int             `json:"preferred_endpoint_id"`
 	FailoverEnabled     bool            `json:"failover_enabled" gorm:"default:true"`
+	SortOrder           int             `json:"sort_order" gorm:"not null;default:0;index"`
 	Endpoints           []RouteEndpoint `json:"endpoints,omitempty" gorm:"foreignKey:RouterID"`
 	CreatedAt           int64           `json:"created_at"`
 	UpdatedAt           int64           `json:"updated_at"`
@@ -61,6 +62,10 @@ type RouteProfileUpdateRequest struct {
 	EndpointsToAdd      []RouteEndpointAddRequest    `json:"endpoints_to_add,omitempty"`
 	EndpointsToUpdate   []RouteEndpointUpdateRequest `json:"endpoints_to_update,omitempty"`
 	EndpointsToDelete   []int                        `json:"endpoints_to_delete,omitempty"`
+}
+
+type RouteProfileReorderRequest struct {
+	IDs []int `json:"ids" binding:"required"`
 }
 
 type RouteEndpointAddRequest struct {
