@@ -6,7 +6,7 @@ import { APP_VERSION, GITHUB_REPO } from '@/lib/info';
 import { useLatestInfo, useNowVersion, useUpdateCore } from '@/api/endpoints/update';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/common/Toast';
-import { isOctopusCacheName, isFontCacheName, SW_MESSAGE_TYPE } from '@/lib/sw';
+import { isUniRouterCacheName, isFontCacheName, SW_MESSAGE_TYPE } from '@/lib/sw';
 
 export function SettingInfo() {
     const t = useTranslations('setting');
@@ -32,7 +32,7 @@ export function SettingInfo() {
             const names = await caches.keys();
             await Promise.all(
                 names
-                    .filter((name) => isOctopusCacheName(name) && !isFontCacheName(name))
+                    .filter((name) => isUniRouterCacheName(name) && !isFontCacheName(name))
                     .map((name) => caches.delete(name))
             );
         }
@@ -176,4 +176,3 @@ export function SettingInfo() {
         </div>
     );
 }
-

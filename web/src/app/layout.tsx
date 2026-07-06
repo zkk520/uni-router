@@ -5,6 +5,7 @@ import { LocaleProvider } from "@/provider/locale";
 import QueryProvider from "@/provider/query";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { TooltipProvider } from "@/components/animate-ui/components/animate/tooltip";
+import { APP_DISPLAY_NAME } from "@/lib/brand";
 
 
 
@@ -17,17 +18,17 @@ export default function RootLayout({
     <html suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#eae9e3" />
-        <meta name="application-name" content="Octopus" />
+        <meta name="application-name" content={APP_DISPLAY_NAME} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-        <meta name="apple-mobile-web-app-title" content="Octopus" />
+        <meta name="apple-mobile-web-app-title" content={APP_DISPLAY_NAME} />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-status-bar-style" content="black" />
-        <meta name="mobile-web-app-title" content="Octopus" />
+        <meta name="mobile-web-app-title" content={APP_DISPLAY_NAME} />
         <link rel="manifest" href="./manifest.json" />
         <link rel="icon" href="./favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="./apple-icon.png" />
-        <title>Octopus</title>
+        <title>{APP_DISPLAY_NAME}</title>
         <style
           dangerouslySetInnerHTML={{
             __html: `

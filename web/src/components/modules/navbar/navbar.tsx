@@ -7,6 +7,8 @@ import { ROUTES } from "@/route/config"
 import { usePreload } from "@/route/use-preload"
 import { useTranslations } from "next-intl"
 import Logo from "@/components/modules/logo"
+import { APP_DISPLAY_NAME } from "@/lib/brand"
+import { APP_VERSION } from "@/lib/info"
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react"
 
 type NavBarProps = {
@@ -46,9 +48,10 @@ export function NavBar({ onNavigate, collapsible = false }: NavBarProps) {
                 <Logo size={38} />
                 {!collapsed && (
                     <div className="min-w-0">
-                        <div className="truncate text-lg font-bold tracking-tight">uni-router</div>
-                        <div className="mt-0.5 inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                            Admin
+                        <div className="truncate text-lg font-bold tracking-tight">{APP_DISPLAY_NAME}</div>
+                        <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
+                            <span>{APP_VERSION}</span>
+                            <span className="size-1.5 rounded-full bg-amber-500" aria-hidden="true" />
                         </div>
                     </div>
                 )}

@@ -11,12 +11,11 @@ export const UNI_ROUTER_CACHE_PREFIX = 'uni-router-';
 // Font cache is version-independent and should persist across updates
 export const UNI_ROUTER_FONT_CACHE_NAME = 'uni-router-font';
 
-export function isOctopusCacheName(name: string) {
+export function isUniRouterCacheName(name: string) {
     return name.startsWith(UNI_ROUTER_CACHE_PREFIX);
 }
 
 export function isFontCacheName(name: string) {
     return name === UNI_ROUTER_FONT_CACHE_NAME;
 }
-
 

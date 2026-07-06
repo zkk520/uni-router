@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { APP_VERSION } from '@/lib/info';
 import { SW_MESSAGE_TYPE } from '@/lib/sw';
 
 export function ServiceWorkerRegister() {
@@ -27,8 +28,10 @@ export function ServiceWorkerRegister() {
 
         navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 
+        const swUrl = `/sw.js?v=${encodeURIComponent(APP_VERSION)}`;
+
         navigator.serviceWorker
-            .register('/sw.js', { scope: '/' })
+            .register(swUrl, { scope: '/' })
             .then((registration) => {
                 // If an update is already waiting, activate it immediately.
                 if (registration.waiting) {
