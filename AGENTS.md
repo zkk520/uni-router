@@ -221,13 +221,43 @@ CI/CD：push main 分支自动触发 GitHub Actions（构建镜像 → 推送 GH
 
 ### 发布策略
 
-- `main` 分支推送后仅构建并推送 Docker `latest` 镜像
+- `main` 分支推送后仅构建、推送并部署 Docker `latest` 镜像
+- `main` 镜像内部版本号使用 GitHub Actions 根据最新 `vX.Y.Z` tag 与 Conventional Commits 计算出的预估 SemVer，禁止显示分支名（如 `main`）
+- `main` 分支 CI 禁止自动创建或推送版本 tag；正式版本只能由人工创建并推送 `vX.Y.Z` tag 确认
 - 仅当推送 `v*` tag 时，GitHub Actions 才生成正式 Release 与多平台二进制压缩包
 - Release 资产命名必须使用 `uni-router-<os>-<arch>.zip`
 - 压缩包内可执行文件必须命名为 `uni-router`，Windows 为 `uni-router.exe`
 - 自更新下载地址固定为 `https://github.com/zkk520/uni-router/releases/latest/download`
 - 自更新 API 地址固定为 `https://api.github.com/repos/zkk520/uni-router/releases/latest`
 - GitHub API 可选令牌环境变量固定为 `UNI_ROUTER_GITHUB_PAT`
+
+### 版本更新规则
+
+- 普通代码修改不手动修改版本文件；版本来源是 Git tag 与提交信息
+- 若没有历史版本 tag，预估版本从 `v0.1.0` 开始
+- `BREAKING CHANGE` 或 `type!:` 触发 major 版本递增
+- `feat:` 触发 minor 版本递增
+- 其它提交类型（如 `fix:` / `chore:` / `docs:`）触发 patch 版本递增
+- 功能提交必须使用 `feat(scope): 中文描述`
+- 修复提交必须使用 `fix(scope): 中文描述`
+- 破坏兼容提交必须使用 `feat(scope)!: 中文描述` 或在正文包含 `BREAKING CHANGE:`
+- 前端更新提示必须基于 SemVer 大小比较；禁止用字符串不等判断“发现新版本”
+
+### 版本防回归检查
+
+修改 `.github/workflows/release.yaml` 后必须检查：
+
+```bash
+rg "VERSION=\\$\\{\\{ github\\.ref_name \\}\\}|Create version tag" .github/workflows/release.yaml
+cd web && pnpm run lint
+cd web && pnpm run build
+```
+
+检查要求：
+
+- workflow 中不得出现 `VERSION=${{ github.ref_name }}`
+- workflow 中不得出现 main 部署后自动 `git tag` 或 `git push origin v*`
+- Docker metadata 中 main 只允许推送 `latest`，正式 tag 镜像只能由 `type=ref,event=tag` 生成
 
 ### 发布步骤
 

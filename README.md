@@ -288,6 +288,8 @@ All configuration options can be overridden via environment variables using the 
 
 ## 📖 Documentation
 
+- [Release Guide](docs/release.md)
+
 ### 📡 Channel Management
 
 Channels are the basic configuration units for connecting to LLM providers.
