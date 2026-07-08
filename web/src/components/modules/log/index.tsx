@@ -7,8 +7,9 @@ import { useAPIKeyList } from '@/api/endpoints/apikey';
 import { useLogPage, type ChannelAttempt, type RelayLog } from '@/api/endpoints/log';
 import { useRouterList, type RouteProfile } from '@/api/endpoints/router';
 import { AdminPagination, AdminTableShell, AdminToolbar } from '@/components/common/AdminTable';
+import { ResizableColGroup, ResizableTableHead, useResizableColumns, type ResizableColumnConfig } from '@/components/common/ResizableTable';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import {
     MorphingDialog,
     MorphingDialogContainer,
@@ -20,6 +21,19 @@ import { cn, formatCurrencyCosts } from '@/lib/utils';
 
 const ALL = 'all';
 type LogStatusFilter = 'all' | 'success' | 'failed';
+
+const logTableColumns: ResizableColumnConfig[] = [
+    { key: 'time', defaultWidth: 150, minWidth: 132, maxWidth: 220 },
+    { key: 'modelRoute', defaultWidth: 280, minWidth: 200, maxWidth: 520 },
+    { key: 'apiKey', defaultWidth: 170, minWidth: 130, maxWidth: 300 },
+    { key: 'router', defaultWidth: 170, minWidth: 130, maxWidth: 300 },
+    { key: 'endpoint', defaultWidth: 190, minWidth: 140, maxWidth: 340 },
+    { key: 'duration', defaultWidth: 130, minWidth: 112, maxWidth: 190 },
+    { key: 'tokens', defaultWidth: 130, minWidth: 110, maxWidth: 200 },
+    { key: 'cost', defaultWidth: 110, minWidth: 96, maxWidth: 170 },
+    { key: 'status', defaultWidth: 150, minWidth: 120, maxWidth: 230 },
+    { key: 'actions', defaultWidth: 100, minWidth: 88, maxWidth: 150 },
+];
 
 function formatTimestamp(timestamp: number) {
     return new Date(timestamp * 1000).toLocaleString('zh-CN', {
@@ -147,6 +161,7 @@ export function Log() {
 
     const { data, isLoading, isFetching, refetch } = useLogPage(params);
     const rows = data?.items ?? [];
+    const { widths, tableWidth, getResizeHandleProps } = useResizableColumns('log', logTableColumns);
 
     const handleRefresh = useCallback(async () => {
         setIsManualRefreshing(true);
@@ -243,19 +258,20 @@ export function Log() {
             />
 
             <AdminTableShell>
-                <Table className="min-w-[1240px]">
+                <Table className="min-w-full table-fixed" style={{ width: `${tableWidth}px` }}>
+                    <ResizableColGroup columns={logTableColumns} widths={widths} />
                     <TableHeader className="sticky top-0 z-10 bg-muted/50">
                         <TableRow>
-                            <TableHead>时间</TableHead>
-                            <TableHead className="min-w-64">模型链路</TableHead>
-                            <TableHead>令牌</TableHead>
-                            <TableHead>路由</TableHead>
-                            <TableHead>端点</TableHead>
-                            <TableHead>耗时</TableHead>
-                            <TableHead>Token</TableHead>
-                            <TableHead>成本</TableHead>
-                            <TableHead>状态</TableHead>
-                            <TableHead className="text-right">操作</TableHead>
+                            <ResizableTableHead columnKey="time" getResizeHandleProps={getResizeHandleProps}>时间</ResizableTableHead>
+                            <ResizableTableHead columnKey="modelRoute" getResizeHandleProps={getResizeHandleProps}>模型链路</ResizableTableHead>
+                            <ResizableTableHead columnKey="apiKey" getResizeHandleProps={getResizeHandleProps}>令牌</ResizableTableHead>
+                            <ResizableTableHead columnKey="router" getResizeHandleProps={getResizeHandleProps}>路由</ResizableTableHead>
+                            <ResizableTableHead columnKey="endpoint" getResizeHandleProps={getResizeHandleProps}>端点</ResizableTableHead>
+                            <ResizableTableHead columnKey="duration" getResizeHandleProps={getResizeHandleProps}>耗时</ResizableTableHead>
+                            <ResizableTableHead columnKey="tokens" getResizeHandleProps={getResizeHandleProps}>Token</ResizableTableHead>
+                            <ResizableTableHead columnKey="cost" getResizeHandleProps={getResizeHandleProps}>成本</ResizableTableHead>
+                            <ResizableTableHead columnKey="status" getResizeHandleProps={getResizeHandleProps}>状态</ResizableTableHead>
+                            <ResizableTableHead columnKey="actions" align="right" getResizeHandleProps={getResizeHandleProps}>操作</ResizableTableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -282,19 +298,19 @@ export function Log() {
                                             <div className="truncate text-xs text-muted-foreground">{log.channel_name} / {log.actual_model_name}</div>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="max-w-40">
+                                    <TableCell>
                                         <div className="flex min-w-0 items-center gap-1 text-sm">
                                             <KeyRound className="size-3.5 shrink-0 text-muted-foreground" />
                                             <span className="truncate">{log.request_api_key_name || '-'}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="max-w-44">
+                                    <TableCell>
                                         <div className="flex min-w-0 items-center gap-1 text-sm">
                                             <Route className="size-3.5 shrink-0 text-muted-foreground" />
                                             <span className="truncate">{log.router_name || (log.router_id ? `Router #${log.router_id}` : '-')}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="max-w-48">
+                                    <TableCell>
                                         <div className="grid min-w-0 gap-1" title={endpointTitle}>
                                             <div className="flex min-w-0 items-center gap-1 text-sm">
                                                 <Waypoints className="size-3.5 shrink-0 text-muted-foreground" />

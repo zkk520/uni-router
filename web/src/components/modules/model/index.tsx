@@ -5,10 +5,11 @@ import { Copy, Edit3, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useDeleteModel, useModelPage, useUpdateModel, type LLMInfo } from '@/api/endpoints/model';
 import { AdminPagination, AdminTableShell, AdminToolbar } from '@/components/common/AdminTable';
+import { ResizableColGroup, ResizableTableHead, useResizableColumns, type ResizableColumnConfig } from '@/components/common/ResizableTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import {
     MorphingDialog,
     MorphingDialogContainer,
@@ -19,6 +20,17 @@ import {
 import { CreateDialogContent } from './Create';
 import { getModelIcon } from '@/lib/model-icons';
 import { toast } from '@/components/common/Toast';
+
+const modelTableColumns: ResizableColumnConfig[] = [
+    { key: 'model', defaultWidth: 360, minWidth: 240, maxWidth: 640 },
+    { key: 'provider', defaultWidth: 140, minWidth: 110, maxWidth: 220 },
+    { key: 'input', defaultWidth: 112, minWidth: 96, maxWidth: 170 },
+    { key: 'output', defaultWidth: 112, minWidth: 96, maxWidth: 170 },
+    { key: 'cacheRead', defaultWidth: 116, minWidth: 100, maxWidth: 180 },
+    { key: 'cacheWrite', defaultWidth: 116, minWidth: 100, maxWidth: 180 },
+    { key: 'status', defaultWidth: 104, minWidth: 88, maxWidth: 150 },
+    { key: 'actions', defaultWidth: 210, minWidth: 190, maxWidth: 300 },
+];
 
 type ProviderGroupKey = 'openai' | 'anthropic' | 'google' | 'deepseek' | 'xai' | 'alibaba' | 'other';
 
@@ -120,6 +132,7 @@ export function Model() {
     }), [keyword, page, pageSize, priced, provider]);
     const { data, isLoading, refetch } = useModelPage(queryParams);
     const rows = data?.items ?? [];
+    const { widths, tableWidth, getResizeHandleProps } = useResizableColumns('model', modelTableColumns);
 
     return (
         <div className="flex h-full min-h-0 flex-col gap-4">
@@ -180,17 +193,18 @@ export function Model() {
             />
 
             <AdminTableShell>
-                <Table>
+                <Table className="min-w-full table-fixed" style={{ width: `${tableWidth}px` }}>
+                    <ResizableColGroup columns={modelTableColumns} widths={widths} />
                     <TableHeader className="sticky top-0 z-10 bg-muted/50">
                         <TableRow>
-                            <TableHead className="min-w-72">模型</TableHead>
-                            <TableHead>供应商</TableHead>
-                            <TableHead>输入</TableHead>
-                            <TableHead>输出</TableHead>
-                            <TableHead>缓存读</TableHead>
-                            <TableHead>缓存写</TableHead>
-                            <TableHead>状态</TableHead>
-                            <TableHead className="text-right">操作</TableHead>
+                            <ResizableTableHead columnKey="model" getResizeHandleProps={getResizeHandleProps}>模型</ResizableTableHead>
+                            <ResizableTableHead columnKey="provider" getResizeHandleProps={getResizeHandleProps}>供应商</ResizableTableHead>
+                            <ResizableTableHead columnKey="input" getResizeHandleProps={getResizeHandleProps}>输入</ResizableTableHead>
+                            <ResizableTableHead columnKey="output" getResizeHandleProps={getResizeHandleProps}>输出</ResizableTableHead>
+                            <ResizableTableHead columnKey="cacheRead" getResizeHandleProps={getResizeHandleProps}>缓存读</ResizableTableHead>
+                            <ResizableTableHead columnKey="cacheWrite" getResizeHandleProps={getResizeHandleProps}>缓存写</ResizableTableHead>
+                            <ResizableTableHead columnKey="status" getResizeHandleProps={getResizeHandleProps}>状态</ResizableTableHead>
+                            <ResizableTableHead columnKey="actions" align="right" getResizeHandleProps={getResizeHandleProps}>操作</ResizableTableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>

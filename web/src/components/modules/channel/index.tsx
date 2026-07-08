@@ -4,11 +4,12 @@ import { useMemo, useState } from 'react';
 import { Edit3, Plus, Radio, Trash2 } from 'lucide-react';
 import { useChannelPage, ChannelType, useEnableChannel, useDeleteChannel, type Channel } from '@/api/endpoints/channel';
 import { AdminPagination, AdminTableShell, AdminToolbar } from '@/components/common/AdminTable';
+import { ResizableColGroup, ResizableTableHead, useResizableColumns, type ResizableColumnConfig } from '@/components/common/ResizableTable';
 import { toast } from '@/components/common/Toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -28,6 +29,17 @@ import {
 import { CreateDialogContent } from './Create';
 import { CardContent } from './CardContent';
 import { cn } from '@/lib/utils';
+
+const channelTableColumns: ResizableColumnConfig[] = [
+    { key: 'name', defaultWidth: 300, minWidth: 220, maxWidth: 520 },
+    { key: 'protocol', defaultWidth: 150, minWidth: 120, maxWidth: 240 },
+    { key: 'keys', defaultWidth: 90, minWidth: 72, maxWidth: 140 },
+    { key: 'models', defaultWidth: 90, minWidth: 72, maxWidth: 140 },
+    { key: 'requests', defaultWidth: 110, minWidth: 88, maxWidth: 180 },
+    { key: 'cost', defaultWidth: 110, minWidth: 88, maxWidth: 180 },
+    { key: 'status', defaultWidth: 96, minWidth: 84, maxWidth: 140 },
+    { key: 'actions', defaultWidth: 190, minWidth: 170, maxWidth: 260 },
+];
 
 function channelTypeLabel(type: ChannelType) {
     switch (type) {
@@ -83,6 +95,7 @@ export function Channel() {
 
     const { data, isLoading, refetch } = useChannelPage(queryParams);
     const rows = data?.items ?? [];
+    const { widths, tableWidth, getResizeHandleProps } = useResizableColumns('channel', channelTableColumns);
 
     const handleDeleteConfirm = (channel: Channel) => {
         deleteChannel.mutate(channel.id, {
@@ -158,17 +171,18 @@ export function Channel() {
             />
 
             <AdminTableShell>
-                <Table>
+                <Table className="min-w-full table-fixed" style={{ width: `${tableWidth}px` }}>
+                    <ResizableColGroup columns={channelTableColumns} widths={widths} />
                     <TableHeader className="sticky top-0 z-10 bg-muted/50">
                         <TableRow>
-                            <TableHead className="min-w-52">名称</TableHead>
-                            <TableHead>协议</TableHead>
-                            <TableHead>密钥</TableHead>
-                            <TableHead>模型</TableHead>
-                            <TableHead>请求</TableHead>
-                            <TableHead>成本</TableHead>
-                            <TableHead>状态</TableHead>
-                            <TableHead className="text-right">操作</TableHead>
+                            <ResizableTableHead columnKey="name" getResizeHandleProps={getResizeHandleProps}>名称</ResizableTableHead>
+                            <ResizableTableHead columnKey="protocol" getResizeHandleProps={getResizeHandleProps}>协议</ResizableTableHead>
+                            <ResizableTableHead columnKey="keys" getResizeHandleProps={getResizeHandleProps}>密钥</ResizableTableHead>
+                            <ResizableTableHead columnKey="models" getResizeHandleProps={getResizeHandleProps}>模型</ResizableTableHead>
+                            <ResizableTableHead columnKey="requests" getResizeHandleProps={getResizeHandleProps}>请求</ResizableTableHead>
+                            <ResizableTableHead columnKey="cost" getResizeHandleProps={getResizeHandleProps}>成本</ResizableTableHead>
+                            <ResizableTableHead columnKey="status" getResizeHandleProps={getResizeHandleProps}>状态</ResizableTableHead>
+                            <ResizableTableHead columnKey="actions" align="right" getResizeHandleProps={getResizeHandleProps}>操作</ResizableTableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>

@@ -26,9 +26,10 @@ import {
 import { useRouterList } from '@/api/endpoints/router';
 import { useStatsAPIKey } from '@/api/endpoints/stats';
 import { AdminPagination, AdminTableShell, AdminToolbar } from '@/components/common/AdminTable';
+import { ResizableColGroup, ResizableTableHead, useResizableColumns, type ResizableColumnConfig } from '@/components/common/ResizableTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import {
     Dialog,
     DialogContent,
@@ -41,6 +42,17 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/components/common/Toast';
 import { CopyIconButton } from '@/components/common/CopyButton';
 import type { ApiError } from '@/api/types';
+
+const apiKeyTableColumns: ResizableColumnConfig[] = [
+    { key: 'name', defaultWidth: 230, minWidth: 170, maxWidth: 380 },
+    { key: 'apiKey', defaultWidth: 230, minWidth: 180, maxWidth: 360 },
+    { key: 'router', defaultWidth: 180, minWidth: 130, maxWidth: 300 },
+    { key: 'usage', defaultWidth: 150, minWidth: 120, maxWidth: 220 },
+    { key: 'quota', defaultWidth: 150, minWidth: 120, maxWidth: 220 },
+    { key: 'expireAt', defaultWidth: 180, minWidth: 150, maxWidth: 260 },
+    { key: 'status', defaultWidth: 100, minWidth: 84, maxWidth: 140 },
+    { key: 'actions', defaultWidth: 180, minWidth: 160, maxWidth: 260 },
+];
 
 function maskAPIKey(apiKey: string) {
     if (!apiKey) return '未生成';
@@ -814,6 +826,7 @@ export function TokenManagement() {
     const rows = data?.items ?? [];
     const statsByKey = useMemo(() => new Map(statsList.map((item) => [item.api_key_id, item])), [statsList]);
     const routerNameByID = useMemo(() => new Map(routers.map((router) => [router.id, router.name])), [routers]);
+    const { widths, tableWidth, getResizeHandleProps } = useResizableColumns('api-key', apiKeyTableColumns);
 
     const handleCreate = useCallback((payload: Omit<APIKey, 'id' | 'api_key'>) => {
         createAPIKey.mutate(payload, {
@@ -914,17 +927,18 @@ export function TokenManagement() {
             />
 
             <AdminTableShell>
-                <Table className="min-w-[1080px]">
+                <Table className="min-w-full table-fixed" style={{ width: `${tableWidth}px` }}>
+                    <ResizableColGroup columns={apiKeyTableColumns} widths={widths} />
                     <TableHeader className="sticky top-0 z-10 bg-muted/50">
                         <TableRow>
-                            <TableHead className="min-w-48">名称</TableHead>
-                            <TableHead>API Key</TableHead>
-                            <TableHead>路由</TableHead>
-                            <TableHead>用量</TableHead>
-                            <TableHead>额度</TableHead>
-                            <TableHead>过期时间</TableHead>
-                            <TableHead>状态</TableHead>
-                            <TableHead className="text-right">操作</TableHead>
+                            <ResizableTableHead columnKey="name" getResizeHandleProps={getResizeHandleProps}>名称</ResizableTableHead>
+                            <ResizableTableHead columnKey="apiKey" getResizeHandleProps={getResizeHandleProps}>API Key</ResizableTableHead>
+                            <ResizableTableHead columnKey="router" getResizeHandleProps={getResizeHandleProps}>路由</ResizableTableHead>
+                            <ResizableTableHead columnKey="usage" getResizeHandleProps={getResizeHandleProps}>用量</ResizableTableHead>
+                            <ResizableTableHead columnKey="quota" getResizeHandleProps={getResizeHandleProps}>额度</ResizableTableHead>
+                            <ResizableTableHead columnKey="expireAt" getResizeHandleProps={getResizeHandleProps}>过期时间</ResizableTableHead>
+                            <ResizableTableHead columnKey="status" getResizeHandleProps={getResizeHandleProps}>状态</ResizableTableHead>
+                            <ResizableTableHead columnKey="actions" align="right" getResizeHandleProps={getResizeHandleProps}>操作</ResizableTableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -939,7 +953,7 @@ export function TokenManagement() {
                             return (
                                 <TableRow key={apiKey.id}>
                                     <TableCell>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex min-w-0 items-center gap-2">
                                             <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                                 <KeyRound className="size-4" />
                                             </span>
@@ -947,8 +961,8 @@ export function TokenManagement() {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <code className="rounded-md bg-muted px-2 py-1 text-xs text-primary">{maskAPIKey(apiKey.api_key)}</code>
+                                        <div className="flex min-w-0 items-center gap-2">
+                                            <code className="truncate rounded-md bg-muted px-2 py-1 text-xs text-primary">{maskAPIKey(apiKey.api_key)}</code>
                                             <CopyIconButton
                                                 text={apiKey.api_key}
                                                 className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -957,7 +971,7 @@ export function TokenManagement() {
                                             />
                                         </div>
                                     </TableCell>
-                                    <TableCell>{apiKey.router_id ? routerNameByID.get(apiKey.router_id) ?? `Router #${apiKey.router_id}` : '-'}</TableCell>
+                                    <TableCell><span className="block truncate">{apiKey.router_id ? routerNameByID.get(apiKey.router_id) ?? `Router #${apiKey.router_id}` : '-'}</span></TableCell>
                                     <TableCell>
                                         <div className="grid gap-1 text-xs text-muted-foreground">
                                             <span>请求 {stats?.request_count.formatted.value ?? '0'}{stats?.request_count.formatted.unit ?? ''}</span>
