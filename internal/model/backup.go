@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-// DBDump is a full-database JSON export format for Octopus.
+// DBDump is a full-database JSON export format for Uni Router.
 // Import uses incremental semantics (insert new rows, and upsert on certain key-based tables).
 type DBDump struct {
 	Version      int       `json:"version"`

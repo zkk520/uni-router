@@ -242,7 +242,7 @@ function Start-FrontendForeground {
 Set-Location $RepoRoot
 
 if (-not (Test-Path (Join-Path $RepoRoot "go.mod"))) {
-    throw "This script must run from inside the Octopus repository."
+    throw "This script must run from inside the Uni Router repository."
 }
 
 if (-not (Test-Path (Join-Path $WebRoot "package.json"))) {
