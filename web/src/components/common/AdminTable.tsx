@@ -150,8 +150,8 @@ export function AdminTableShell({
     className?: string;
 }) {
     return (
-        <div className={cn('min-h-0 flex-1 overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm', className)}>
-            <div className="h-full overflow-auto">{children}</div>
+        <div className={cn('min-h-0 flex-1 overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm [&>div]:h-full', className)}>
+            {children}
         </div>
     );
 }
