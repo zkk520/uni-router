@@ -2,12 +2,23 @@
 
 import { useMemo, useState } from 'react';
 import { Edit3, Plus, Radio, Trash2 } from 'lucide-react';
-import { useChannelPage, ChannelType, useEnableChannel, type Channel } from '@/api/endpoints/channel';
+import { useChannelPage, ChannelType, useEnableChannel, useDeleteChannel, type Channel } from '@/api/endpoints/channel';
 import { AdminPagination, AdminTableShell, AdminToolbar } from '@/components/common/AdminTable';
+import { toast } from '@/components/common/Toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
     MorphingDialog,
     MorphingDialogContainer,
@@ -56,7 +67,9 @@ export function Channel() {
     const [keyword, setKeyword] = useState('');
     const [enabled, setEnabled] = useState<string>('all');
     const [type, setType] = useState<string>('all');
+    const [deleteTarget, setDeleteTarget] = useState<Channel | null>(null);
     const enableChannel = useEnableChannel();
+    const deleteChannel = useDeleteChannel();
 
     const queryParams = useMemo(() => ({
         page,
@@ -70,6 +83,23 @@ export function Channel() {
 
     const { data, isLoading, refetch } = useChannelPage(queryParams);
     const rows = data?.items ?? [];
+
+    const handleDeleteConfirm = (channel: Channel) => {
+        deleteChannel.mutate(channel.id, {
+            onSuccess: () => {
+                toast.success('供应商已删除');
+                setDeleteTarget(null);
+                if (rows.length === 1 && page > 1) {
+                    setPage(page - 1);
+                }
+            },
+            onError: (error) => {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                toast.error('删除供应商失败', { description: errorMessage });
+                setDeleteTarget(null);
+            },
+        });
+    };
 
     return (
         <div className="flex h-full min-h-0 flex-col gap-4">
@@ -187,7 +217,15 @@ export function Channel() {
                                                 </MorphingDialogContent>
                                             </MorphingDialogContainer>
                                         </MorphingDialog>
-                                        <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive" disabled>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            className="text-muted-foreground hover:text-destructive"
+                                            disabled={deleteChannel.isPending}
+                                            aria-label={`删除 ${channel.name}`}
+                                            title="删除供应商"
+                                            onClick={() => setDeleteTarget(channel)}
+                                        >
                                             <Trash2 className="size-4" />
                                         </Button>
                                     </div>
@@ -208,6 +246,27 @@ export function Channel() {
                     setPage(1);
                 }}
             />
+
+            <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>删除供应商</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            确定要删除供应商「{deleteTarget?.name}」吗？此操作会同时删除该供应商的密钥和统计数据，且无法撤销。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleteChannel.isPending}>取消</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40"
+                            disabled={deleteChannel.isPending}
+                            onClick={() => deleteTarget && handleDeleteConfirm(deleteTarget)}
+                        >
+                            确认删除
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
