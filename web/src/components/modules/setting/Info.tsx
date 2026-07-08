@@ -7,6 +7,7 @@ import { useLatestInfo, useNowVersion, useUpdateCore } from '@/api/endpoints/upd
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/common/Toast';
 import { isUniRouterCacheName, isFontCacheName, SW_MESSAGE_TYPE } from '@/lib/sw';
+import { isNewerSemVer } from '@/lib/version';
 
 export function SettingInfo() {
     const t = useTranslations('setting');
@@ -19,8 +20,8 @@ export function SettingInfo() {
 
     // 前端版本与后端当前版本不一致 → 浏览器缓存问题
     const isCacheMismatch = !!backendNowVersion && backendNowVersion !== APP_VERSION;
-    // 最新版本与后端当前版本不一致 → 有新版本可更新
-    const hasNewVersion = latestVersion && backendNowVersion && latestVersion !== backendNowVersion;
+    // 只有最新发布版本高于当前后端版本时才提示更新，避免 main 预估版本误报
+    const hasNewVersion = isNewerSemVer(latestVersion, backendNowVersion);
 
     const clearCacheAndReload = async () => {
         // 通知 Service Worker 清理缓存
