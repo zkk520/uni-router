@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -256,6 +256,33 @@ export function AdminTableShell({
     );
 }
 
+type PaginationItem = number | 'ellipsis-start' | 'ellipsis-end';
+
+function getPaginationItems(page: number, totalPages: number, siblingCount = 2): PaginationItem[] {
+    if (totalPages <= 1) return [1];
+
+    const currentPage = Math.min(Math.max(page, 1), totalPages);
+    const startPage = Math.max(2, currentPage - siblingCount);
+    const endPage = Math.min(totalPages - 1, currentPage + siblingCount);
+    const items: PaginationItem[] = [1];
+
+    if (startPage > 2) {
+        items.push(startPage === 3 ? 2 : 'ellipsis-start');
+    }
+
+    for (let item = startPage; item <= endPage; item += 1) {
+        items.push(item);
+    }
+
+    if (endPage < totalPages - 1) {
+        items.push(endPage === totalPages - 2 ? totalPages - 1 : 'ellipsis-end');
+    }
+
+    items.push(totalPages);
+
+    return items;
+}
+
 export function AdminPagination({
     page,
     pageSize,
@@ -272,8 +299,10 @@ export function AdminPagination({
     compact?: boolean;
 }) {
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
-    const end = Math.min(total, page * pageSize);
+    const currentPage = Math.min(Math.max(page, 1), totalPages);
+    const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const end = Math.min(total, currentPage * pageSize);
+    const paginationItems = getPaginationItems(currentPage, totalPages, compact ? 1 : 2);
 
     return (
         <div
@@ -292,7 +321,7 @@ export function AdminPagination({
                     <>显示 {start} 至 {end} 共 {total} 条结果</>
                 )}
             </div>
-            <div className={cn('flex items-center gap-3', compact ? 'w-full justify-between' : 'justify-end')}>
+            <div className={cn('flex items-center gap-3', compact ? 'w-full flex-wrap justify-between' : 'flex-wrap justify-end')}>
                 <span className="shrink-0">每页:</span>
                 <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
                     <SelectTrigger className="h-9 w-20 rounded-lg bg-background shadow-none">
@@ -311,22 +340,77 @@ export function AdminPagination({
                         variant="ghost"
                         size="icon"
                         className="rounded-none"
-                        disabled={page <= 1}
-                        onClick={() => onPageChange(page - 1)}
+                        disabled={currentPage <= 1}
+                        onClick={() => onPageChange(1)}
+                        aria-label="跳转首页"
+                        title="跳转首页"
                     >
-                        <ChevronLeft className="size-4" />
+                        <ChevronsLeft className="size-4" />
                     </Button>
-                    <div className="flex h-9 min-w-10 items-center justify-center border-x border-border bg-primary px-3 text-primary-foreground">
-                        {page}
-                    </div>
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="rounded-none"
-                        disabled={page >= totalPages}
-                        onClick={() => onPageChange(page + 1)}
+                        className="rounded-none border-l border-border"
+                        disabled={currentPage <= 1}
+                        onClick={() => onPageChange(currentPage - 1)}
+                        aria-label="上一页"
+                        title="上一页"
+                    >
+                        <ChevronLeft className="size-4" />
+                    </Button>
+                    {paginationItems.map((item) => {
+                        if (typeof item !== 'number') {
+                            return (
+                                <span
+                                    key={item}
+                                    className="flex h-9 min-w-9 items-center justify-center border-l border-border px-2 text-muted-foreground"
+                                    aria-hidden="true"
+                                >
+                                    ...
+                                </span>
+                            );
+                        }
+
+                        const isCurrent = item === currentPage;
+
+                        return (
+                            <Button
+                                key={item}
+                                variant={isCurrent ? 'default' : 'ghost'}
+                                size="icon"
+                                className={cn(
+                                    'min-w-9 rounded-none border-l border-border px-3',
+                                    isCurrent && 'pointer-events-none cursor-default'
+                                )}
+                                onClick={() => onPageChange(item)}
+                                aria-label={isCurrent ? `当前第 ${item} 页` : `跳转第 ${item} 页`}
+                                aria-current={isCurrent ? 'page' : undefined}
+                            >
+                                {item}
+                            </Button>
+                        );
+                    })}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-none border-l border-border"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => onPageChange(currentPage + 1)}
+                        aria-label="下一页"
+                        title="下一页"
                     >
                         <ChevronRight className="size-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-none border-l border-border"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => onPageChange(totalPages)}
+                        aria-label="跳转尾页"
+                        title="跳转尾页"
+                    >
+                        <ChevronsRight className="size-4" />
                     </Button>
                 </div>
             </div>
