@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { type ReactNode, useMemo, useState, useEffect } from 'react';
 import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, KeyRound, Route, Waypoints, Server, CheckCircle2, XCircle, Ban, ShieldAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
@@ -299,7 +299,13 @@ function DeferredJsonContent({
     );
 }
 
-export function LogCard({ log }: { log: RelayLog }) {
+interface LogCardProps {
+    log: RelayLog;
+    trigger?: ReactNode;
+    triggerClassName?: string;
+}
+
+export function LogCard({ log, trigger, triggerClassName }: LogCardProps) {
     const t = useTranslations('log.card');
     const { Avatar: ModelAvatar, color: brandColor } = useMemo(
         () => getModelIcon(log.actual_model_name),
@@ -315,104 +321,108 @@ export function LogCard({ log }: { log: RelayLog }) {
     const [isDiagnosticExpanded, setIsDiagnosticExpanded] = useState(false);
     const costText = formatLogCost(log);
 
+    const defaultTrigger = (
+        <div className={cn("p-4 grid grid-cols-[auto_1fr] gap-4", hasError ? "items-start" : "items-center")}>
+            <ModelAvatar size={40} />
+            <div className="min-w-0 flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-2 min-w-0 text-sm">
+                    <span className="font-semibold text-card-foreground truncate" title={log.request_model_name}>
+                        {log.request_model_name}
+                    </span>
+                    <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
+                    <Badge variant="outline" className="shrink-0 max-w-[180px] gap-1 truncate border-border bg-muted/30 px-1.5 py-0 text-xs">
+                        <Route className="size-3 shrink-0" />
+                        <span className="truncate" title={routeLabel}>{routeLabel}</span>
+                    </Badge>
+                    {endpointLabel && (
+                        <>
+                            <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
+                            <Badge variant="outline" className="shrink-0 max-w-[180px] gap-1 truncate border-border bg-muted/30 px-1.5 py-0 text-xs">
+                                <Waypoints className="size-3 shrink-0" />
+                                <span className="truncate" title={endpointLabel}>{endpointLabel}</span>
+                            </Badge>
+                        </>
+                    )}
+                    <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
+                    {hasMultipleAttempts ? (
+                        <RetryBadgeWithTooltip
+                            channelName={log.channel_name}
+                            brandColor={brandColor}
+                            attempts={log.attempts!}
+                        />
+                    ) : (
+                        <Badge
+                            variant="secondary"
+                            className="shrink-0 text-xs px-1.5 py-0"
+                            style={{ backgroundColor: `${brandColor}15`, color: brandColor }}
+                        >
+                            {log.channel_name}
+                        </Badge>
+                    )}
+                    <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
+                    <span className="text-muted-foreground truncate" title={log.actual_model_name}>
+                        {log.actual_model_name}
+                    </span>
+                    <LogStatusBadge log={log} />
+                    {log.attempts?.some(a => a.sticky) && (
+                        <Pin className="size-3.5 shrink-0 text-amber-500" />
+                    )}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-7 gap-x-4 gap-y-2 text-xs tabular-nums text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                        <Clock className="size-3.5 shrink-0" style={{ color: brandColor }} />
+                        <span>{formatTime(log.time)}</span>
+                    </div>
+                    {requestAPIKeyName && (
+                        <div className="flex items-center gap-1.5">
+                            <KeyRound className="size-3.5 shrink-0 text-orange-500" />
+                            <span className="truncate" title={requestAPIKeyName}>
+                                {requestAPIKeyName}
+                            </span>
+                        </div>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                        <Zap className="size-3.5 shrink-0 text-amber-500" />
+                        <span>{t('firstToken')} {formatDuration(log.ftut)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <Cpu className="size-3.5 shrink-0 text-blue-500" />
+                        <span>{t('totalTime')} {formatDuration(log.use_time)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <ArrowDownToLine className="size-3.5 shrink-0 text-green-500" />
+                        <span>{t('input')} {log.input_tokens.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <ArrowUpFromLine className="size-3.5 shrink-0 text-purple-500" />
+                        <span>{t('output')} {log.output_tokens.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <DollarSign className="size-3.5 shrink-0 text-emerald-500" />
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                            {t('cost')} {costText}
+                        </span>
+                    </div>
+                </div>
+                {hasError && (
+                    <div className="p-2.5 rounded-xl bg-destructive/10 border border-destructive/20 overflow-hidden">
+                        <p className="text-xs text-destructive line-clamp-2">{log.error}</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
     return (
         <TooltipProvider>
             <MorphingDialog>
                 <MorphingDialogTrigger
-                    className={cn(
+                    className={triggerClassName ?? cn(
                         "rounded-3xl border bg-card w-full text-left",
                         hasError ? "border-destructive/40" : "border-border",
                     )}
                 >
-                    <div className={cn("p-4 grid grid-cols-[auto_1fr] gap-4", hasError ? "items-start" : "items-center")}>
-                        <ModelAvatar size={40} />
-                        <div className="min-w-0 flex flex-col gap-3">
-                            <div className="flex flex-wrap items-center gap-2 min-w-0 text-sm">
-                                <span className="font-semibold text-card-foreground truncate" title={log.request_model_name}>
-                                    {log.request_model_name}
-                                </span>
-                                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
-                                <Badge variant="outline" className="shrink-0 max-w-[180px] gap-1 truncate border-border bg-muted/30 px-1.5 py-0 text-xs">
-                                    <Route className="size-3 shrink-0" />
-                                    <span className="truncate" title={routeLabel}>{routeLabel}</span>
-                                </Badge>
-                                {endpointLabel && (
-                                    <>
-                                        <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
-                                        <Badge variant="outline" className="shrink-0 max-w-[180px] gap-1 truncate border-border bg-muted/30 px-1.5 py-0 text-xs">
-                                            <Waypoints className="size-3 shrink-0" />
-                                            <span className="truncate" title={endpointLabel}>{endpointLabel}</span>
-                                        </Badge>
-                                    </>
-                                )}
-                                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
-                                {hasMultipleAttempts ? (
-                                    <RetryBadgeWithTooltip
-                                        channelName={log.channel_name}
-                                        brandColor={brandColor}
-                                        attempts={log.attempts!}
-                                    />
-                                ) : (
-                                    <Badge
-                                        variant="secondary"
-                                        className="shrink-0 text-xs px-1.5 py-0"
-                                        style={{ backgroundColor: `${brandColor}15`, color: brandColor }}
-                                    >
-                                        {log.channel_name}
-                                    </Badge>
-                                )}
-                                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50" />
-                                <span className="text-muted-foreground truncate" title={log.actual_model_name}>
-                                    {log.actual_model_name}
-                                </span>
-                                <LogStatusBadge log={log} />
-                                {log.attempts?.some(a => a.sticky) && (
-                                    <Pin className="size-3.5 shrink-0 text-amber-500" />
-                                )}
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-7 gap-x-4 gap-y-2 text-xs tabular-nums text-muted-foreground">
-                                <div className="flex items-center gap-1.5">
-                                    <Clock className="size-3.5 shrink-0" style={{ color: brandColor }} />
-                                    <span>{formatTime(log.time)}</span>
-                                </div>
-                                {requestAPIKeyName && (
-                                    <div className="flex items-center gap-1.5">
-                                        <KeyRound className="size-3.5 shrink-0 text-orange-500" />
-                                        <span className="truncate" title={requestAPIKeyName}>
-                                            {requestAPIKeyName}
-                                        </span>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-1.5">
-                                    <Zap className="size-3.5 shrink-0 text-amber-500" />
-                                    <span>{t('firstToken')} {formatDuration(log.ftut)}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <Cpu className="size-3.5 shrink-0 text-blue-500" />
-                                    <span>{t('totalTime')} {formatDuration(log.use_time)}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <ArrowDownToLine className="size-3.5 shrink-0 text-green-500" />
-                                    <span>{t('input')} {log.input_tokens.toLocaleString()}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <ArrowUpFromLine className="size-3.5 shrink-0 text-purple-500" />
-                                    <span>{t('output')} {log.output_tokens.toLocaleString()}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <DollarSign className="size-3.5 shrink-0 text-emerald-500" />
-                                    <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                                        {t('cost')} {costText}
-                                    </span>
-                                </div>
-                            </div>
-                            {hasError && (
-                                <div className="p-2.5 rounded-xl bg-destructive/10 border border-destructive/20 overflow-hidden">
-                                    <p className="text-xs text-destructive line-clamp-2">{log.error}</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    {trigger ?? defaultTrigger}
                 </MorphingDialogTrigger>
 
                 <MorphingDialogContainer>

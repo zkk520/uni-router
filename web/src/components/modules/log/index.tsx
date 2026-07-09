@@ -10,12 +10,6 @@ import { AdminPagination, AdminTableShell, AdminToolbar, type RefreshState } fro
 import { ResizableColGroup, ResizableTableHead, useResizableColumns, type ResizableColumnConfig } from '@/components/common/ResizableTable';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
-import {
-    MorphingDialog,
-    MorphingDialogContainer,
-    MorphingDialogContent,
-    MorphingDialogTrigger,
-} from '@/components/ui/morphing-dialog';
 import { LogCard } from './Item';
 import { cn, formatCurrencyCosts } from '@/lib/utils';
 
@@ -387,17 +381,16 @@ export function Log() {
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex justify-end">
-                                            <MorphingDialog>
-                                                <MorphingDialogTrigger className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                                            <LogCard
+                                                log={log}
+                                                triggerClassName="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                trigger={(
+                                                    <>
                                                     {failed ? <AlertCircle className="size-3.5" /> : <Eye className="size-3.5" />}
                                                     详情
-                                                </MorphingDialogTrigger>
-                                                <MorphingDialogContainer>
-                                                    <MorphingDialogContent className="w-[calc(100vw-2rem)] max-w-6xl rounded-lg bg-card p-0 text-card-foreground shadow-xl">
-                                                        <LogCard log={log} />
-                                                    </MorphingDialogContent>
-                                                </MorphingDialogContainer>
-                                            </MorphingDialog>
+                                                    </>
+                                                )}
+                                            />
                                         </div>
                                     </TableCell>
                                 </TableRow>
