@@ -285,6 +285,63 @@ export function Channel() {
         });
     };
 
+    const createAction = (
+        <MorphingDialog>
+            <MorphingDialogTrigger className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90">
+                <Plus className="size-4" />
+                创建供应商
+            </MorphingDialogTrigger>
+            <MorphingDialogContainer>
+                <MorphingDialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] min-h-0 w-fit max-w-full overflow-hidden rounded-lg bg-card px-6 py-4 text-card-foreground shadow-xl">
+                    <CreateDialogContent />
+                </MorphingDialogContent>
+            </MorphingDialogContainer>
+        </MorphingDialog>
+    );
+
+    const toolbarAction = hasSelection ? (
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+            <Badge variant="secondary" className="h-8 shrink-0 px-3">
+                已选 {selectedCount} 个
+            </Badge>
+            {allFilteredSelected ? (
+                <Badge variant="secondary" className="h-8 shrink-0 px-3 font-normal text-muted-foreground">
+                    {excludedIds.size > 0 ? `排除 ${excludedIds.size}` : '全部结果'}
+                </Badge>
+            ) : total > selectedIds.size ? (
+                <Button
+                    variant="link"
+                    size="sm"
+                    className="h-8 px-1 text-primary"
+                    disabled={isBatchPending || total === 0}
+                    onClick={() => {
+                        setAllFilteredSelected(true);
+                        setSelectedIds(new Set());
+                        setExcludedIds(new Set());
+                    }}
+                >
+                    全选全部 {total} 个
+                </Button>
+            ) : null}
+            <Button variant="outline" size="sm" disabled={isBatchPending} onClick={() => executeBatch('enable')}>
+                <CheckCircle2 className="size-4" />
+                启用
+            </Button>
+            <Button variant="outline" size="sm" disabled={isBatchPending} onClick={() => executeBatch('disable')}>
+                <Ban className="size-4" />
+                停用
+            </Button>
+            <Button variant="destructive" size="sm" disabled={isBatchPending} onClick={() => setBatchDeleteOpen(true)}>
+                <Trash2 className="size-4" />
+                删除
+            </Button>
+            <Button variant="ghost" size="icon-sm" disabled={isBatchPending} aria-label="清空选择" title="清空选择" onClick={clearSelection}>
+                <X className="size-4" />
+            </Button>
+            {createAction}
+        </div>
+    ) : createAction;
+
     return (
         <div className="flex h-full min-h-0 flex-col gap-4">
             <AdminToolbar
@@ -329,64 +386,8 @@ export function Channel() {
                         ],
                     },
                 ]}
-                action={(
-                    <MorphingDialog>
-                        <MorphingDialogTrigger className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90">
-                            <Plus className="size-4" />
-                            创建供应商
-                        </MorphingDialogTrigger>
-                        <MorphingDialogContainer>
-                            <MorphingDialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] min-h-0 w-fit max-w-full overflow-hidden rounded-lg bg-card px-6 py-4 text-card-foreground shadow-xl">
-                                <CreateDialogContent />
-                            </MorphingDialogContent>
-                        </MorphingDialogContainer>
-                    </MorphingDialog>
-                )}
+                action={toolbarAction}
             />
-
-            {hasSelection ? (
-                <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-card px-4 py-3 shadow-sm md:flex-row md:items-center md:justify-between">
-                    <div className="flex min-w-0 flex-col gap-1">
-                        <div className="flex flex-wrap items-center gap-2 text-sm">
-                            <Badge variant="secondary">已选 {selectedCount} 个</Badge>
-                            {allFilteredSelected ? (
-                                <span className="text-muted-foreground">当前筛选结果已全部选中{excludedIds.size > 0 ? `，已排除 ${excludedIds.size} 个` : ''}</span>
-                            ) : total > selectedIds.size ? (
-                                <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="h-auto px-0 text-primary"
-                                    disabled={isBatchPending || total === 0}
-                                    onClick={() => {
-                                        setAllFilteredSelected(true);
-                                        setSelectedIds(new Set());
-                                        setExcludedIds(new Set());
-                                    }}
-                                >
-                                    选择当前筛选条件下全部 {total} 个结果
-                                </Button>
-                            ) : null}
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button variant="outline" size="sm" disabled={isBatchPending} onClick={() => executeBatch('enable')}>
-                            <CheckCircle2 className="size-4" />
-                            启用
-                        </Button>
-                        <Button variant="outline" size="sm" disabled={isBatchPending} onClick={() => executeBatch('disable')}>
-                            <Ban className="size-4" />
-                            停用
-                        </Button>
-                        <Button variant="destructive" size="sm" disabled={isBatchPending} onClick={() => setBatchDeleteOpen(true)}>
-                            <Trash2 className="size-4" />
-                            删除
-                        </Button>
-                        <Button variant="ghost" size="icon-sm" disabled={isBatchPending} aria-label="清空选择" title="清空选择" onClick={clearSelection}>
-                            <X className="size-4" />
-                        </Button>
-                    </div>
-                </div>
-            ) : null}
 
             <AdminTableShell>
                 <Table className="min-w-full table-fixed" style={{ width: `${tableWidth}px` }}>
