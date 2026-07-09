@@ -1,10 +1,14 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+
+const MIN_REFRESH_DURATION_MS = 650;
+const REFRESH_COMPLETED_DURATION_MS = 900;
 
 export type FilterOption = {
     value: string;
@@ -19,6 +23,13 @@ export type FilterControl = {
 };
 
 export type RefreshState = 'idle' | 'refreshing' | 'completed';
+
+function isRefreshResultSuccessful(result: unknown) {
+    if (!result || typeof result !== 'object') return true;
+
+    const queryResult = result as { isError?: unknown; status?: unknown };
+    return queryResult.isError !== true && queryResult.status !== 'error';
+}
 
 function RefreshIcon({ state }: { state: RefreshState }) {
     if (state === 'completed') {
@@ -52,16 +63,87 @@ export function AdminToolbar({
     refreshLabel?: string;
     refreshingLabel?: string;
     completedLabel?: string;
-    action?: React.ReactNode;
+    action?: ReactNode;
     compact?: boolean;
 }) {
-    const currentRefreshState = refreshState ?? (isRefreshing ? 'refreshing' : 'idle');
+    const [internalRefreshState, setInternalRefreshState] = useState<RefreshState>('idle');
+    const refreshTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+    const isMountedRef = useRef(true);
+    const isRefreshControlled = refreshState !== undefined;
+
+    const clearRefreshTimers = useCallback(() => {
+        refreshTimersRef.current.forEach((timer) => clearTimeout(timer));
+        refreshTimersRef.current = [];
+    }, []);
+
+    const setRefreshTimer = useCallback((callback: () => void, delay: number) => {
+        const timer = setTimeout(() => {
+            refreshTimersRef.current = refreshTimersRef.current.filter((item) => item !== timer);
+            callback();
+        }, delay);
+
+        refreshTimersRef.current.push(timer);
+    }, []);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+
+        return () => {
+            isMountedRef.current = false;
+            clearRefreshTimers();
+        };
+    }, [clearRefreshTimers]);
+
+    const currentRefreshState = refreshState ?? (isRefreshing ? 'refreshing' : internalRefreshState);
     const refreshAriaLabel = currentRefreshState === 'refreshing'
         ? refreshingLabel
         : currentRefreshState === 'completed'
             ? completedLabel
             : refreshLabel;
     const disableRefresh = currentRefreshState === 'refreshing';
+
+    const handleRefreshClick = useCallback(() => {
+        if (!onRefresh || disableRefresh) return;
+
+        if (isRefreshControlled) {
+            void onRefresh();
+            return;
+        }
+
+        clearRefreshTimers();
+        setInternalRefreshState('refreshing');
+
+        const startedAt = Date.now();
+
+        void Promise.resolve()
+            .then(() => onRefresh())
+            .then(
+                (result) => isRefreshResultSuccessful(result),
+                () => false,
+            )
+            .then((success) => {
+                if (!isMountedRef.current) return;
+
+                const elapsed = Date.now() - startedAt;
+                const remaining = Math.max(MIN_REFRESH_DURATION_MS - elapsed, 0);
+
+                setRefreshTimer(() => {
+                    if (!isMountedRef.current) return;
+
+                    if (!success) {
+                        setInternalRefreshState('idle');
+                        return;
+                    }
+
+                    setInternalRefreshState('completed');
+                    setRefreshTimer(() => {
+                        if (isMountedRef.current) {
+                            setInternalRefreshState('idle');
+                        }
+                    }, REFRESH_COMPLETED_DURATION_MS);
+                }, remaining);
+            });
+    }, [clearRefreshTimers, disableRefresh, isRefreshControlled, onRefresh, setRefreshTimer]);
 
     if (compact) {
         return (
@@ -96,11 +178,10 @@ export function AdminToolbar({
                                 variant="outline"
                                 size="icon"
                                 className="size-10 shrink-0 rounded-lg bg-background shadow-sm"
-                                onClick={() => {
-                                    void onRefresh();
-                                }}
+                                onClick={handleRefreshClick}
                                 disabled={disableRefresh}
                                 aria-label={refreshAriaLabel}
+                                title={refreshAriaLabel}
                             >
                                 <RefreshIcon state={currentRefreshState} />
                             </Button>
@@ -147,11 +228,10 @@ export function AdminToolbar({
                         variant="outline"
                         size="icon"
                         className="rounded-lg bg-background shadow-sm"
-                        onClick={() => {
-                            void onRefresh();
-                        }}
+                        onClick={handleRefreshClick}
                         disabled={disableRefresh}
                         aria-label={refreshAriaLabel}
+                        title={refreshAriaLabel}
                     >
                         <RefreshIcon state={currentRefreshState} />
                     </Button>
@@ -166,7 +246,7 @@ export function AdminTableShell({
     children,
     className,
 }: {
-    children: React.ReactNode;
+    children: ReactNode;
     className?: string;
 }) {
     return (
