@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,6 +18,16 @@ export type FilterControl = {
     onChange: (value: string) => void;
 };
 
+export type RefreshState = 'idle' | 'refreshing' | 'completed';
+
+function RefreshIcon({ state }: { state: RefreshState }) {
+    if (state === 'completed') {
+        return <Check className="size-4 text-emerald-600 dark:text-emerald-400" />;
+    }
+
+    return <RefreshCw className={cn('size-4', state === 'refreshing' && 'animate-spin')} />;
+}
+
 export function AdminToolbar({
     search,
     searchPlaceholder,
@@ -25,8 +35,10 @@ export function AdminToolbar({
     filters = [],
     onRefresh,
     isRefreshing = false,
+    refreshState,
     refreshLabel = '刷新',
     refreshingLabel = '正在刷新',
+    completedLabel = '已刷新',
     action,
     compact = false,
 }: {
@@ -36,12 +48,20 @@ export function AdminToolbar({
     filters?: FilterControl[];
     onRefresh?: () => void | Promise<unknown>;
     isRefreshing?: boolean;
+    refreshState?: RefreshState;
     refreshLabel?: string;
     refreshingLabel?: string;
+    completedLabel?: string;
     action?: React.ReactNode;
     compact?: boolean;
 }) {
-    const refreshAriaLabel = isRefreshing ? refreshingLabel : refreshLabel;
+    const currentRefreshState = refreshState ?? (isRefreshing ? 'refreshing' : 'idle');
+    const refreshAriaLabel = currentRefreshState === 'refreshing'
+        ? refreshingLabel
+        : currentRefreshState === 'completed'
+            ? completedLabel
+            : refreshLabel;
+    const disableRefresh = currentRefreshState === 'refreshing';
 
     if (compact) {
         return (
@@ -79,10 +99,10 @@ export function AdminToolbar({
                                 onClick={() => {
                                     void onRefresh();
                                 }}
-                                disabled={isRefreshing}
+                                disabled={disableRefresh}
                                 aria-label={refreshAriaLabel}
                             >
-                                <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
+                                <RefreshIcon state={currentRefreshState} />
                             </Button>
                         ) : null}
                         <div className="flex min-w-0 justify-end">
@@ -130,10 +150,10 @@ export function AdminToolbar({
                         onClick={() => {
                             void onRefresh();
                         }}
-                        disabled={isRefreshing}
+                        disabled={disableRefresh}
                         aria-label={refreshAriaLabel}
                     >
-                        <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
+                        <RefreshIcon state={currentRefreshState} />
                     </Button>
                 ) : null}
                 {action}

@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useAPIKeyList } from '@/api/endpoints/apikey';
 import { useLogPage, type ChannelAttempt, type RelayLog } from '@/api/endpoints/log';
 import { useRouterList, type RouteProfile } from '@/api/endpoints/router';
-import { AdminPagination, AdminTableShell, AdminToolbar } from '@/components/common/AdminTable';
+import { AdminPagination, AdminTableShell, AdminToolbar, type RefreshState } from '@/components/common/AdminTable';
 import { ResizableColGroup, ResizableTableHead, useResizableColumns, type ResizableColumnConfig } from '@/components/common/ResizableTable';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,6 +21,9 @@ import { cn, formatCurrencyCosts } from '@/lib/utils';
 
 const ALL = 'all';
 type LogStatusFilter = 'all' | 'success' | 'failed';
+
+const MIN_MANUAL_REFRESH_MS = 650;
+const REFRESH_COMPLETED_MS = 900;
 
 const logTableColumns: ResizableColumnConfig[] = [
     { key: 'time', defaultWidth: 150, minWidth: 132, maxWidth: 220 },
@@ -132,8 +135,10 @@ export function Log() {
     const [apiKeyName, setAPIKeyName] = useState(ALL);
     const [routerID, setRouterID] = useState(ALL);
     const [endpointID, setEndpointID] = useState(ALL);
-    const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+    const [refreshState, setRefreshState] = useState<RefreshState>('idle');
     const pendingRefreshAfterPageResetRef = useRef(false);
+    const refreshStartedAtRef = useRef(0);
+    const refreshTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
     const { data: apiKeys = [] } = useAPIKeyList();
     const { data: routers = [] } = useRouterList();
@@ -159,12 +164,41 @@ export function Log() {
         endpoint_id: endpointID === ALL ? undefined : Number(endpointID),
     }), [apiKeyName, endpointID, page, pageSize, routerID, status]);
 
-    const { data, isLoading, isFetching, refetch } = useLogPage(params);
+    const { data, isLoading, refetch } = useLogPage(params);
     const rows = data?.items ?? [];
     const { widths, tableWidth, getResizeHandleProps } = useResizableColumns('log', logTableColumns);
 
+    const clearRefreshTimers = useCallback(() => {
+        refreshTimersRef.current.forEach((timer) => clearTimeout(timer));
+        refreshTimersRef.current = [];
+    }, []);
+
+    const setRefreshTimer = useCallback((callback: () => void, delay: number) => {
+        const timer = setTimeout(() => {
+            refreshTimersRef.current = refreshTimersRef.current.filter((item) => item !== timer);
+            callback();
+        }, delay);
+        refreshTimersRef.current.push(timer);
+    }, []);
+
+    const beginManualRefresh = useCallback(() => {
+        clearRefreshTimers();
+        refreshStartedAtRef.current = Date.now();
+        setRefreshState('refreshing');
+    }, [clearRefreshTimers]);
+
+    const finishManualRefresh = useCallback(() => {
+        const elapsed = Date.now() - refreshStartedAtRef.current;
+        const remaining = Math.max(MIN_MANUAL_REFRESH_MS - elapsed, 0);
+
+        setRefreshTimer(() => {
+            setRefreshState('completed');
+            setRefreshTimer(() => setRefreshState('idle'), REFRESH_COMPLETED_MS);
+        }, remaining);
+    }, [setRefreshTimer]);
+
     const handleRefresh = useCallback(async () => {
-        setIsManualRefreshing(true);
+        beginManualRefresh();
 
         if (page !== 1) {
             pendingRefreshAfterPageResetRef.current = true;
@@ -175,18 +209,20 @@ export function Log() {
         try {
             await refetch();
         } finally {
-            setIsManualRefreshing(false);
+            finishManualRefresh();
         }
-    }, [page, refetch]);
+    }, [beginManualRefresh, finishManualRefresh, page, refetch]);
 
     useEffect(() => {
         if (page !== 1 || !pendingRefreshAfterPageResetRef.current) return;
 
         pendingRefreshAfterPageResetRef.current = false;
         void refetch().finally(() => {
-            setIsManualRefreshing(false);
+            finishManualRefresh();
         });
-    }, [page, refetch]);
+    }, [finishManualRefresh, page, refetch]);
+
+    useEffect(() => () => clearRefreshTimers(), [clearRefreshTimers]);
 
     const handleRouterChange = (value: string) => {
         setRouterID(value);
@@ -201,9 +237,10 @@ export function Log() {
                 searchPlaceholder={t('filters.title')}
                 onSearchChange={() => undefined}
                 onRefresh={handleRefresh}
-                isRefreshing={isFetching || isManualRefreshing}
+                refreshState={refreshState}
                 refreshLabel="刷新日志"
                 refreshingLabel="正在刷新日志"
+                completedLabel="日志已刷新"
                 filters={[
                     {
                         label: t('filters.statusAll'),
