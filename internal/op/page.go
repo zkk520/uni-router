@@ -94,9 +94,22 @@ func PageSlice[T any](items []T, params PageParams) PageResult[T] {
 
 func ChannelPage(ctx context.Context, filter ChannelPageFilter) (PageResult[model.Channel], error) {
 	params := NormalizePageParams(filter.PageParams)
-	channels, err := ChannelList(ctx)
+	items, err := ChannelFilter(ctx, ChannelPageFilter{
+		PageParams: PageParams{Keyword: params.Keyword, SortBy: params.SortBy, SortOrder: params.SortOrder},
+		Enabled:    filter.Enabled,
+		Type:       filter.Type,
+	})
 	if err != nil {
 		return PageResult[model.Channel]{}, err
+	}
+	return PageSlice(items, params), nil
+}
+
+func ChannelFilter(ctx context.Context, filter ChannelPageFilter) ([]model.Channel, error) {
+	params := NormalizePageParams(filter.PageParams)
+	channels, err := ChannelList(ctx)
+	if err != nil {
+		return nil, err
 	}
 	items := make([]model.Channel, 0, len(channels))
 	for _, channel := range channels {
@@ -126,7 +139,7 @@ func ChannelPage(ctx context.Context, filter ChannelPageFilter) (PageResult[mode
 		}
 		return less
 	})
-	return PageSlice(items, params), nil
+	return items, nil
 }
 
 func LLMPage(ctx context.Context, filter LLMPageFilter) (PageResult[model.LLMInfo], error) {

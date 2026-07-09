@@ -273,6 +273,37 @@ export type ChannelPageParams = PaginationParams & {
     type?: number | 'all';
 };
 
+export type ChannelBatchAction = 'enable' | 'disable' | 'delete';
+export type ChannelBatchScope = 'ids' | 'filter';
+
+export type ChannelBatchFilter = {
+    keyword?: string;
+    enabled?: boolean;
+    type?: number;
+};
+
+export type ChannelBatchRequest = {
+    action: ChannelBatchAction;
+    scope: ChannelBatchScope;
+    ids?: number[];
+    filter?: ChannelBatchFilter;
+    exclude_ids?: number[];
+};
+
+export type ChannelBatchFailedItem = {
+    id: number;
+    message: string;
+};
+
+export type ChannelBatchResult = {
+    action: ChannelBatchAction;
+    requested: number;
+    succeeded: number;
+    failed: number;
+    success_ids: number[];
+    failed_items: ChannelBatchFailedItem[];
+};
+
 function toQuery(params: object) {
     const query: Record<string, string | number | boolean> = {};
     for (const [key, value] of Object.entries(params)) {
@@ -411,6 +442,28 @@ export function useEnableChannel() {
         },
         onError: (error) => {
             logger.warn('供应商状态更新失败:', error instanceof Error ? error.message : String(error));
+        },
+    });
+}
+
+export function useBatchChannel() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (data: ChannelBatchRequest) => {
+            return apiClient.post<ChannelBatchResult>('/api/v1/channel/batch', data);
+        },
+        onSuccess: (_data, variables) => {
+            logger.log('供应商批量操作成功:', _data);
+            queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['channels', 'page'] });
+            queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
+            if (variables.action === 'delete') {
+                queryClient.invalidateQueries({ queryKey: ['models', 'list'] });
+            }
+        },
+        onError: (error) => {
+            logger.warn('供应商批量操作失败:', error instanceof Error ? error.message : String(error));
         },
     });
 }

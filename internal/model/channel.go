@@ -75,6 +75,49 @@ type ChannelUpdateRequest struct {
 	KeysToDelete []int                     `json:"keys_to_delete,omitempty"`
 }
 
+type ChannelBatchAction string
+
+const (
+	ChannelBatchActionEnable  ChannelBatchAction = "enable"
+	ChannelBatchActionDisable ChannelBatchAction = "disable"
+	ChannelBatchActionDelete  ChannelBatchAction = "delete"
+)
+
+type ChannelBatchScope string
+
+const (
+	ChannelBatchScopeIDs    ChannelBatchScope = "ids"
+	ChannelBatchScopeFilter ChannelBatchScope = "filter"
+)
+
+type ChannelBatchFilter struct {
+	Keyword string `json:"keyword,omitempty"`
+	Enabled *bool  `json:"enabled,omitempty"`
+	Type    *int   `json:"type,omitempty"`
+}
+
+type ChannelBatchRequest struct {
+	Action     ChannelBatchAction `json:"action" binding:"required"`
+	Scope      ChannelBatchScope  `json:"scope" binding:"required"`
+	IDs        []int              `json:"ids,omitempty"`
+	Filter     ChannelBatchFilter `json:"filter,omitempty"`
+	ExcludeIDs []int              `json:"exclude_ids,omitempty"`
+}
+
+type ChannelBatchFailedItem struct {
+	ID      int    `json:"id"`
+	Message string `json:"message"`
+}
+
+type ChannelBatchResult struct {
+	Action      ChannelBatchAction       `json:"action"`
+	Requested   int                      `json:"requested"`
+	Succeeded   int                      `json:"succeeded"`
+	Failed      int                      `json:"failed"`
+	SuccessIDs  []int                    `json:"success_ids"`
+	FailedItems []ChannelBatchFailedItem `json:"failed_items"`
+}
+
 type ChannelKeyAddRequest struct {
 	Enabled         bool                   `json:"enabled"`
 	ChannelKey      string                 `json:"channel_key" binding:"required"`

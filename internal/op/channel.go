@@ -367,6 +367,99 @@ func ChannelEnabled(id int, enabled bool, ctx context.Context) error {
 	return nil
 }
 
+func ChannelBatch(req model.ChannelBatchRequest, ctx context.Context) (model.ChannelBatchResult, error) {
+	result := model.ChannelBatchResult{
+		Action:      req.Action,
+		SuccessIDs:  []int{},
+		FailedItems: []model.ChannelBatchFailedItem{},
+	}
+
+	ids, err := channelBatchIDs(req, ctx)
+	if err != nil {
+		return result, err
+	}
+	result.Requested = len(ids)
+	if len(ids) == 0 {
+		return result, nil
+	}
+
+	for _, id := range ids {
+		if id <= 0 {
+			result.FailedItems = append(result.FailedItems, model.ChannelBatchFailedItem{ID: id, Message: "invalid channel id"})
+			continue
+		}
+
+		var err error
+		switch req.Action {
+		case model.ChannelBatchActionEnable:
+			err = ChannelEnabled(id, true, ctx)
+		case model.ChannelBatchActionDisable:
+			err = ChannelEnabled(id, false, ctx)
+		case model.ChannelBatchActionDelete:
+			err = ChannelDel(id, ctx)
+		default:
+			return result, fmt.Errorf("invalid batch action")
+		}
+
+		if err != nil {
+			result.FailedItems = append(result.FailedItems, model.ChannelBatchFailedItem{ID: id, Message: err.Error()})
+			continue
+		}
+		result.SuccessIDs = append(result.SuccessIDs, id)
+	}
+
+	result.Succeeded = len(result.SuccessIDs)
+	result.Failed = len(result.FailedItems)
+	return result, nil
+}
+
+func channelBatchIDs(req model.ChannelBatchRequest, ctx context.Context) ([]int, error) {
+	excluded := make(map[int]struct{}, len(req.ExcludeIDs))
+	for _, id := range req.ExcludeIDs {
+		excluded[id] = struct{}{}
+	}
+
+	ids := []int{}
+	seen := map[int]struct{}{}
+	addID := func(id int) {
+		if _, skip := excluded[id]; skip {
+			return
+		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+
+	switch req.Scope {
+	case model.ChannelBatchScopeIDs:
+		for _, id := range req.IDs {
+			addID(id)
+		}
+	case model.ChannelBatchScopeFilter:
+		channels, err := ChannelFilter(ctx, ChannelPageFilter{
+			PageParams: PageParams{Keyword: req.Filter.Keyword, SortBy: "id", SortOrder: "desc"},
+			Enabled:    req.Filter.Enabled,
+			Type:       req.Filter.Type,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, channel := range channels {
+			addID(channel.ID)
+		}
+		if req.Action == model.ChannelBatchActionDelete {
+			for left, right := 0, len(ids)-1; left < right; left, right = left+1, right-1 {
+				ids[left], ids[right] = ids[right], ids[left]
+			}
+		}
+	default:
+		return nil, fmt.Errorf("invalid batch scope")
+	}
+	return ids, nil
+}
+
 func ChannelDel(id int, ctx context.Context) error {
 	ch, ok := channelCache.Get(id)
 	if !ok {

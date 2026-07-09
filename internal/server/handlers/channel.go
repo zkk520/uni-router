@@ -42,6 +42,10 @@ func init() {
 				Handle(enableChannel),
 		).
 		AddRoute(
+			router.NewRoute("/batch", http.MethodPost).
+				Handle(batchChannel),
+		).
+		AddRoute(
 			router.NewRoute("/delete/:id", http.MethodDelete).
 				Handle(deleteChannel),
 		).
@@ -158,6 +162,20 @@ func enableChannel(c *gin.Context) {
 		return
 	}
 	resp.Success(c, nil)
+}
+
+func batchChannel(c *gin.Context) {
+	var request model.ChannelBatchRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
+		return
+	}
+	result, err := op.ChannelBatch(request, c.Request.Context())
+	if err != nil {
+		resp.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	resp.Success(c, result)
 }
 
 func deleteChannel(c *gin.Context) {
