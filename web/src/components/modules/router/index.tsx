@@ -1,6 +1,7 @@
 'use client';
 
-import { type DragEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd';
 import { Check, Copy, GripVertical, KeyRound, LayoutGrid, List, Loader2, Plus, Trash2, X, TestTube2 } from 'lucide-react';
 import {
     useCreateRouter,
@@ -111,6 +112,13 @@ function endpointOptionKey(endpoint: Pick<RouteEndpoint, 'channel_id' | 'channel
 
 function endpointKey(endpoint: Pick<RouteEndpoint, 'channel_id' | 'channel_key_id'>) {
     return `${endpoint.channel_id}:${endpoint.channel_key_id}`;
+}
+
+function reorderByIndex<T>(items: T[], sourceIndex: number, targetIndex: number) {
+    const next = [...items];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    return next;
 }
 
 function duplicateRouteName(sourceName: string, routes: RouteProfile[]) {
@@ -698,7 +706,6 @@ function RouterDetail({ routerId }: { routerId: number }) {
     const testEndpoint = useTestRouterEndpoint();
     const routerLayout = useToolbarViewOptionsStore((s) => s.getRouterLayout('router'));
     const setRouterLayout = useToolbarViewOptionsStore((s) => s.setRouterLayout);
-    const [draggingEndpointId, setDraggingEndpointId] = useState<number | null>(null);
 
     const routerEndpoints = router?.endpoints;
     const routerMode = router?.mode;
@@ -805,46 +812,28 @@ function RouterDetail({ routerId }: { routerId: number }) {
         );
     };
 
-    const reorderEndpoint = (sourceId: number, targetId: number) => {
-        if (sourceId === targetId) return;
-        const source = endpoints.find((item) => item.id === sourceId);
-        const target = endpoints.find((item) => item.id === targetId);
-        if (!source || !target || !source.enabled) return;
+    const handleEndpointDragEnd = (result: DropResult) => {
+        const { destination, draggableId, source } = result;
+        if (!destination || updateRouter.isPending || routerLayout !== 'list') return;
+        if (destination.droppableId !== 'endpoints' || source.droppableId !== 'endpoints') return;
+        if (destination.index === source.index) return;
 
-        const nextEnabledEndpoints = endpoints.filter((item) => item.enabled);
-        const sourceIndex = nextEnabledEndpoints.findIndex((item) => item.id === sourceId);
-        const [moved] = nextEnabledEndpoints.splice(sourceIndex, 1);
-        const targetIndex = target.enabled
-            ? nextEnabledEndpoints.findIndex((item) => item.id === targetId)
-            : nextEnabledEndpoints.length;
-        nextEnabledEndpoints.splice(targetIndex < 0 ? nextEnabledEndpoints.length : targetIndex, 0, moved);
-        const nextEndpoints = [...nextEnabledEndpoints, ...endpoints.filter((item) => !item.enabled)];
+        const sourceId = Number(draggableId.replace('endpoint-', ''));
+        const sourceEndpoint = endpoints.find((item) => item.id === sourceId);
+        if (!sourceEndpoint?.enabled) return;
+
+        const nextEnabledEndpoints = reorderByIndex(enabledEndpoints, source.index, Math.min(destination.index, enabledEndpoints.length - 1));
+        const nextEndpoints = [...nextEnabledEndpoints, ...disabledEndpoints];
         updateRouter.mutate(
             {
                 id: router.id,
                 endpoints_to_update: endpointPriorityUpdates(nextEndpoints),
             },
-            { onError: (error) => toast.error('端点排序失败', { description: String(error) }) }
+            {
+                onSuccess: () => toast.success('端点顺序已保存'),
+                onError: (error) => toast.error('端点排序失败', { description: String(error) }),
+            }
         );
-    };
-
-    const handleEndpointDragStart = (event: DragEvent<HTMLSpanElement>, endpoint: RouteEndpoint) => {
-        if (!endpoint.enabled) {
-            event.preventDefault();
-            return;
-        }
-        const endpointId = endpoint.id;
-        setDraggingEndpointId(endpointId);
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', String(endpointId));
-    };
-
-    const handleEndpointDrop = (event: DragEvent<HTMLDivElement>, targetId: number) => {
-        event.preventDefault();
-        const sourceId = Number(event.dataTransfer.getData('text/plain') || draggingEndpointId);
-        setDraggingEndpointId(null);
-        if (!Number.isFinite(sourceId)) return;
-        reorderEndpoint(sourceId, targetId);
     };
 
     const addEndpoint = (endpoint: RouteEndpointAddRequest) => {
@@ -927,14 +916,19 @@ function RouterDetail({ routerId }: { routerId: number }) {
                             添加端点后此路由才能使用。
                         </div>
                     ) : (
-                        <div
-                            className={
-                                routerLayout === 'grid'
-                                    ? 'grid gap-3 p-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]'
-                                    : 'divide-y divide-border/60'
-                            }
-                        >
-                            {endpoints.map((endpoint) => {
+                        <DragDropContext onDragEnd={handleEndpointDragEnd}>
+                            <Droppable droppableId="endpoints" isDropDisabled={routerLayout !== 'list' || updateRouter.isPending}>
+                                {(dropProvided) => (
+                                    <div
+                                        ref={dropProvided.innerRef}
+                                        {...dropProvided.droppableProps}
+                                        className={
+                                            routerLayout === 'grid'
+                                                ? 'grid gap-3 p-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]'
+                                                : 'divide-y divide-border/60'
+                                        }
+                                    >
+                            {endpoints.map((endpoint, endpointIndex) => {
                                 const label = endpointLabel(endpoint, options);
                                 const optionChannel = options.find((item) => item.id === endpoint.channel_id);
                                 const optionKey = endpointOptionKey(endpoint, options);
@@ -961,10 +955,27 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                     ? Math.round((Math.max(1, endpoint.weight || 1) / totalWeight) * 100)
                                     : 0;
                                 const isGrid = routerLayout === 'grid';
+                                const dragDisabledReason = isGrid
+                                    ? '切换到列表视图调整端点顺序'
+                                    : !endpoint.enabled
+                                        ? '停用端点不参与排序'
+                                        : updateRouter.isPending
+                                            ? '正在保存端点变更'
+                                            : undefined;
+                                const dragTitle = dragDisabledReason
+                                    ?? (router.mode === 'weighted' ? '拖动调整显示顺序' : '拖动调整主备顺序');
 
                                 return (
-                                    <div
+                                    <Draggable
                                         key={endpoint.id}
+                                        draggableId={`endpoint-${endpoint.id}`}
+                                        index={endpointIndex}
+                                        isDragDisabled={!!dragDisabledReason}
+                                    >
+                                        {(dragProvided, dragSnapshot) => (
+                                    <div
+                                        ref={dragProvided.innerRef}
+                                        {...dragProvided.draggableProps}
                                         className={cn(
                                             isGrid
                                                 ? 'flex h-full min-h-0 flex-col rounded-xl border border-border/70 p-4 transition-colors'
@@ -972,30 +983,20 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                             isPrimary ? 'bg-primary/[0.04]' : 'bg-background/70',
                                             duplicate && 'bg-amber-500/[0.06]',
                                             invalid && 'bg-destructive/[0.05]',
-                                            draggingEndpointId === endpoint.id && 'opacity-60 ring-2 ring-primary/30'
+                                            dragSnapshot.isDragging && 'relative z-20 border-primary/40 bg-background shadow-lg ring-2 ring-primary/30'
                                         )}
-                                        onDragOver={(event) => {
-                                            event.preventDefault();
-                                            event.dataTransfer.dropEffect = 'move';
-                                        }}
-                                        onDrop={(event) => handleEndpointDrop(event, endpoint.id)}
                                     >
                                         <div className={cn('grid min-w-0 gap-3', isGrid && 'h-full')}>
                                             <div className="min-w-0">
                                                 <div className="grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center justify-start gap-2">
                                                     <span className={cn('size-2 rounded-full', statusClass(endpoint.status))} />
                                                     <span
-                                                        draggable={endpoint.enabled}
-                                                        title={
-                                                            endpoint.enabled
-                                                                ? router.mode === 'weighted' ? '拖动调整显示顺序' : '拖动调整主备顺序'
-                                                                : '停用端点不参与排序'
-                                                        }
-                                                        onDragStart={(event) => handleEndpointDragStart(event, endpoint)}
-                                                        onDragEnd={() => setDraggingEndpointId(null)}
+                                                        {...(dragProvided.dragHandleProps ?? {})}
+                                                        title={dragTitle}
                                                         className={cn(
-                                                            'inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground',
-                                                            endpoint.enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-50'
+                                                            'inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground active:scale-95',
+                                                            dragDisabledReason ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing',
+                                                            dragSnapshot.isDragging && 'bg-primary/10 text-primary'
                                                         )}
                                                     >
                                                         <GripVertical className="size-4" />
@@ -1144,9 +1145,15 @@ function RouterDetail({ routerId }: { routerId: number }) {
                                             </div>
                                         </div>
                                     </div>
+                                        )}
+                                    </Draggable>
                                 );
                             })}
-                        </div>
+                                        {dropProvided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+                        </DragDropContext>
                     )}
                 </div>
             </div>
@@ -1167,7 +1174,6 @@ export function Router() {
     const [pageSize, setPageSize] = useState(20);
     const [keyword, setKeyword] = useState('');
     const [mode, setMode] = useState<string>('all');
-    const [draggingRouterId, setDraggingRouterId] = useState<number | null>(null);
     const { data: routeList = [], error, isLoading, refetch } = useRouterList();
     const normalizedKeyword = keyword.trim().toLowerCase();
     const filteredRouters = useMemo(() => routeList.filter((router) => {
@@ -1245,29 +1251,20 @@ export function Router() {
         );
     };
 
-    const handleRouterDragStart = (event: DragEvent<HTMLSpanElement>, router: RouteProfile) => {
-        if (!canReorderRoutes) {
-            event.preventDefault();
-            return;
-        }
-        setDraggingRouterId(router.id);
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', String(router.id));
-    };
+    const handleRouterDragEnd = (result: DropResult) => {
+        const { destination, draggableId } = result;
+        if (!destination || !canReorderRoutes) return;
+        if (destination.droppableId !== 'routers') return;
 
-    const handleRouterDrop = (event: DragEvent<HTMLDivElement>, targetId: number) => {
-        event.preventDefault();
-        const sourceId = Number(event.dataTransfer.getData('text/plain') || draggingRouterId);
-        setDraggingRouterId(null);
-        if (!canReorderRoutes || !Number.isFinite(sourceId) || sourceId === targetId) return;
+        const sourceId = Number(draggableId.replace('router-', ''));
+        const target = routers[destination.index];
+        if (!Number.isFinite(sourceId) || !target || sourceId === target.id) return;
 
         const sourceIndex = routeList.findIndex((item) => item.id === sourceId);
-        const targetIndex = routeList.findIndex((item) => item.id === targetId);
-        if (sourceIndex < 0 || targetIndex < 0) return;
+        const targetIndex = routeList.findIndex((item) => item.id === target.id);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
 
-        const nextRoutes = [...routeList];
-        const [moved] = nextRoutes.splice(sourceIndex, 1);
-        nextRoutes.splice(targetIndex, 0, moved);
+        const nextRoutes = reorderByIndex(routeList, sourceIndex, targetIndex);
         reorderRouters.mutate(
             { ids: nextRoutes.map((item) => item.id) },
             {
@@ -1332,13 +1329,31 @@ export function Router() {
                         ) : routers.length === 0 ? (
                             <div className="p-6 text-center text-sm text-muted-foreground">暂无路由。</div>
                         ) : (
-                            <div className="grid gap-2 p-3">
-                                {routers.map((router) => {
+                            <DragDropContext onDragEnd={handleRouterDragEnd}>
+                                <Droppable droppableId="routers" isDropDisabled={!canReorderRoutes}>
+                                    {(dropProvided) => (
+                            <div ref={dropProvided.innerRef} {...dropProvided.droppableProps} className="grid gap-2 p-3">
+                                {routers.map((router, routerIndex) => {
                                     const boundKey = router.bound_api_key;
                                     const boundKeyCount = router.bound_api_key_count ?? 0;
+                                    const dragDisabledReason = canReorderRoutes
+                                        ? undefined
+                                        : normalizedKeyword !== '' || mode !== 'all'
+                                            ? '仅在未搜索且未筛选时可拖动排序'
+                                            : reorderRouters.isPending
+                                                ? '正在保存路由顺序'
+                                                : '至少需要两个路由才能排序';
                                     return (
-                                        <div
+                                        <Draggable
                                             key={router.id}
+                                            draggableId={`router-${router.id}`}
+                                            index={routerIndex}
+                                            isDragDisabled={!canReorderRoutes}
+                                        >
+                                            {(dragProvided, dragSnapshot) => (
+                                        <div
+                                            ref={dragProvided.innerRef}
+                                            {...dragProvided.draggableProps}
                                             role="button"
                                             tabIndex={0}
                                             onClick={() => setSelectedId(router.id)}
@@ -1348,27 +1363,20 @@ export function Router() {
                                                     setSelectedId(router.id);
                                                 }
                                             }}
-                                            onDragOver={(event) => {
-                                                if (!canReorderRoutes) return;
-                                                event.preventDefault();
-                                                event.dataTransfer.dropEffect = 'move';
-                                            }}
-                                            onDrop={(event) => handleRouterDrop(event, router.id)}
                                             className={cn(
                                                 'relative w-full cursor-pointer rounded-xl border px-3 py-3 text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                                                 selected === router.id ? 'border-primary/35 bg-primary/[0.05] shadow-primary/5' : 'border-border/70 bg-background/80 hover:border-primary/25 hover:bg-muted/30',
-                                                draggingRouterId === router.id && 'opacity-60 ring-2 ring-primary/30'
+                                                dragSnapshot.isDragging && 'z-20 border-primary/40 bg-background shadow-lg ring-2 ring-primary/30'
                                             )}
                                         >
                                             <span
-                                                draggable={canReorderRoutes}
-                                                title={canReorderRoutes ? '拖动调整路由顺序' : '仅在未搜索且未筛选时可拖动排序'}
+                                                {...(dragProvided.dragHandleProps ?? {})}
+                                                title={dragDisabledReason ?? '拖动调整路由顺序'}
                                                 onClick={(e) => e.stopPropagation()}
-                                                onDragStart={(event) => handleRouterDragStart(event, router)}
-                                                onDragEnd={() => setDraggingRouterId(null)}
                                                 className={cn(
-                                                    'absolute left-2 top-2 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground',
-                                                    canReorderRoutes ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-45'
+                                                    'absolute left-2 top-2 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground active:scale-95',
+                                                    canReorderRoutes ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-45',
+                                                    dragSnapshot.isDragging && 'bg-primary/10 text-primary'
                                                 )}
                                             >
                                                 <GripVertical className="size-4" />
@@ -1483,9 +1491,15 @@ export function Router() {
                                                 </Button>
                                             )}
                                         </div>
+                                            )}
+                                        </Draggable>
                                     );
                                 })}
+                                {dropProvided.placeholder}
                             </div>
+                                    )}
+                                </Droppable>
+                            </DragDropContext>
                         )}
                     </div>
                     <AdminPagination
