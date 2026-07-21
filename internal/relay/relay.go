@@ -140,7 +140,7 @@ func (ra *relayAttempt) forward() (int, error) {
 // copyHeaders 复制请求头，过滤 hop-by-hop 头
 func (ra *relayAttempt) copyHeaders(outboundRequest *http.Request) {
 	for key, values := range ra.c.Request.Header {
-		if hopByHopHeaders[strings.ToLower(key)] {
+		if !ra.shouldForwardClientHeader(key) {
 			continue
 		}
 		for _, value := range values {

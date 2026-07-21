@@ -18,7 +18,6 @@ import (
 	inboundopenai "github.com/zkk520/uni-router/internal/transformer/inbound/openai"
 	transformermodel "github.com/zkk520/uni-router/internal/transformer/model"
 	"github.com/zkk520/uni-router/internal/transformer/outbound"
-	outboundopenai "github.com/zkk520/uni-router/internal/transformer/outbound/openai"
 )
 
 func TestParseRequestPreservesRawBodyAndFormat(t *testing.T) {
@@ -128,7 +127,7 @@ func TestTransparentForwardPreservesRequestAndSuccessfulResponse(t *testing.T) {
 	attempt.c.Request.URL.RawQuery = "token=client&trace=one"
 	attempt.internalRequest.Query = attempt.c.Request.URL.Query()
 	attempt.c.Request.Header.Set("Authorization", "Bearer client-key")
-	attempt.c.Request.Header.Set("X-OpenAI-Internal-Codex-Responses-Lite", "true")
+	attempt.c.Request.Header.Set(openAIResponsesLiteHeader, "true")
 	attempt.c.Request.Header.Set("X-Route-Header", "client")
 	attempt.channel.CustomHeader = []dbmodel.CustomHeader{{HeaderKey: "X-Route-Header", HeaderValue: "channel"}}
 
@@ -151,7 +150,7 @@ func TestTransparentForwardPreservesRequestAndSuccessfulResponse(t *testing.T) {
 	if got := capturedHeader.Get("Authorization"); got != "Bearer upstream-key" {
 		t.Fatalf("上游认证 = %q", got)
 	}
-	if got := capturedHeader.Get("X-OpenAI-Internal-Codex-Responses-Lite"); got != "true" {
+	if got := capturedHeader.Get(openAIResponsesLiteHeader); got != "true" {
 		t.Fatalf("Codex Lite Header 未透传: %q", got)
 	}
 	if got := capturedHeader.Get("X-Route-Header"); got != "channel" {
@@ -172,6 +171,65 @@ func TestTransparentForwardPreservesRequestAndSuccessfulResponse(t *testing.T) {
 	}
 	if attempt.metrics.Stats.InputToken != 3 || attempt.metrics.Stats.OutputToken != 4 {
 		t.Fatalf("统计 token = (%d, %d)，期望 (3, 4)", attempt.metrics.Stats.InputToken, attempt.metrics.Stats.OutputToken)
+	}
+}
+
+func TestCrossProtocolForwardFiltersResponsesLiteHeader(t *testing.T) {
+	setTransparentRelayForTest(t, true)
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name    string
+		keyType outbound.OutboundType
+	}{
+		{name: "OpenAI Chat", keyType: outbound.OutboundTypeOpenAIChat},
+		{name: "NewAPI Chat", keyType: outbound.OutboundTypeNewAPIChat},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rawRequest := []byte(`{"model":"gpt-5.6-sol","input":"hello","reasoning":{"effort":"high","context":"all_turns"}}`)
+			upstreamResponse := []byte(`{"id":"chatcmpl_1","object":"chat.completion","created":1,"model":"gpt-5.6-sol","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`)
+
+			var capturedHeader http.Header
+			var capturedPath string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				capturedHeader = r.Header.Clone()
+				capturedPath = r.URL.Path
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(upstreamResponse)
+			}))
+			defer server.Close()
+
+			_, attempt := newResponsesRelayAttemptForType(t, server.URL+"/v1", rawRequest, false, tt.keyType)
+			attempt.c.Request.Header.Set(openAIResponsesLiteHeader, "true")
+			attempt.c.Request.Header.Set("X-Client-Feature", "kept")
+			attempt.c.Request.Header.Set("X-Route-Header", "client")
+			attempt.channel.CustomHeader = []dbmodel.CustomHeader{{HeaderKey: "X-Route-Header", HeaderValue: "channel"}}
+
+			statusCode, err := attempt.forward()
+			if err != nil {
+				t.Fatalf("跨协议转发失败: %v", err)
+			}
+			if statusCode != http.StatusOK {
+				t.Fatalf("状态码 = %d，期望 %d", statusCode, http.StatusOK)
+			}
+			if capturedPath != "/v1/chat/completions" {
+				t.Fatalf("上游路径 = %q，期望 /v1/chat/completions", capturedPath)
+			}
+			if got := capturedHeader.Get(openAIResponsesLiteHeader); got != "" {
+				t.Fatalf("Responses Lite Header 泄露到 Chat 上游: %q", got)
+			}
+			if got := capturedHeader.Get("X-Client-Feature"); got != "kept" {
+				t.Fatalf("普通客户端 Header 未保留: %q", got)
+			}
+			if got := capturedHeader.Get("Authorization"); got != "Bearer upstream-key" {
+				t.Fatalf("上游认证 = %q，期望渠道密钥", got)
+			}
+			if got := capturedHeader.Get("X-Route-Header"); got != "channel" {
+				t.Fatalf("渠道自定义 Header 未覆盖客户端值: %q", got)
+			}
+		})
 	}
 }
 
@@ -283,6 +341,10 @@ func TestTransparentUpstreamErrorDoesNotWriteClientResponse(t *testing.T) {
 }
 
 func newResponsesRelayAttempt(t *testing.T, baseURL string, rawRequest []byte, stream bool) (*httptest.ResponseRecorder, *relayAttempt) {
+	return newResponsesRelayAttemptForType(t, baseURL, rawRequest, stream, outbound.OutboundTypeOpenAIResponse)
+}
+
+func newResponsesRelayAttemptForType(t *testing.T, baseURL string, rawRequest []byte, stream bool, keyType outbound.OutboundType) (*httptest.ResponseRecorder, *relayAttempt) {
 	t.Helper()
 	inAdapter := &inboundopenai.ResponseInbound{}
 	request, err := inAdapter.TransformRequest(context.Background(), rawRequest)
@@ -306,12 +368,12 @@ func newResponsesRelayAttempt(t *testing.T, baseURL string, rawRequest []byte, s
 	}
 	return recorder, &relayAttempt{
 		relayRequest: relayRequest,
-		outAdapter:   &outboundopenai.ResponseOutbound{},
+		outAdapter:   outbound.Get(keyType),
 		channel: &dbmodel.Channel{
 			BaseUrls: []dbmodel.BaseUrl{{URL: baseURL}},
 		},
 		usedKey: dbmodel.ChannelKey{ChannelKey: "upstream-key"},
-		keyType: outbound.OutboundTypeOpenAIResponse,
+		keyType: keyType,
 	}
 }
 

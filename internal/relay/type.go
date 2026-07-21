@@ -53,6 +53,8 @@ var hopByHopHeaders = map[string]bool{
 	"x-cluster-client-ip": true,
 }
 
+const openAIResponsesLiteHeader = "X-OpenAI-Internal-Codex-Responses-Lite"
+
 type relayRequest struct {
 	c               *gin.Context
 	inAdapter       model.Inbound
@@ -77,6 +79,17 @@ type relayAttempt struct {
 	usedKey              dbmodel.ChannelKey
 	keyType              outbound.OutboundType
 	firstTokenTimeOutSec int
+}
+
+func (ra *relayAttempt) shouldForwardClientHeader(header string) bool {
+	if hopByHopHeaders[strings.ToLower(header)] {
+		return false
+	}
+	if !strings.EqualFold(header, openAIResponsesLiteHeader) {
+		return true
+	}
+	return ra.internalRequest.RawAPIFormat == model.APIFormatOpenAIResponse &&
+		ra.keyType == outbound.OutboundTypeOpenAIResponse
 }
 
 // attemptResult 封装单次尝试的结果

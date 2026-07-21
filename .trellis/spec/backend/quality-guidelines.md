@@ -202,6 +202,8 @@ fi
 
 - 同构组合仅包括 Responses -> Responses、OpenAI Chat -> OpenAI/NewAPI Chat、Anthropic -> Anthropic、Embedding -> Embedding。
 - 命中同构组合时保留原始请求 Body；目标 URL、渠道认证、Header 过滤和渠道自定义 Header 仍由 uni-router 控制。
+- 协议专用 Header 必须服从入站格式与 `EffectiveChannelKeyType` 共同决定的出站协议；不得只因客户端携带就跨协议复制。
+- `X-OpenAI-Internal-Codex-Responses-Lite` 仅允许在 Responses -> Responses 时转发。Responses 转换到 Chat/NewAPI Chat 时必须过滤，否则会形成 Lite Header 存在但 Body 无 `reasoning.context` 的非法组合。
 - 成功响应和 SSE 原始内容直接返回；已知 usage 通过旁路解析采集。
 - 旁路统计失败只能记录警告，不得阻塞、取消或改写客户端响应。
 - 配置默认开启；关闭后必须完整回到现有转换链路。
@@ -212,6 +214,8 @@ fi
 |---|---|
 | 同构协议且配置开启 | 双向透明转发 |
 | 跨协议、Volcengine 或 Gemini | 使用转换器 |
+| Responses -> OpenAI/NewAPI Chat 且携带 Lite Header | 转换 Body，并过滤客户端 Lite Header |
+| 渠道默认 Chat、Key 覆盖 Responses | 使用 Key 的有效类型，走 Responses 同协议透明转发 |
 | 路由发生模型改写 | 使用转换器，避免原始 Body 携带旧模型 |
 | 上游返回 2xx | 原样返回成功状态、允许的 Header 和内容 |
 | 上游返回非 2xx | 不提前写客户端，继续现有故障转移 |
@@ -228,6 +232,7 @@ fi
 
 - 单元测试同构协议矩阵和配置默认值、环境变量回退。
 - `httptest` 断言原始请求字节、渠道认证、查询参数优先级和自定义 Header。
+- `httptest` 必须覆盖实际有效 Key 类型：至少验证 Responses -> Responses 保留 Lite Header，以及 Responses -> OpenAI Chat/NewAPI Chat 过滤 Lite Header。
 - 断言未知成功响应字段和未知 SSE 事件保持原始字节。
 - 断言已知 usage 仍进入统计，旁路失败不影响响应。
 - 断言非 2xx 与首 Token 超时发生前客户端响应尚未写入。
