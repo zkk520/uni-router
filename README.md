@@ -228,6 +228,7 @@ All configuration options can be overridden via environment variables using the 
 | `UNI_ROUTER_LOG_LEVEL` | `log.level` |
 | `UNI_ROUTER_GITHUB_PAT` | For rate limiting when getting the latest version (optional) |
 | `UNI_ROUTER_RELAY_MAX_SSE_EVENT_SIZE` | Maximum SSE event size (optional) |
+| `UNI_ROUTER_RELAY_TRANSPARENT_SAME_PROTOCOL` | Preserve request and successful response payloads for matching protocols (optional, default `true`) |
 | `UNI_ROUTER_IMAGES_BODY_MEMORY_THRESHOLD_MB` | Images request body in-memory threshold. If exceeded, it will be spooled to a temporary file (optional, default 16) |
 | `UNI_ROUTER_IMAGES_BODY_MAX_MB` | Images request body maximum size. Requests above this limit are rejected (optional, default 256) |
 | `UNI_ROUTER_IMAGES_BODY_TMP_DIR` | Images request body temporary directory (optional, default `./cache`) |

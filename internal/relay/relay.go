@@ -51,6 +51,8 @@ func parseRequest(inboundType inbound.InboundType, c *gin.Context) (*model.Inter
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return nil, nil, err
 	}
+	internalRequest.RawRequest = append([]byte(nil), body...)
+	internalRequest.RawAPIFormat = inboundAPIFormat(inboundType)
 
 	// Pass through the original query parameters
 	internalRequest.Query = c.Request.URL.Query()
@@ -66,6 +68,7 @@ func parseRequest(inboundType inbound.InboundType, c *gin.Context) (*model.Inter
 // forward 转发请求到上游服务
 func (ra *relayAttempt) forward() (int, error) {
 	ctx := ra.c.Request.Context()
+	transparent := ra.useTransparentRelay()
 
 	baseURL, err := outbound.NormalizeBaseURL(ra.channel.GetBaseUrl(), ra.keyType)
 	if err != nil {
@@ -83,6 +86,11 @@ func (ra *relayAttempt) forward() (int, error) {
 	if err != nil {
 		log.Warnf("failed to create request: %v", err)
 		return 0, fmt.Errorf("failed to create request: %w", err)
+	}
+	if transparent {
+		if err := prepareTransparentRequest(outboundRequest, ra.internalRequest.RawRequest, baseURL, ra.internalRequest.Query); err != nil {
+			return 0, fmt.Errorf("failed to prepare transparent request: %w", err)
+		}
 	}
 
 	// 复制请求头
@@ -102,6 +110,18 @@ func (ra *relayAttempt) forward() (int, error) {
 			return 0, fmt.Errorf("failed to read response body: %w", err)
 		}
 		return response.StatusCode, fmt.Errorf("upstream error: %d: %s", response.StatusCode, string(body))
+	}
+	if transparent {
+		if ra.internalRequest.Stream != nil && *ra.internalRequest.Stream {
+			if err := ra.handleTransparentStreamResponse(ctx, response); err != nil {
+				return response.StatusCode, err
+			}
+			return response.StatusCode, nil
+		}
+		if err := ra.handleTransparentResponse(ctx, response); err != nil {
+			return response.StatusCode, err
+		}
+		return response.StatusCode, nil
 	}
 
 	// 处理响应

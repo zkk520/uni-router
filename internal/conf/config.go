@@ -132,10 +132,15 @@ type Database struct {
 	Path string `mapstructure:"path"`
 }
 
+type Relay struct {
+	TransparentSameProtocol bool `mapstructure:"transparent_same_protocol"`
+}
+
 type Config struct {
 	Server   Server   `mapstructure:"server"`
 	Log      Log      `mapstructure:"log"`
 	Database Database `mapstructure:"database"`
+	Relay    Relay    `mapstructure:"relay"`
 }
 
 var AppConfig Config
@@ -183,4 +188,5 @@ func setDefaults() {
 	viper.SetDefault("database.type", "sqlite")
 	viper.SetDefault("database.path", "data/data.db")
 	viper.SetDefault("log.level", "info")
+	viper.SetDefault("relay.transparent_same_protocol", true)
 }

@@ -46,3 +46,35 @@ func TestSaveServerPortAndDevFrontendPort(t *testing.T) {
 		t.Fatalf("开发前端端口未写入配置: %#v", dev["frontend_port"])
 	}
 }
+
+func TestLoadTransparentSameProtocol(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		want bool
+	}{
+		{name: "默认开启", want: true},
+		{name: "环境变量关闭", env: "false", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			AppConfig = Config{}
+
+			configFile := filepath.Join(t.TempDir(), "config.json")
+			if err := os.WriteFile(configFile, []byte("{}\n"), 0600); err != nil {
+				t.Fatalf("写入测试配置失败: %v", err)
+			}
+			t.Setenv("UNI_ROUTER_RELAY_TRANSPARENT_SAME_PROTOCOL", tt.env)
+
+			if err := Load(configFile); err != nil {
+				t.Fatalf("加载配置失败: %v", err)
+			}
+			if AppConfig.Relay.TransparentSameProtocol != tt.want {
+				t.Fatalf("transparent_same_protocol = %v，期望 %v", AppConfig.Relay.TransparentSameProtocol, tt.want)
+			}
+		})
+	}
+}

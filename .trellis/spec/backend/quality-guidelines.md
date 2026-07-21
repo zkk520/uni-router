@@ -184,4 +184,69 @@ fi
 
 <!-- What reviewers should check -->
 
+## 场景：严格同构协议透明转发
+
+### 1. 适用范围 / 触发条件
+
+- 修改 LLM 请求转发、协议适配器、上游响应或 SSE 处理时适用。
+- 当入站 `APIFormat` 与渠道 `OutboundType` 严格同构时，业务载荷不得因固定结构重新序列化而丢失未知字段。
+
+### 2. 签名
+
+- 原始请求：`InternalLLMRequest.RawRequest []byte`
+- 原始协议：`InternalLLMRequest.RawAPIFormat APIFormat`
+- 同构判定：`isTransparentProtocolPair(APIFormat, outbound.OutboundType) bool`
+- 回退配置：`relay.transparent_same_protocol` / `UNI_ROUTER_RELAY_TRANSPARENT_SAME_PROTOCOL`
+
+### 3. 契约
+
+- 同构组合仅包括 Responses -> Responses、OpenAI Chat -> OpenAI/NewAPI Chat、Anthropic -> Anthropic、Embedding -> Embedding。
+- 命中同构组合时保留原始请求 Body；目标 URL、渠道认证、Header 过滤和渠道自定义 Header 仍由 uni-router 控制。
+- 成功响应和 SSE 原始内容直接返回；已知 usage 通过旁路解析采集。
+- 旁路统计失败只能记录警告，不得阻塞、取消或改写客户端响应。
+- 配置默认开启；关闭后必须完整回到现有转换链路。
+
+### 4. 校验与错误矩阵
+
+| 条件 | 必须行为 |
+|---|---|
+| 同构协议且配置开启 | 双向透明转发 |
+| 跨协议、Volcengine 或 Gemini | 使用转换器 |
+| 路由发生模型改写 | 使用转换器，避免原始 Body 携带旧模型 |
+| 上游返回 2xx | 原样返回成功状态、允许的 Header 和内容 |
+| 上游返回非 2xx | 不提前写客户端，继续现有故障转移 |
+| SSE 旁路积压或解析失败 | 停止观察，继续原样转发 |
+| 首 Token 超时 | 关闭上游 Body，并保持客户端未写入以允许切换端点 |
+
+### 5. Good / Base / Bad
+
+- Good：Codex Responses Lite 的 Header 与 `reasoning.context=all_turns` 同时原样到达上游。
+- Base：Responses 请求路由到 Anthropic 时继续转换，不把 OpenAI 私有字段发送给 Anthropic。
+- Bad：转发 Lite Header，却因结构体缺少字段而删除 `reasoning.context`。
+
+### 6. 必需测试
+
+- 单元测试同构协议矩阵和配置默认值、环境变量回退。
+- `httptest` 断言原始请求字节、渠道认证、查询参数优先级和自定义 Header。
+- 断言未知成功响应字段和未知 SSE 事件保持原始字节。
+- 断言已知 usage 仍进入统计，旁路失败不影响响应。
+- 断言非 2xx 与首 Token 超时发生前客户端响应尚未写入。
+
+### 7. Wrong vs Correct
+
+错误：
+
+```go
+// 同协议请求先解码再编码，未知字段会被静默删除。
+body, _ := json.Marshal(internalRequest)
+```
+
+正确：
+
+```go
+// 适配器负责目标 URL 和认证，同协议数据面使用已保存的原始 Body。
+outboundRequest, _ := adapter.TransformRequest(ctx, internalRequest, baseURL, key)
+_ = prepareTransparentRequest(outboundRequest, internalRequest.RawRequest, baseURL, internalRequest.Query)
+```
+
 (To be filled by the team)

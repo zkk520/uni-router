@@ -232,6 +232,7 @@ http://localhost:3000
 | `UNI_ROUTER_LOG_LEVEL` | `log.level` |
 | `UNI_ROUTER_GITHUB_PAT` | 用于获取最新版本时的速率限制(可选) |
 | `UNI_ROUTER_RELAY_MAX_SSE_EVENT_SIZE` | 最大 SSE 事件大小(可选) |
+| `UNI_ROUTER_RELAY_TRANSPARENT_SAME_PROTOCOL` | 同协议路由保留原始请求与成功响应内容(可选，默认 `true`) |
 | `UNI_ROUTER_IMAGES_BODY_MEMORY_THRESHOLD_MB` | Images 请求体内存缓存阈值，超过阈值会落盘临时文件(可选，默认 16) |
 | `UNI_ROUTER_IMAGES_BODY_MAX_MB` | Images 请求体最大大小限制，超过限制将拒绝请求(可选，默认 256) |
 | `UNI_ROUTER_IMAGES_BODY_TMP_DIR` | Images 请求体临时文件目录(可选，默认 `./cache`) |
