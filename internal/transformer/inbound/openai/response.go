@@ -879,6 +879,7 @@ type ResponsesTextFormat struct {
 
 type ResponsesReasoning struct {
 	Effort    string `json:"effort,omitempty"`
+	Context   string `json:"context,omitempty"`
 	MaxTokens *int64 `json:"max_tokens,omitempty"`
 }
 
@@ -963,6 +964,9 @@ func convertToInternalRequest(req *ResponsesRequest) (*model.InternalLLMRequest,
 	if req.Reasoning != nil {
 		if req.Reasoning.Effort != "" {
 			chatReq.ReasoningEffort = req.Reasoning.Effort
+		}
+		if req.Reasoning.Context != "" {
+			chatReq.ReasoningContext = req.Reasoning.Context
 		}
 		if req.Reasoning.MaxTokens != nil {
 			chatReq.ReasoningBudget = req.Reasoning.MaxTokens
