@@ -73,3 +73,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: 修复 Responses Lite 跨协议 Header 泄露
+
+**Date**: 2026-07-21
+**Task**: 修复 Responses Lite 跨协议 Header 泄露
+**Branch**: `main`
+
+### Summary
+
+确认 Key 继承 OpenAI Chat 导致 Responses Lite 请求走跨协议转换；用户将 Key 覆盖为 OpenAI Response 后复测成功。代码侧过滤非 Responses 出站的 Lite 专用 Header，补充 Chat/NewAPI 完整转发回归并更新后端规范。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6d4d12e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
